@@ -38,13 +38,25 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
         console.error("Error al obtener objetivos:", goalErr);
       }
 
-      // Default goal si aún no tiene
-      const goal = goalData || {
-        calories: 2000,
-        protein_g: 140,
-        carbs_g: 220,
-        fat_g: 65,
+      // Default goal o meta base
+      let goal = goalData || {
+        calories: 2175,
+        protein_g: 155,
+        carbs_g: 245,
+        fat_g: 60,
       };
+
+      // Ciclado de carbohidratos en el Plan Maestro: Domingo día de fútbol y recarga
+      const isSunday = selectedDate.getDay() === 0;
+      if (isSunday && (user?.email === "barvaro0411@gmail.com" || goal.calories === 2175)) {
+        goal = {
+          ...goal,
+          calories: 2550,
+          protein_g: 150,
+          carbs_g: 360,
+          fat_g: 58,
+        };
+      }
 
       // 2. Obtener comidas registradas en el día con sus ítems
       const { data: mealsData, error: mealsErr } = await supabase

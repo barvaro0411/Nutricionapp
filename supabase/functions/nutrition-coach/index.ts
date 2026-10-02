@@ -129,10 +129,29 @@ serve(async (req: Request) => {
     const historyReversed = (recentMessages || []).reverse();
 
     // 3. Prompt de sistema contextual
+    const masterPlanContext = user.email === "barvaro0411@gmail.com" ? `
+### PLAN MAESTRO DE TRANSFORMACIÓN ACTIVO (ÁLVARO ACOSTA):
+- Composición corporal InBody: Estatura 173 cm, Peso actual 70.6 kg, 14.4% de grasa corporal (10.2 kg), 34.3 kg MME (masa muscular esquelética), Tasa Metabólica Basal (TMB): 1675 kcal/día.
+- Meta de transformación: Bajar grasa corporal al rango 12-13% (~68.6 kg) preservando masa muscular, fuerza y rendimiento. Ritmo: 0.2 a 0.4 kg/semana.
+- Ciclado Nutricional:
+  * Lunes a Sábado: 2150-2200 kcal | 150-160g Proteína | 230-260g Carbohidratos | 55-65g Grasas.
+  * Domingo (Partido de Fútbol / Carga de Carbohidratos): 2500-2600 kcal | ~150g Proteína | 350-375g Carbohidratos | 55-60g Grasas.
+- Hidratación deportiva: 3.0 a 3.5 Litros de agua diarios (base 3.2 L).
+- Horarios y comidas tipo del plan:
+  * 07:00 Desayuno (~500 kcal, ~39g P): Avena 60g + whey 30g + plátano 100g + leche descremada 200ml.
+  * 10:30 Colación (~290 kcal, ~20g P): Yogurt alto en proteína + manzana/pera + almendras 15g.
+  * 13:45 Pre-Gym (~250 kcal): Pan blanco 60g + mermelada 20g + café (combustible rápido).
+  * 16:15 Post-Entreno / Almuerzo (~720 kcal, ~58g P): Pollo 170g + arroz cocido 220g + verduras 200g + aceite de oliva 10g.
+  * 20:30 Cena (~410 kcal, ~38g P): 2 huevos + atún 80g + pan integral 40g + palta 30g + ensalada.
+- Rutina semanal de entrenamiento: Lunes Torso + Bici, Martes Piernas + Bici, Miércoles Push + Bici, Jueves Pull + Bici (sin peso muerto), Viernes Hombros/brazos + Bici, Sábado Recuperación activa, Domingo Partido de Fútbol.
+- Suplementación: Creatina monohidratada (3-5g diarios), Proteína Whey (20-30g según necesidad), Cafeína (100-200mg pre-entreno), Omega-3, Electrolitos para el fútbol y calor.
+- RIR (Repeticiones en Reserva): RIR 1-2 en ejercicios básicos pesados, RIR 0-1 solo en aislados. Regla de doble progresión.
+` : "";
+
     const systemPrompt = `
 Eres el Coach Nutricional IA de una aplicación de nutrición en Chile.
 Tu rol es acompañar al usuario con empatía, base científica y soluciones prácticas aterrizadas a la realidad chilena (ferias libres, supermercados, picadas, once familiar).
-
+${masterPlanContext}
 ### CONTEXTO EN TIEMPO REAL DEL USUARIO HOY:
 - Nombre: ${profile?.full_name || "Usuario"}
 - Objetivo: ${profile?.objective || "Mantenimiento"}

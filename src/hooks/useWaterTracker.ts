@@ -38,9 +38,11 @@ export function useWaterTracker(selectedDate: Date = new Date()) {
 
       const totalMl = (data || []).reduce((acc, log) => acc + log.amount_ml, 0);
 
+      const targetMl = user?.email === "barvaro0411@gmail.com" ? 3200 : 2000;
+
       return {
         totalMl,
-        targetMl: 2000,
+        targetMl,
         logs: data || [],
       };
     },

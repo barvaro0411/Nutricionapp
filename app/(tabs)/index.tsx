@@ -18,6 +18,7 @@ import {
   Mic,
   Barcode,
   Star,
+  Target,
 } from "lucide-react-native";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useWaterTracker } from "@/hooks/useWaterTracker";
@@ -29,6 +30,7 @@ import { WaterCard } from "@/components/dashboard/WaterCard";
 import { ActivityModal } from "@/components/dashboard/ActivityModal";
 import { TextVoiceModal } from "@/components/meal/TextVoiceModal";
 import { FavoritesModal } from "@/components/meal/FavoritesModal";
+import { MasterPlanModal } from "@/components/dashboard/MasterPlanModal";
 import { OfflineBanner } from "@/components/common/OfflineBanner";
 import { colors } from "@/constants/colors";
 import { MealType } from "@/types/meal";
@@ -39,6 +41,7 @@ export default function DashboardScreen() {
   const [showTextVoiceModal, setShowTextVoiceModal] = useState(false);
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
+  const [showMasterPlanModal, setShowMasterPlanModal] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>("almuerzo");
 
   const { data, isLoading, isRefetching, refetch } = useDailyNutrition(selectedDate);
@@ -133,6 +136,29 @@ export default function DashboardScreen() {
             <ChevronRight size={16} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
+
+        {/* Banner Mi Plan Maestro */}
+        <TouchableOpacity
+          style={styles.masterPlanBanner}
+          onPress={() => setShowMasterPlanModal(true)}
+          activeOpacity={0.85}
+        >
+          <View style={styles.masterPlanBadge}>
+            <Target size={18} color="#FFFFFF" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={styles.masterPlanTitle}>Mi Plan Maestro</Text>
+              <View style={styles.masterPlanPill}>
+                <Text style={styles.masterPlanPillText}>Activo</Text>
+              </View>
+            </View>
+            <Text style={styles.masterPlanSubtitle}>
+              Recomposición 12-13% • Ciclado 2.175/2.550 kcal • Rutina Gym
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.primary} />
+        </TouchableOpacity>
 
         {/* Barra de atajos de registro rápido */}
         <View style={styles.quickActionsBar}>
@@ -267,6 +293,12 @@ export default function DashboardScreen() {
           await logActivity({ calories: cal, steps: st });
         }}
       />
+
+      {/* Modal de Mi Plan Maestro */}
+      <MasterPlanModal
+        visible={showMasterPlanModal}
+        onClose={() => setShowMasterPlanModal(false)}
+      />
     </>
   );
 }
@@ -383,6 +415,46 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     marginTop: 1,
+  },
+  masterPlanBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.card,
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    marginBottom: 14,
+    gap: 12,
+  },
+  masterPlanBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  masterPlanTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  masterPlanPill: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  masterPlanPillText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.primaryDark,
+  },
+  masterPlanSubtitle: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   quickActionsBar: {
     flexDirection: "row",
