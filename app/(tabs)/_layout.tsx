@@ -16,14 +16,14 @@ export default function TabLayout() {
           tabBarLabelStyle: {
             fontSize: 11,
             fontWeight: "600",
-            marginBottom: 2,
+            marginBottom: 4,
           },
           tabBarStyle: {
             backgroundColor: colors.card,
             borderTopColor: colors.cardBorder,
             borderTopWidth: 1,
-            height: 64,
-            paddingBottom: 6,
+            height: 68,
+            paddingBottom: 8,
             paddingTop: 6,
             elevation: 8,
             shadowColor: "#0F172A",
@@ -94,7 +94,7 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   floatingButtonContainer: {
     position: "absolute",
-    bottom: 78,
+    bottom: 80,
     right: 20,
     zIndex: 99,
   },

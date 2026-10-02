@@ -31,3 +31,4 @@ supabase/.branches/
 
 expo-env.d.ts
 # @end expo-cli
+.vercel
