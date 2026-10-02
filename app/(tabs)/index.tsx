@@ -154,7 +154,7 @@ export default function DashboardScreen() {
               </View>
             </View>
             <Text style={styles.masterPlanSubtitle}>
-              Recomposición 12-13% • Ciclado 2.175/2.550 kcal • Rutina Gym
+              Recomposición 12-13% • Ciclado 2.175/2.550 kcal • Rutina Semanal
             </Text>
           </View>
           <ChevronRight size={18} color={colors.primary} />

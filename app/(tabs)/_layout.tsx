@@ -14,17 +14,17 @@ export default function TabLayout() {
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textMuted,
           tabBarLabelStyle: {
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: "600",
-            marginTop: 2,
+            marginBottom: 2,
           },
           tabBarStyle: {
             backgroundColor: colors.card,
             borderTopColor: colors.cardBorder,
             borderTopWidth: 1,
-            height: 66,
-            paddingBottom: 10,
-            paddingTop: 8,
+            height: 64,
+            paddingBottom: 6,
+            paddingTop: 6,
             elevation: 8,
             shadowColor: "#0F172A",
             shadowOffset: { width: 0, height: -2 },
@@ -77,12 +77,12 @@ export default function TabLayout() {
         />
       </Tabs>
 
-      {/* Botón flotante central de captura de comida con IA */}
+      {/* Botón flotante de cámara inteligente IA posicionado ergonómicamente */}
       <View style={styles.floatingButtonContainer} pointerEvents="box-none">
         <TouchableOpacity
           style={styles.floatingButton}
           onPress={() => router.push("/meal/camera")}
-          activeOpacity={0.88}
+          activeOpacity={0.85}
         >
           <Camera size={26} color="#FFFFFF" strokeWidth={2.2} />
         </TouchableOpacity>
@@ -94,23 +94,23 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   floatingButtonContainer: {
     position: "absolute",
-    bottom: 22,
-    alignSelf: "center",
+    bottom: 78,
+    right: 20,
     zIndex: 99,
   },
   floatingButton: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 4,
+    borderWidth: 3,
     borderColor: "#FFFFFF",
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
-    shadowRadius: 12,
+    shadowRadius: 10,
     elevation: 8,
   },
 });
