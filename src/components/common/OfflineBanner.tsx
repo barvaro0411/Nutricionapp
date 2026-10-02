@@ -1,13 +1,32 @@
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
+import { WifiOff } from "lucide-react-native";
 import { useOfflineStore, checkConnectivity } from "@/services/offlineService";
-import { colors } from "@/constants/colors";
 
 export function OfflineBanner() {
   const { isOffline, setIsOffline, pendingSyncCount } = useOfflineStore();
 
   useEffect(() => {
-    // Intervalo suave de sondeo de conectividad
+    // En Web, escuchar directamente los eventos del navegador para máxima precisión y reactividad instantánea
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const handleOnline = () => setIsOffline(false);
+      const handleOffline = () => setIsOffline(true);
+
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+
+      // Verificación inicial con la API nativa de red del navegador
+      if (typeof navigator !== "undefined" && navigator.onLine !== undefined) {
+        setIsOffline(!navigator.onLine);
+      }
+
+      return () => {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      };
+    }
+
+    // Intervalo suave de sondeo de conectividad para nativo
     const check = async () => {
       const online = await checkConnectivity();
       setIsOffline(!online);
@@ -22,7 +41,7 @@ export function OfflineBanner() {
 
   return (
     <View style={styles.banner}>
-      <Text style={styles.icon}>📡</Text>
+      <WifiOff size={18} color="#92400E" />
       <View style={styles.textContainer}>
         <Text style={styles.title}>Modo Sin Conexión</Text>
         <Text style={styles.subtitle}>
@@ -46,9 +65,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  icon: {
-    fontSize: 18,
-  },
   textContainer: {
     flex: 1,
   },
@@ -63,3 +79,4 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 });
+

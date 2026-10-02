@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { Platform } from "react-native";
 
 interface OfflineState {
   isOffline: boolean;
@@ -23,9 +24,31 @@ export const useOfflineStore = create<OfflineState>((set) => ({
 }));
 
 /**
- * Verifica la conectividad básica realizando un HEAD request liviano
+ * Verifica la conectividad de forma segura tanto en Web/PWA como en móvil
  */
 export async function checkConnectivity(): Promise<boolean> {
+  // En Web / PWA, usamos la API nativa del navegador y verificamos origen propio para evitar bloqueos por CORS
+  if (Platform.OS === "web" || typeof window !== "undefined") {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return false;
+    }
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch("/favicon.ico", {
+        method: "HEAD",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return res.ok;
+    } catch {
+      // Fallback a navigator.onLine si fetch local falla
+      return typeof navigator !== "undefined" ? navigator.onLine : true;
+    }
+  }
+
+  // En móvil nativo
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3500);
@@ -40,3 +63,4 @@ export async function checkConnectivity(): Promise<boolean> {
     return false;
   }
 }
+
