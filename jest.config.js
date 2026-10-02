@@ -1,0 +1,10 @@
+module.exports = {
+  testEnvironment: "node",
+  transform: {
+    "^.+\\.(ts|tsx|js|jsx)$": "babel-jest",
+  },
+  moduleNameMapper: {
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^npm:zod@3.24.1$": "zod",
+  },
+};

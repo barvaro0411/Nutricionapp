@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "NutricionApp",
+    "slug": "nutricionapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "nutricionapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#10B981"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.nutricionapp.chile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#10B981"
+      },
+      "package": "com.nutricionapp.chile"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "Nutrición IA Chile",
+      "shortName": "Nutrición IA",
+      "description": "Seguimiento nutricional con IA para Chile",
+      "themeColor": "#10B981",
+      "backgroundColor": "#FFFFFF",
+      "display": "standalone",
+      "orientation": "portrait",
+      "lang": "es-CL"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "La app necesita acceso a tus fotos para analizar los alimentos de tu comida.",
+          "cameraPermission": "La app necesita acceso a tu cámara para tomar fotos de tus platos de comida."
+        }
+      ],
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
