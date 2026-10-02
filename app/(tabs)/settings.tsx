@@ -9,6 +9,7 @@ import {
   Switch,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Crown, FileText, Target, ChevronRight, LogOut } from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import {
@@ -93,7 +94,10 @@ export default function SettingsScreen() {
         activeOpacity={0.8}
       >
         <View style={styles.proCardLeft}>
-          <Text style={styles.proBadge}>💎 {isPro ? "NUTRICIÓN PRO ACTIVO" : "PLAN GRATUITO"}</Text>
+          <View style={styles.proBadgeRow}>
+            <Crown size={14} color="#F59E0B" />
+            <Text style={styles.proBadge}>{isPro ? "NUTRICIÓN PRO ACTIVO" : "PLAN GRATUITO"}</Text>
+          </View>
           <Text style={styles.proTitle}>
             {isPro ? "Suscripción Premium Activa" : "Desbloquea Nutrición Pro"}
           </Text>
@@ -103,7 +107,7 @@ export default function SettingsScreen() {
               : `Cupo de fotos hoy: ${remainingAiScans} restantes. Pasa a Pro por $4.990 CLP.`}
           </Text>
         </View>
-        <Text style={styles.chevronPro}>›</Text>
+        <ChevronRight size={22} color="#94A3B8" />
       </TouchableOpacity>
 
       {/* Informes Clínicos para Nutricionistas */}
@@ -113,14 +117,16 @@ export default function SettingsScreen() {
           style={styles.actionRow}
           onPress={() => router.push("/export")}
         >
-          <Text style={styles.actionIcon}>📄</Text>
+          <View style={styles.actionIconBadge}>
+            <FileText size={20} color={colors.primary} />
+          </View>
           <View style={styles.actionTextWrapper}>
             <Text style={styles.actionTitle}>Exportar Informe para Nutricionista</Text>
             <Text style={styles.actionSubtitle}>
               Genera tu resumen semanal o mensual para WhatsApp o planilla Excel
             </Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          <ChevronRight size={20} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -185,19 +191,22 @@ export default function SettingsScreen() {
       <Text style={styles.sectionHeader}>Preferencias</Text>
       <View style={styles.actionsCard}>
         <TouchableOpacity style={styles.actionRow} onPress={handleRecalculateGoals}>
-          <Text style={styles.actionIcon}>🎯</Text>
+          <View style={[styles.actionIconBadge, { backgroundColor: "#FEF3C7" }]}>
+            <Target size={20} color="#D97706" />
+          </View>
           <View style={styles.actionTextWrapper}>
             <Text style={styles.actionTitle}>Recalcular Objetivos</Text>
             <Text style={styles.actionSubtitle}>
               Actualiza tu peso o cambia tu meta de calorías y macros
             </Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          <ChevronRight size={20} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
 
       {/* Cerrar Sesión */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut} activeOpacity={0.8}>
+        <LogOut size={18} color={colors.danger} style={{ marginRight: 8 }} />
         <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
       </TouchableOpacity>
 
@@ -268,12 +277,17 @@ const styles = StyleSheet.create({
   proCardLeft: {
     flex: 1,
   },
+  proBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
   proBadge: {
     fontSize: 10,
     fontWeight: "800",
     color: colors.primaryAccent,
     letterSpacing: 1,
-    marginBottom: 6,
   },
   proTitle: {
     fontSize: 17,
@@ -286,12 +300,6 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     marginTop: 4,
     lineHeight: 16,
-  },
-  chevronPro: {
-    fontSize: 22,
-    color: "#94A3B8",
-    fontWeight: "600",
-    marginLeft: 8,
   },
   sectionHeader: {
     fontSize: 13,
@@ -348,8 +356,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 16,
   },
-  actionIcon: {
-    fontSize: 22,
+  actionIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.primaryLight,
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 14,
   },
   actionTextWrapper: {
@@ -366,15 +379,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
-  chevron: {
-    fontSize: 22,
-    color: colors.textMuted,
-    fontWeight: "600",
-  },
   logoutButton: {
     backgroundColor: colors.card,
     borderRadius: 16,
     paddingVertical: 16,
+    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.danger,

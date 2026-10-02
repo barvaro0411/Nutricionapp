@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { MailCheck } from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
 import { colors } from "@/constants/colors";
 
@@ -72,7 +73,7 @@ export default function RegisterScreen() {
           {needsConfirmation ? (
             <View style={styles.confirmationContent}>
               <View style={styles.confirmationIconBadge}>
-                <Text style={styles.confirmationEmoji}>✉️</Text>
+                <MailCheck size={32} color={colors.primary} strokeWidth={2.2} />
               </View>
               <Text style={styles.confirmationTitle}>¡Revisa tu correo!</Text>
               <Text style={styles.confirmationText}>

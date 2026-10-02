@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Flame } from "lucide-react-native";
 import { colors } from "@/constants/colors";
 
 interface CalorieHeroProps {
@@ -33,7 +34,7 @@ export function CalorieHero({
             onPress={onExercisePress}
             activeOpacity={0.8}
           >
-            <View style={styles.flameDot} />
+            <Flame size={13} color="#F59E0B" fill="#F59E0B" />
             <Text style={styles.exerciseBadgeText}>+{burnedCalories} kcal activas</Text>
           </TouchableOpacity>
         )}

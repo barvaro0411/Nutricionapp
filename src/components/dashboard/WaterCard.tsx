@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { Droplets } from "lucide-react-native";
 import { colors } from "@/constants/colors";
 
 interface WaterCardProps {
@@ -16,12 +17,15 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
-        <div>
-          <Text style={styles.overline}>HIDRATACIÓN</Text>
+        <View>
+          <View style={styles.titleRow}>
+            <Droplets size={14} color={colors.water} />
+            <Text style={styles.overline}>HIDRATACIÓN</Text>
+          </View>
           <Text style={styles.valueText}>
             {totalMl.toLocaleString("es-CL")} <Text style={styles.targetText}>/ {targetMl.toLocaleString("es-CL")} ml</Text>
           </Text>
-        </div>
+        </View>
         <View style={styles.pctBadge}>
           <Text style={styles.pctText}>{progressPct}%</Text>
         </View>
@@ -78,12 +82,17 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 14,
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
   overline: {
     fontSize: 11,
     fontWeight: "700",
     color: colors.textSecondary,
     letterSpacing: 1,
-    marginBottom: 4,
   },
   valueText: {
     fontSize: 20,

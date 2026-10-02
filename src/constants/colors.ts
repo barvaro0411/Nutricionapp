@@ -1,17 +1,17 @@
 export const colors = {
-  // Acentos de Marca (Minimalista & Pro)
-  primary: "#0F172A", // Obsidian / Slate 900 (Elegante y sobrio)
-  primaryAccent: "#059669", // Esmeralda botánico de alta gama
-  primaryDark: "#022C22",
-  primaryLight: "#ECFDF5",
-  primaryGhost: "#F8FAFC",
+  // Acentos de Marca (Saludable, Fresco y Enérgico estilo Lifesum / Apple Health)
+  primary: "#10B981", // Esmeralda vibrante
+  primaryAccent: "#059669", // Esmeralda profundo
+  primaryDark: "#047857",
+  primaryLight: "#ECFDF5", // Menta suave para fondos e iconos activos
+  primaryGhost: "#F0FDF4",
 
-  // Macronutrientes (Colores científicos y refinados)
-  protein: "#4F46E5", // Indigo 600
+  // Macronutrientes (Colores nítidos y modernos)
+  protein: "#6366F1", // Indigo
   proteinLight: "#EEF2FF",
-  carbs: "#D97706", // Amber 600
+  carbs: "#F59E0B", // Ámbar / Naranja
   carbsLight: "#FFFBEB",
-  fat: "#0284C7", // Sky 600
+  fat: "#0EA5E9", // Celeste / Sky
   fatLight: "#F0F9FF",
 
   // Hidratación
@@ -20,23 +20,23 @@ export const colors = {
   waterTrack: "#E0F2FE",
 
   // Superficies y Fondos
-  background: "#FAFAFA", // Off-white premium
+  background: "#F8FAFC", // Fondo claro y pulcro
   card: "#FFFFFF",
-  cardBorder: "#F1F5F9", // Borde ultra fino
-  cardBorderHover: "#E2E8F0",
-  surfaceMuted: "#F4F4F5", // Zinc 100
+  cardBorder: "#E2E8F0", // Borde sutil y limpio
+  cardBorderHover: "#CBD5E1",
+  surfaceMuted: "#F1F5F9",
 
   // Tipografía
-  text: "#09090B", // Zinc 950 (Alto contraste, nítido)
-  textSecondary: "#71717A", // Zinc 500
-  textMuted: "#A1A1AA", // Zinc 400
+  text: "#0F172A", // Pizarra oscuro de alta legibilidad
+  textSecondary: "#64748B",
+  textMuted: "#94A3B8",
 
   // Estados
-  danger: "#E11D48", // Rose 600
-  dangerLight: "#FFE4E6",
-  warning: "#D97706",
+  danger: "#EF4444", // Rojo vibrante
+  dangerLight: "#FEE2E2",
+  warning: "#F59E0B",
   warningLight: "#FEF3C7",
-  success: "#059669",
+  success: "#10B981",
   successLight: "#ECFDF5",
 
   dark: {

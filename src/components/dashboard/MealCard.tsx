@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   calPill: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 14,
@@ -132,18 +132,18 @@ const styles = StyleSheet.create({
   calText: {
     fontSize: 13,
     fontWeight: "700",
-    color: colors.text,
+    color: colors.primaryDark,
   },
   addBtn: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 14,
   },
   addBtnText: {
     fontSize: 12,
-    fontWeight: "600",
-    color: colors.text,
+    fontWeight: "700",
+    color: colors.primaryDark,
   },
   itemsList: {
     marginTop: 14,
@@ -189,8 +189,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   addMoreText: {
-    fontSize: 12,
-    color: colors.primaryAccent,
-    fontWeight: "600",
+    fontSize: 13,
+    color: colors.primaryDark,
+    fontWeight: "700",
   },
 });

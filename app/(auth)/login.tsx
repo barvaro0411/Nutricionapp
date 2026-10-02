@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { Salad } from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
 import { colors } from "@/constants/colors";
 
@@ -43,7 +44,7 @@ export default function LoginScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoBadge}>
-            <Text style={styles.logoEmoji}>🥗</Text>
+            <Salad size={32} color={colors.primary} strokeWidth={2.2} />
           </View>
           <Text style={styles.title}>Nutrición IA</Text>
           <Text style={styles.subtitle}>Tu comida chilena analizada en segundos</Text>

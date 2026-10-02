@@ -9,6 +9,16 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  ChefHat,
+  Camera,
+  Mic,
+  Barcode,
+  Star,
+} from "lucide-react-native";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useWaterTracker } from "@/hooks/useWaterTracker";
 import { useActivitySync } from "@/hooks/useActivitySync";
@@ -76,7 +86,7 @@ export default function DashboardScreen() {
         {/* Navegador de Fecha */}
         <View style={styles.dateSelector}>
           <TouchableOpacity style={styles.dateArrow} onPress={() => changeDay(-1)}>
-            <Text style={styles.dateArrowText}>‹</Text>
+            <ChevronLeft size={18} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.dateCenter}>
             <Text style={styles.dateTitle}>{isToday ? "Hoy" : formattedDate}</Text>
@@ -87,7 +97,7 @@ export default function DashboardScreen() {
             onPress={() => !isToday && changeDay(1)}
             disabled={isToday}
           >
-            <Text style={[styles.dateArrowText, isToday && styles.dateArrowTextDisabled]}>›</Text>
+            <ChevronRight size={18} color={isToday ? colors.textMuted : colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -98,12 +108,14 @@ export default function DashboardScreen() {
             onPress={() => router.push("/coach")}
             activeOpacity={0.85}
           >
-            <Text style={styles.coachBannerIcon}>🤖</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.coachBannerTitle}>Coach Nutricional IA</Text>
-              <Text style={styles.coachBannerDesc}>¿Qué comer hoy según tus metas?</Text>
+            <View style={styles.bannerIconBadge}>
+              <Sparkles size={18} color={colors.primary} />
             </View>
-            <Text style={styles.coachBannerAction}>Chatear ›</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.coachBannerTitle}>Coach IA</Text>
+              <Text style={styles.coachBannerDesc}>¿Qué comer hoy?</Text>
+            </View>
+            <ChevronRight size={16} color={colors.textMuted} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -111,12 +123,14 @@ export default function DashboardScreen() {
             onPress={() => router.push("/recipes")}
             activeOpacity={0.85}
           >
-            <Text style={styles.coachBannerIcon}>📖</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.recipesBannerTitle}>Recetas Chilenas</Text>
-              <Text style={styles.recipesBannerDesc}>Opciones altas en proteína</Text>
+            <View style={[styles.bannerIconBadge, { backgroundColor: "#FEF3C7" }]}>
+              <ChefHat size={18} color="#D97706" />
             </View>
-            <Text style={styles.recipesBannerAction}>Ver ›</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.recipesBannerTitle}>Recetas</Text>
+              <Text style={styles.recipesBannerDesc}>Chilenas fitness</Text>
+            </View>
+            <ChevronRight size={16} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
 
@@ -125,32 +139,44 @@ export default function DashboardScreen() {
           <TouchableOpacity
             style={styles.quickActionBtn}
             onPress={() => router.push("/meal/camera")}
+            activeOpacity={0.8}
           >
-            <Text style={styles.quickActionIcon}>📸</Text>
+            <View style={[styles.quickActionIconWrap, { backgroundColor: colors.primaryLight }]}>
+              <Camera size={18} color={colors.primary} />
+            </View>
             <Text style={styles.quickActionText}>Foto IA</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.quickActionBtn}
             onPress={() => setShowTextVoiceModal(true)}
+            activeOpacity={0.8}
           >
-            <Text style={styles.quickActionIcon}>🎙️</Text>
+            <View style={[styles.quickActionIconWrap, { backgroundColor: "#EEF2FF" }]}>
+              <Mic size={18} color="#6366F1" />
+            </View>
             <Text style={styles.quickActionText}>Texto/Voz</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.quickActionBtn}
             onPress={() => router.push("/meal/barcode")}
+            activeOpacity={0.8}
           >
-            <Text style={styles.quickActionIcon}>📦</Text>
+            <View style={[styles.quickActionIconWrap, { backgroundColor: "#F0F9FF" }]}>
+              <Barcode size={18} color="#0EA5E9" />
+            </View>
             <Text style={styles.quickActionText}>Código</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.quickActionBtn}
             onPress={() => setShowFavoritesModal(true)}
+            activeOpacity={0.8}
           >
-            <Text style={styles.quickActionIcon}>⭐</Text>
+            <View style={[styles.quickActionIconWrap, { backgroundColor: "#FEF3C7" }]}>
+              <Star size={18} color="#F59E0B" />
+            </View>
             <Text style={styles.quickActionText}>Frecuentes</Text>
           </TouchableOpacity>
         </View>
@@ -312,13 +338,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.card,
-    padding: 14,
+    padding: 12,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
-  coachBannerIcon: {
-    fontSize: 18,
+  bannerIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: colors.primaryLight,
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 10,
   },
   coachBannerTitle: {
@@ -332,18 +363,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 1,
   },
-  coachBannerAction: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.textMuted,
-    marginLeft: 4,
-  },
   recipesBanner: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.card,
-    padding: 14,
+    padding: 12,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.cardBorder,
@@ -359,12 +384,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 1,
   },
-  recipesBannerAction: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.textMuted,
-    marginLeft: 4,
-  },
   quickActionsBar: {
     flexDirection: "row",
     gap: 8,
@@ -374,14 +393,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.card,
     borderRadius: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
-  quickActionIcon: {
-    fontSize: 18,
-    marginBottom: 4,
+  quickActionIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 6,
   },
   quickActionText: {
     fontSize: 11,

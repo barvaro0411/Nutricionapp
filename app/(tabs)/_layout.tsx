@@ -1,6 +1,7 @@
 import React from "react";
 import { Tabs, useRouter } from "expo-router";
-import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { LayoutDashboard, CalendarDays, Settings, Camera } from "lucide-react-native";
 import { colors } from "@/constants/colors";
 
 export default function TabLayout() {
@@ -12,18 +13,34 @@ export default function TabLayout() {
         screenOptions={{
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textMuted,
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: "600",
+            marginTop: 2,
+          },
           tabBarStyle: {
             backgroundColor: colors.card,
             borderTopColor: colors.cardBorder,
-            height: 64,
+            borderTopWidth: 1,
+            height: 66,
             paddingBottom: 10,
             paddingTop: 8,
+            elevation: 8,
+            shadowColor: "#0F172A",
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 8,
           },
           headerStyle: {
             backgroundColor: colors.card,
+            elevation: 0,
+            shadowOpacity: 0,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.cardBorder,
           },
           headerTitleStyle: {
             fontWeight: "700",
+            fontSize: 18,
             color: colors.text,
           },
         }}
@@ -33,7 +50,9 @@ export default function TabLayout() {
           options={{
             title: "Hoy",
             headerTitle: "Nutrición Hoy",
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>📊</Text>,
+            tabBarIcon: ({ color, focused }) => (
+              <LayoutDashboard size={22} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+            ),
           }}
         />
         <Tabs.Screen
@@ -41,7 +60,9 @@ export default function TabLayout() {
           options={{
             title: "Historial",
             headerTitle: "Historial y Semanal",
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>📅</Text>,
+            tabBarIcon: ({ color, focused }) => (
+              <CalendarDays size={22} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+            ),
           }}
         />
         <Tabs.Screen
@@ -49,7 +70,9 @@ export default function TabLayout() {
           options={{
             title: "Ajustes",
             headerTitle: "Mi Perfil y Metas",
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>⚙️</Text>,
+            tabBarIcon: ({ color, focused }) => (
+              <Settings size={22} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+            ),
           }}
         />
       </Tabs>
@@ -59,9 +82,9 @@ export default function TabLayout() {
         <TouchableOpacity
           style={styles.floatingButton}
           onPress={() => router.push("/meal/camera")}
-          activeOpacity={0.85}
+          activeOpacity={0.88}
         >
-          <Text style={styles.floatingButtonIcon}>📸</Text>
+          <Camera size={26} color="#FFFFFF" strokeWidth={2.2} />
         </TouchableOpacity>
       </View>
     </>
@@ -71,24 +94,23 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   floatingButtonContainer: {
     position: "absolute",
-    bottom: 20,
+    bottom: 22,
     alignSelf: "center",
     zIndex: 99,
   },
   floatingButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  floatingButtonIcon: {
-    fontSize: 22,
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
 });
