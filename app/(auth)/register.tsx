@@ -186,6 +186,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
+    width: "100%", maxWidth: 520, alignSelf: "center",
     flexGrow: 1,
     justifyContent: "center",
     padding: 24,

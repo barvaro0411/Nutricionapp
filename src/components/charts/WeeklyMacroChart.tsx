@@ -18,7 +18,7 @@ export function WeeklyMacroChart({ days, targetCalories }: WeeklyMacroChartProps
   return (
     <View style={styles.container}>
       <View style={styles.chartArea}>
-        {days.map((day, idx) => {
+        {days.map((day) => {
           const heightPct = Math.min(100, Math.round((day.calories / maxCalories) * 100));
           const isOver = day.calories > targetCalories;
           const isZero = day.calories === 0;

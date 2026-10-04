@@ -1,24 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/services/supabase";
+import { getDateKey, getDayRange, loggedAtForDate } from "@/utils/dates";
+import { usePersonalPlan } from "@/hooks/usePersonalPlan";
 import { useAuthStore } from "@/stores/useAuthStore";
 
 export function useWaterTracker(selectedDate: Date = new Date()) {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const startOfDay = new Date(selectedDate);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(selectedDate);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  const year = selectedDate.getFullYear();
-  const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
-  const day = String(selectedDate.getDate()).padStart(2, "0");
-  const dateKey = `${year}-${month}-${day}`;
-
+  const { data: plan } = usePersonalPlan();
+  const { start, end } = getDayRange(selectedDate);
+  const dateKey = getDateKey(selectedDate);
   const waterQuery = useQuery({
-    queryKey: ["waterLogs", user?.id, dateKey],
+    queryKey: ["waterLogs", user?.id, dateKey, plan?.dailyGoals.waterMl],
     enabled: !!user?.id,
     queryFn: async () => {
       if (!user) return { totalMl: 0, targetMl: 2000, logs: [] };
@@ -27,19 +21,13 @@ export function useWaterTracker(selectedDate: Date = new Date()) {
         .from("water_logs")
         .select("*")
         .eq("user_id", user.id)
-        .gte("logged_at", startOfDay.toISOString())
-        .lte("logged_at", endOfDay.toISOString())
+        .gte("logged_at", start)
+        .lt("logged_at", end)
         .order("logged_at", { ascending: false });
 
-      if (error) {
-        console.error("Error al obtener water_logs:", error);
-        return { totalMl: 0, targetMl: 2000, logs: [] };
-      }
-
+      if (error) throw new Error("No se pudo cargar el agua registrada.");
       const totalMl = (data || []).reduce((acc, log) => acc + log.amount_ml, 0);
-
-      const targetMl = user?.email === "barvaro0411@gmail.com" ? 3200 : 2000;
-
+      const targetMl = plan?.dailyGoals.waterMl ?? 2000;
       return {
         totalMl,
         targetMl,
@@ -52,12 +40,13 @@ export function useWaterTracker(selectedDate: Date = new Date()) {
     mutationFn: async (amountMl: number) => {
       if (!user) throw new Error("No hay usuario autenticado");
 
+      if (!Number.isInteger(amountMl) || amountMl <= 0 || amountMl > 5000) throw new Error("Cantidad de agua inválida.");
       const { data, error } = await supabase
         .from("water_logs")
         .insert({
           user_id: user.id,
           amount_ml: amountMl,
-          logged_at: new Date().toISOString(),
+          logged_at: loggedAtForDate(selectedDate),
         })
         .select()
         .single();
@@ -75,6 +64,7 @@ export function useWaterTracker(selectedDate: Date = new Date()) {
     targetMl: waterQuery.data?.targetMl || 2000,
     logs: waterQuery.data?.logs || [],
     isLoading: waterQuery.isLoading,
+    error: waterQuery.error,
     addWater: addWaterMutation.mutateAsync,
     isAdding: addWaterMutation.isPending,
   };

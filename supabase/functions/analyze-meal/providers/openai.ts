@@ -1,3 +1,4 @@
+import { ApiError } from "../../_shared/http.ts";
 import { AIStructuredOutputSchema } from "../types.ts";
 import { VisionProvider, VisionProviderResult } from "./provider.interface.ts";
 
@@ -55,6 +56,9 @@ export class OpenAIVisionProvider implements VisionProvider {
       ],
     };
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+    try {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -62,11 +66,11 @@ export class OpenAIVisionProvider implements VisionProvider {
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify(requestBody),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Error en API OpenAI (${response.status}): ${errText}`);
+      throw new ApiError(502, "AI_PROVIDER_ERROR", "El proveedor alternativo no pudo procesar la imagen.");
     }
 
     const result = await response.json();
@@ -85,5 +89,6 @@ export class OpenAIVisionProvider implements VisionProvider {
       tokensCompletion: result.usage?.completion_tokens,
       providerName: this.name,
     };
+    } finally { clearTimeout(timeout); }
   }
 }

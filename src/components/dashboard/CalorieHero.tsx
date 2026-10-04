@@ -14,7 +14,6 @@ interface CalorieHeroProps {
 export function CalorieHero({
   goal,
   consumed,
-  remaining,
   burnedCalories = 0,
   onExercisePress,
 }: CalorieHeroProps) {

@@ -10,13 +10,12 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { Link } from "expo-router";
 import { Salad } from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
 import { colors } from "@/constants/colors";
 
 export default function LoginScreen() {
-  const router = useRouter();
   const { signInWithEmail, loading } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -125,6 +124,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
+    width: "100%", maxWidth: 520, alignSelf: "center",
     flexGrow: 1,
     justifyContent: "center",
     padding: 24,

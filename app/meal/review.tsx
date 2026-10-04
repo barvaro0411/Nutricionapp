@@ -1,3 +1,4 @@
+import { showAlert } from "@/utils/alerts";
 import React, { useState } from "react";
 import {
   View,
@@ -8,7 +9,6 @@ import {
   Image,
   TextInput,
   ActivityIndicator,
-  Alert,
   Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -18,9 +18,11 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useFavoriteMeals } from "@/hooks/useFavoriteMeals";
 import { saveMealToDatabase } from "@/services/mealService";
 import { VariantModal } from "@/components/meal/VariantModal";
-import { findFamilyForFood, FoodVariant } from "@/constants/chileanPresets";
+import { findFamilyForFood } from "@/constants/chileanPresets";
 import { colors } from "@/constants/colors";
 import { MealType } from "@/types/meal";
+import { DetectedFoodItemSchema } from "@/types/meal";
+import { parseDecimal } from "@/utils/dates";
 
 export default function MealReviewScreen() {
   const router = useRouter();
@@ -34,6 +36,8 @@ export default function MealReviewScreen() {
     localImageUri,
     imagePath,
     userNotes,
+    loggedAt,
+    clientRequestId,
     setMealType,
     updateItemGrams,
     adjustItemGramsDelta,
@@ -60,7 +64,7 @@ export default function MealReviewScreen() {
 
   const handleSaveFavorite = async () => {
     if (!favTitle.trim()) {
-      Alert.alert("Título requerido", "Ingresa un nombre para tu comida frecuente (ej: Mi desayuno habitual)");
+      showAlert("Título requerido", "Ingresa un nombre para tu comida frecuente (ej: Mi desayuno habitual)");
       return;
     }
     try {
@@ -71,20 +75,20 @@ export default function MealReviewScreen() {
         totals,
       });
       setShowFavModal(false);
-      Alert.alert("¡Guardada!", "Esta comida ahora está disponible en tus Comidas Frecuentes para registrarla con 1 toque.");
+      showAlert("¡Guardada!", "Esta comida ahora está disponible en tus Comidas Frecuentes para registrarla con 1 toque.");
     } catch (err: any) {
-      Alert.alert("Error", err?.message || "No se pudo guardar como favorita");
+      showAlert("Error", err?.message || "No se pudo guardar como favorita");
     }
   };
 
   const handleConfirmMeal = async () => {
     if (!user) {
-      Alert.alert("Error", "No se detectó sesión de usuario.");
+      showAlert("Error", "No se detectó sesión de usuario.");
       return;
     }
 
     if (items.length === 0) {
-      Alert.alert("Aviso", "Debes tener al menos un alimento en la lista.");
+      showAlert("Aviso", "Debes tener al menos un alimento en la lista.");
       return;
     }
 
@@ -97,6 +101,8 @@ export default function MealReviewScreen() {
         items,
         totals,
         notes: userNotes,
+        loggedAt: loggedAt ? new Date(loggedAt) : undefined,
+        clientRequestId,
       });
 
       // Invalidar queries de TanStack para refrescar Dashboard e Historial de inmediato
@@ -106,7 +112,7 @@ export default function MealReviewScreen() {
       reset();
       router.replace("/(tabs)");
     } catch (err: any) {
-      Alert.alert("Error al guardar", err?.message || "Ocurrió un error al persistir la comida.");
+      showAlert("Error al guardar", err?.message || "Ocurrió un error al persistir la comida.");
     } finally {
       setSaving(false);
     }
@@ -114,11 +120,15 @@ export default function MealReviewScreen() {
 
   const handleAddNewItem = () => {
     if (!newFoodName.trim()) return;
-    const grams = parseFloat(newFoodGrams) || 100;
-    const calories = parseFloat(newFoodCals) || 0;
-    const protein = parseFloat(newFoodProt) || 0;
-    const carbs = parseFloat(newFoodCarbs) || 0;
-    const fat = parseFloat(newFoodFat) || 0;
+    const grams = parseDecimal(newFoodGrams);
+    const calories = parseDecimal(newFoodCals);
+    const protein = parseDecimal(newFoodProt);
+    const carbs = parseDecimal(newFoodCarbs);
+    const fat = parseDecimal(newFoodFat);
+    if (!DetectedFoodItemSchema.safeParse({ food: newFoodName.trim(), grams, calories, protein, carbs, fat }).success) {
+      showAlert("Datos inválidos", "Ingresa cantidades y nutrientes válidos, sin números negativos.");
+      return;
+    }
 
     addItem({
       food: newFoodName.trim(),
@@ -250,6 +260,31 @@ export default function MealReviewScreen() {
           </View>
         )}
 
+        {/* Estado vacío cuando no hay alimentos detectados */}
+        {items.length === 0 && !showAddModal && (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>🍽️</Text>
+            <Text style={styles.emptyTitle}>Bandeja de comida vacía</Text>
+            <Text style={styles.emptyDescription}>
+              Esta pantalla es para revisar y confirmar los alimentos detectados por la IA después de tomar una foto o ingresar una comida.
+            </Text>
+            <View style={styles.emptyButtonsContainer}>
+              <TouchableOpacity
+                style={styles.emptyPrimaryBtn}
+                onPress={() => router.replace("/(tabs)")}
+              >
+                <Text style={styles.emptyPrimaryBtnText}>🏠 Ir al Panel Principal (Dashboard)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.emptySecondaryBtn}
+                onPress={() => router.push("/meal/camera")}
+              >
+                <Text style={styles.emptySecondaryBtnText}>📸 Escanear Comida con Foto</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Lista de alimentos interactiva */}
         {items.map((item, index) => {
           const hasVariants = !!findFamilyForFood(item.food);
@@ -299,7 +334,7 @@ export default function MealReviewScreen() {
                     style={styles.gramsInput}
                     keyboardType="numeric"
                     value={String(Math.round(item.grams))}
-                    onChangeText={(val) => updateItemGrams(index, parseFloat(val) || 0)}
+                    onChangeText={(val) => updateItemGrams(index, parseDecimal(val))}
                   />
                   <Text style={styles.gramsUnit}>g</Text>
                 </View>
@@ -813,5 +848,64 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 14,
+  },
+  emptyContainer: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    marginTop: 12,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    borderStyle: "dashed",
+  },
+  emptyIcon: {
+    fontSize: 44,
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.text,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  emptyDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 20,
+    maxWidth: 320,
+  },
+  emptyButtonsContainer: {
+    width: "100%",
+    gap: 10,
+  },
+  emptyPrimaryBtn: {
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    width: "100%",
+  },
+  emptyPrimaryBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  emptySecondaryBtn: {
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    width: "100%",
+  },
+  emptySecondaryBtnText: {
+    color: colors.primaryDark,
+    fontWeight: "700",
+    fontSize: 15,
   },
 });

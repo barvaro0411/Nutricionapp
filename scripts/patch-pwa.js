@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const distPath = path.resolve(__dirname, '..', 'dist');
 const indexPath = path.join(distPath, 'index.html');
@@ -41,3 +42,17 @@ if (!html.includes('rel="manifest"')) {
 } else {
   console.log('ℹ️ PWA manifest tag already present in dist/index.html');
 }
+const assetPaths = [];
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full);
+    else if (entry.name !== 'sw.js' && !entry.name.endsWith('.map')) assetPaths.push('/' + path.relative(distPath, full).split(path.sep).join('/'));
+  }
+}
+walk(distPath);
+const version = crypto.createHash('sha256').update(fs.readFileSync(indexPath)).update(assetPaths.join('|')).digest('hex').slice(0,12);
+const worker = fs.readFileSync(path.join(__dirname, '..', 'public', 'sw.js'), 'utf8')
+  .replace('__VERSION__', version).replace('__ASSETS__', JSON.stringify(assetPaths));
+fs.writeFileSync(path.join(distPath, 'sw.js'), worker);
+console.log('PWA: ' + assetPaths.length + ' recursos, versión ' + version);

@@ -1,3 +1,4 @@
+import { showAlert } from "@/utils/alerts";
 import React, { useState } from "react";
 import {
   View,
@@ -8,7 +9,6 @@ import {
   ActivityIndicator,
   TextInput,
   ScrollView,
-  Alert,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -29,7 +29,7 @@ export default function CameraScreen() {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permiso requerido", "Se necesita acceso a la cámara para tomar fotos de tu comida.");
+      showAlert("Permiso requerido", "Se necesita acceso a la cámara para tomar fotos de tu comida.");
       return;
     }
 
@@ -48,7 +48,7 @@ export default function CameraScreen() {
   const pickFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permiso requerido", "Se necesita acceso a tu galería para seleccionar fotos.");
+      showAlert("Permiso requerido", "Se necesita acceso a tu galería para seleccionar fotos.");
       return;
     }
 

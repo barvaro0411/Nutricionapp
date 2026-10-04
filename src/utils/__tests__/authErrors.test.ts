@@ -33,6 +33,17 @@ describe("translateAuthError", () => {
 
   it("handles empty or unknown errors gracefully", () => {
     expect(translateAuthError("")).toBe("Ha ocurrido un error inesperado.");
+    expect(translateAuthError({})).toBe("Ha ocurrido un error inesperado.");
+    expect(translateAuthError({ message: 500 })).toBe("Ha ocurrido un error inesperado.");
     expect(translateAuthError("Custom error message")).toBe("Custom error message");
   });
+
+  it.each(["Failed to fetch", "fetch failed", "Network request failed", "Request timeout"])(
+    "explains the connection failure %s in Spanish",
+    message => {
+      expect(translateAuthError({ message })).toBe(
+        "Error de conexión. Revisa tu conexión a internet e inténtalo de nuevo."
+      );
+    }
+  );
 });

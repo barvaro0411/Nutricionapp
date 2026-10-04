@@ -1,3 +1,4 @@
+import { showAlert } from "@/utils/alerts";
 import React from "react";
 import {
   Modal,
@@ -7,7 +8,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useFavoriteMeals, FavoriteMealWithItems } from "@/hooks/useFavoriteMeals";
 import { colors } from "@/constants/colors";
@@ -23,10 +23,10 @@ export function FavoritesModal({ visible, onClose }: FavoritesModalProps) {
   const handleSelectFavorite = async (fav: FavoriteMealWithItems) => {
     try {
       await logFavoriteMeal(fav);
-      Alert.alert("¡Listo!", `Se registró "${fav.title}" en tus comidas del día.`);
+      showAlert("¡Listo!", `Se registró "${fav.title}" en tus comidas del día.`);
       onClose();
     } catch (err: any) {
-      Alert.alert("Error", err?.message || "No se pudo registrar la comida favorita");
+      showAlert("Error", err?.message || "No se pudo registrar la comida favorita");
     }
   };
 

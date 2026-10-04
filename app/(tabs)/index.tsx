@@ -1,3 +1,7 @@
+import { useMealReviewStore } from "@/stores/useMealReviewStore";
+import { usePersonalPlan } from "@/hooks/usePersonalPlan";
+import { getDateKey, loggedAtForDate, APP_TIME_ZONE } from "@/utils/dates";
+import { showAlert } from "@/utils/alerts";
 import React, { useState } from "react";
 import {
   View,
@@ -37,6 +41,8 @@ import { MealType } from "@/types/meal";
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { data: personalPlan } = usePersonalPlan();
+  const beginMeal = () => { useMealReviewStore.getState().reset(); useMealReviewStore.getState().setLoggedAt(loggedAtForDate(selectedDate)); };
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showTextVoiceModal, setShowTextVoiceModal] = useState(false);
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
@@ -44,12 +50,12 @@ export default function DashboardScreen() {
   const [showMasterPlanModal, setShowMasterPlanModal] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>("almuerzo");
 
-  const { data, isLoading, isRefetching, refetch } = useDailyNutrition(selectedDate);
+  const { data, error, isLoading, isRefetching, refetch } = useDailyNutrition(selectedDate);
   const { totalMl, targetMl, addWater, isAdding } = useWaterTracker(selectedDate);
   const { burnedCalories, steps, logActivity } = useActivitySync(selectedDate);
 
   const isToday =
-    selectedDate.toDateString() === new Date().toDateString();
+    getDateKey(selectedDate) === getDateKey(new Date());
 
   const changeDay = (delta: number) => {
     const nextDate = new Date(selectedDate);
@@ -58,6 +64,7 @@ export default function DashboardScreen() {
   };
 
   const handleAddMeal = (mealType: MealType) => {
+    beginMeal();
     setActiveMealType(mealType);
     router.push({
       pathname: "/meal/camera",
@@ -66,6 +73,7 @@ export default function DashboardScreen() {
   };
 
   const formattedDate = selectedDate.toLocaleDateString("es-CL", {
+    timeZone: APP_TIME_ZONE,
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -138,7 +146,7 @@ export default function DashboardScreen() {
         </View>
 
         {/* Banner Mi Plan Maestro */}
-        <TouchableOpacity
+        {personalPlan && <TouchableOpacity
           style={styles.masterPlanBanner}
           onPress={() => setShowMasterPlanModal(true)}
           activeOpacity={0.85}
@@ -154,17 +162,17 @@ export default function DashboardScreen() {
               </View>
             </View>
             <Text style={styles.masterPlanSubtitle}>
-              Recomposición 12-13% • Ciclado 2.175/2.550 kcal • Rutina Semanal
+              {personalPlan.user.objectiveTitle}
             </Text>
           </View>
           <ChevronRight size={18} color={colors.primary} />
-        </TouchableOpacity>
+        </TouchableOpacity>}
 
         {/* Barra de atajos de registro rápido */}
         <View style={styles.quickActionsBar}>
           <TouchableOpacity
             style={styles.quickActionBtn}
-            onPress={() => router.push("/meal/camera")}
+            onPress={() => { beginMeal(); router.push("/meal/camera"); }}
             activeOpacity={0.8}
           >
             <View style={[styles.quickActionIconWrap, { backgroundColor: colors.primaryLight }]}>
@@ -175,7 +183,7 @@ export default function DashboardScreen() {
 
           <TouchableOpacity
             style={styles.quickActionBtn}
-            onPress={() => setShowTextVoiceModal(true)}
+            onPress={() => { beginMeal(); setShowTextVoiceModal(true); }}
             activeOpacity={0.8}
           >
             <View style={[styles.quickActionIconWrap, { backgroundColor: "#EEF2FF" }]}>
@@ -186,7 +194,7 @@ export default function DashboardScreen() {
 
           <TouchableOpacity
             style={styles.quickActionBtn}
-            onPress={() => router.push("/meal/barcode")}
+            onPress={() => { beginMeal(); router.push("/meal/barcode"); }}
             activeOpacity={0.8}
           >
             <View style={[styles.quickActionIconWrap, { backgroundColor: "#F0F9FF" }]}>
@@ -197,7 +205,7 @@ export default function DashboardScreen() {
 
           <TouchableOpacity
             style={styles.quickActionBtn}
-            onPress={() => setShowFavoritesModal(true)}
+            onPress={() => { beginMeal(); setShowFavoritesModal(true); }}
             activeOpacity={0.8}
           >
             <View style={[styles.quickActionIconWrap, { backgroundColor: "#FEF3C7" }]}>
@@ -212,7 +220,7 @@ export default function DashboardScreen() {
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loaderText}>Cargando tu progreso...</Text>
           </View>
-        ) : (
+        ) : error ? <Text accessibilityRole="alert" style={styles.loaderText}>{error.message}</Text> : (
           <>
             {/* Calorie Hero Dinámico con Calorías de Ejercicio */}
             <CalorieHero
@@ -227,7 +235,7 @@ export default function DashboardScreen() {
             <WaterCard
               totalMl={totalMl}
               targetMl={targetMl}
-              onAddWater={(ml) => addWater(ml)}
+              onAddWater={async (ml) => { try { await addWater(ml); } catch { showAlert("Agua", "No se pudo guardar. Revisa la conexión."); } }}
               loading={isAdding}
             />
 

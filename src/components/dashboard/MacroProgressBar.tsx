@@ -10,7 +10,7 @@ interface MacroCardProps {
   lightBg: string;
 }
 
-function MacroCard({ label, consumed, goal, color, lightBg }: MacroCardProps) {
+function MacroCard({ label, consumed, goal, color }: MacroCardProps) {
   const safeGoal = goal || 1;
   const progressPct = Math.min(100, Math.round((consumed / safeGoal) * 100));
   const remaining = Math.max(0, goal - consumed);

@@ -1,3 +1,4 @@
+import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import React from "react";
 import { Tabs, useRouter } from "expo-router";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
@@ -81,7 +82,7 @@ export default function TabLayout() {
       <View style={styles.floatingButtonContainer} pointerEvents="box-none">
         <TouchableOpacity
           style={styles.floatingButton}
-          onPress={() => router.push("/meal/camera")}
+          onPress={() => { useMealReviewStore.getState().reset(); router.push("/meal/camera"); }}
           activeOpacity={0.85}
         >
           <Camera size={26} color="#FFFFFF" strokeWidth={2.2} />

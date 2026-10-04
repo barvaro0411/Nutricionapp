@@ -1,3 +1,4 @@
+import { getDateKey } from "@/utils/dates";
 import { supabase } from "@/services/supabase";
 
 export interface ActivityLog {
@@ -20,7 +21,8 @@ export async function fetchDailyActivity(
     .eq("logged_at", dateStr)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error) throw new Error("No se pudo cargar tu actividad.");
+  if (!data) return null;
 
   return {
     id: data.id,
@@ -39,7 +41,8 @@ export async function saveActivityCalories(
   source: "apple_health" | "health_connect" | "manual" = "manual",
   dateStr?: string
 ) {
-  const targetDate = dateStr || new Date().toISOString().split("T")[0];
+  if (!Number.isFinite(caloriesBurned) || caloriesBurned < 0 || caloriesBurned > 10000 || !Number.isInteger(steps) || steps < 0 || steps > 200000) throw new Error("Actividad inválida.");
+  const targetDate = dateStr || getDateKey(new Date());
 
   const { data, error } = await supabase
     .from("activity_logs")

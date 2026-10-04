@@ -24,15 +24,15 @@ export function useCoachChat() {
         .from("coach_messages")
         .select("id, role, content, created_at")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(50);
 
       if (error) {
         console.error("Error al cargar mensajes del coach:", error);
-        return [];
+        throw new Error("No se pudo cargar la conversación. Reintenta.");
       }
 
-      return (data || []).map((m: any) => ({
+      return (data || []).reverse().map((m: any) => ({
         id: m.id,
         role: m.role as "user" | "assistant",
         content: m.content,

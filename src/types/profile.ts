@@ -18,7 +18,7 @@ export type Objective = z.infer<typeof ObjectiveSchema>;
 export const OnboardingProfileSchema = z.object({
   fullName: z.string().min(2, "Ingresa tu nombre"),
   gender: GenderSchema,
-  age: z.number().min(14, "Debes tener al menos 14 años").max(100),
+  age: z.number().int().min(14, "Debes tener al menos 14 años").max(100),
   heightCm: z.number().min(100, "Altura mínima 100 cm").max(240, "Altura máxima 240 cm"),
   weightKg: z.number().min(30, "Peso mínimo 30 kg").max(300, "Peso máximo 300 kg"),
   activityLevel: ActivityLevelSchema,
@@ -27,9 +27,9 @@ export const OnboardingProfileSchema = z.object({
 export type OnboardingProfile = z.infer<typeof OnboardingProfileSchema>;
 
 export const GoalsSchema = z.object({
-  calories: z.number().min(800).max(6000),
+  calories: z.number().finite().min(1200).max(8000),
   proteinG: z.number().min(20).max(400),
-  carbsG: z.number().min(20).max(800),
+  carbsG: z.number().finite().min(20).max(1600),
   fatG: z.number().min(15).max(300),
 });
 export type Goals = z.infer<typeof GoalsSchema>;

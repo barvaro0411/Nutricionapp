@@ -46,7 +46,14 @@
           "cameraPermission": "La app necesita acceso a tu cámara para tomar fotos de tus platos de comida."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Permite usar el micrófono para describir tus comidas."
+        }
+      ],
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true

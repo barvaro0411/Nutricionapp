@@ -1,3 +1,6 @@
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import { showAlert } from "@/utils/alerts";
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -7,7 +10,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Share,
-  Alert,
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -20,28 +22,22 @@ import { colors } from "@/constants/colors";
 
 export default function ExportReportScreen() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const userId = useAuthStore(s => s.user?.id);
 
   const [daysBack, setDaysBack] = useState<7 | 30>(7);
   const [report, setReport] = useState<NutritionistReportData | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    loadReport();
-  }, [daysBack, user]);
-
-  const loadReport = async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const data = await generateNutritionistReport(user.id, daysBack);
-      setReport(data);
-    } catch (err: any) {
-      console.error("Error al generar informe:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    if (!userId) return;
+    let active = true;
+    setLoading(true); setReport(null); setError(null);
+    generateNutritionistReport(userId, daysBack).then(data => { if (active) setReport(data); })
+      .catch(e => { if (active) setError(e.message || "No se pudo generar el informe."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [daysBack, userId]);
 
   const handleShareWhatsApp = async () => {
     if (!report) return;
@@ -51,19 +47,27 @@ export default function ExportReportScreen() {
         title: `Informe Nutricional - ${report.patientName}`,
       });
     } catch (err: any) {
-      Alert.alert("Error al compartir", err?.message);
+      showAlert("Error al compartir", err?.message);
     }
   };
 
   const handleExportCSV = async () => {
     if (!report) return;
     try {
-      await Share.share({
-        message: report.csvContent,
-        title: `Nutricion_${report.patientName}_${report.startDate}_a_${report.endDate}.csv`,
-      });
+      const filename = "Nutricion_" + report.startDate + "_a_" + report.endDate + ".csv";
+      if (Platform.OS === "web") {
+        const url = URL.createObjectURL(new Blob(["\ufeff" + report.csvContent], { type: "text/csv;charset=utf-8" }));
+        const link = document.createElement("a"); link.href = url; link.download = filename;
+        document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } else {
+        if (!await Sharing.isAvailableAsync()) throw new Error("Este dispositivo no permite compartir archivos.");
+        const file = FileSystem.cacheDirectory + filename;
+        await FileSystem.writeAsStringAsync(file, "\ufeff" + report.csvContent);
+        try { await Sharing.shareAsync(file, { mimeType: "text/csv", UTI: "public.comma-separated-values-text" }); }
+        finally { await FileSystem.deleteAsync(file, { idempotent: true }); }
+      }
     } catch (err: any) {
-      Alert.alert("Error al exportar CSV", err?.message);
+      showAlert("Error al exportar CSV", err?.message);
     }
   };
 
@@ -103,6 +107,7 @@ export default function ExportReportScreen() {
         </TouchableOpacity>
       </View>
 
+      {error && <Text accessibilityRole="alert" style={styles.subtitle}>{error}</Text>}
       {loading ? (
         <ActivityIndicator color={colors.primary} size="large" style={{ marginVertical: 40 }} />
       ) : report ? (

@@ -1,5 +1,6 @@
 import { supabase } from "@/services/supabase";
-import { DetectedFoodItem, MealTotals, MealType } from "@/types/meal";
+import { DetectedFoodItem, DetectedFoodItemSchema, MealTotals, MealType } from "@/types/meal";
+import { Json } from "@/types/database.types";
 
 export interface SaveMealParams {
   userId: string;
@@ -9,54 +10,21 @@ export interface SaveMealParams {
   totals: MealTotals;
   notes?: string;
   loggedAt?: Date;
+  clientRequestId?: string;
 }
 
 export async function saveMealToDatabase(params: SaveMealParams) {
-  const { userId, mealType, imagePath, items, totals, notes, loggedAt } = params;
-
-  // 1. Insertar registro principal en 'meals'
-  const { data: mealData, error: mealError } = await supabase
-    .from("meals")
-    .insert({
-      user_id: userId,
-      meal_type: mealType,
-      image_path: imagePath,
-      total_calories: totals.calories,
-      total_protein: totals.protein,
-      total_carbs: totals.carbs,
-      total_fat: totals.fat,
-      notes: notes || null,
-      logged_at: (loggedAt || new Date()).toISOString(),
-    })
-    .select()
-    .single();
-
-  if (mealError || !mealData) {
-    throw new Error(`Error al guardar la comida: ${mealError?.message}`);
-  }
-
-  // 2. Insertar cada uno de los alimentos en 'meal_items'
-  const itemsToInsert = items.map((item) => ({
-    meal_id: mealData.id,
-    food_name: item.food,
-    grams: item.grams,
-    calories: item.calories,
-    protein: item.protein,
-    carbs: item.carbs,
-    fat: item.fat,
-    confidence: item.confidence ?? null,
-    ai_detected: true,
-  }));
-
-  const { error: itemsError } = await supabase
-    .from("meal_items")
-    .insert(itemsToInsert);
-
-  if (itemsError) {
-    // Si falla el detalle, intentar limpiar la comida huérfana
-    await supabase.from("meals").delete().eq("id", mealData.id);
-    throw new Error(`Error al guardar el detalle de alimentos: ${itemsError.message}`);
-  }
-
-  return mealData;
+  const { mealType, imagePath, items, notes, loggedAt, clientRequestId } = params;
+  if (!items.length || items.length > 100) throw new Error("La comida debe tener entre 1 y 100 alimentos.");
+  const validatedItems = items.map((item) => DetectedFoodItemSchema.parse(item));
+  const { data, error } = await supabase.rpc("save_meal", {
+    p_meal_type: mealType,
+    p_items: validatedItems as unknown as Json,
+    p_image_path: imagePath || null,
+    p_notes: notes?.trim() || null,
+    p_logged_at: (loggedAt || new Date()).toISOString(),
+    ...(clientRequestId ? { p_client_request_id: clientRequestId } : {}),
+  });
+  if (error || !data) throw new Error(`Error al guardar la comida: ${error?.message || "Sin respuesta del servidor"}`);
+  return data;
 }

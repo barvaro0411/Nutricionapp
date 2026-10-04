@@ -59,8 +59,7 @@ export async function checkConnectivity(): Promise<boolean> {
     });
     clearTimeout(timeoutId);
     return res.status === 204 || res.ok;
-  } catch (e) {
+  } catch {
     return false;
   }
 }
-

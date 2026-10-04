@@ -6,5 +6,6 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
     "^npm:zod@3.24.1$": "zod",
+    "^npm:@supabase/supabase-js@2.117.2$": "@supabase/supabase-js",
   },
 };

@@ -1,3 +1,4 @@
+import { showAlert } from "@/utils/alerts";
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -5,13 +6,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Switch,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Crown, FileText, Target, ChevronRight, LogOut } from "lucide-react-native";
+import { FileText, Target, ChevronRight, LogOut } from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
-import { useSubscription } from "@/hooks/useSubscription";
 import {
   getReminderPreferences,
   toggleReminder,
@@ -23,7 +23,6 @@ import { colors } from "@/constants/colors";
 export default function SettingsScreen() {
   const router = useRouter();
   const { user, profile, signOut } = useAuth();
-  const { isPro, remainingAiScans } = useSubscription();
   const [reminders, setReminders] = useState<MealReminderConfig[]>(DEFAULT_CHILEAN_REMINDERS);
 
   useEffect(() => {
@@ -36,19 +35,19 @@ export default function SettingsScreen() {
   };
 
   const handleToggleReminder = async (id: string, value: boolean) => {
-    const updated = await toggleReminder(id, value);
-    setReminders(updated);
+    try { const updated = await toggleReminder(id, value); setReminders(updated); }
+    catch (e) { showAlert("Recordatorios", e instanceof Error ? e.message : "No se pudo programar."); }
   };
 
   const handleSignOut = () => {
-    Alert.alert("Cerrar Sesión", "¿Estás seguro de que deseas salir?", [
+    showAlert("Cerrar Sesión", "¿Estás seguro de que deseas salir?", [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Salir",
         style: "destructive",
         onPress: async () => {
-          await signOut();
-          router.replace("/(auth)/login");
+          try { await signOut(); router.replace("/(auth)/login"); }
+          catch { showAlert("No se pudo cerrar la sesión", "Reintenta para continuar."); }
         },
       },
     ]);
@@ -87,29 +86,8 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Tarjeta de Suscripción Pro */}
-      <TouchableOpacity
-        style={styles.proCard}
-        onPress={() => router.push("/paywall")}
-        activeOpacity={0.8}
-      >
-        <View style={styles.proCardLeft}>
-          <View style={styles.proBadgeRow}>
-            <Crown size={14} color="#F59E0B" />
-            <Text style={styles.proBadge}>{isPro ? "NUTRICIÓN PRO ACTIVO" : "PLAN GRATUITO"}</Text>
-          </View>
-          <Text style={styles.proTitle}>
-            {isPro ? "Suscripción Premium Activa" : "Desbloquea Nutrición Pro"}
-          </Text>
-          <Text style={styles.proSubtitle}>
-            {isPro
-              ? "Fotos con IA y Coach sin límites"
-              : `Cupo de fotos hoy: ${remainingAiScans} restantes. Pasa a Pro por $4.990 CLP.`}
-          </Text>
-        </View>
-        <ChevronRight size={22} color="#94A3B8" />
-      </TouchableOpacity>
-
+      <Text style={styles.sectionHeader}>Beta de pruebas</Text>
+      <Text style={styles.actionSubtitle}>Comidas, metas, IA e informes. Cada cuenta mantiene sus datos separados.</Text>
       {/* Informes Clínicos para Nutricionistas */}
       <Text style={styles.sectionHeader}>Herramientas de Salud</Text>
       <View style={styles.actionsCard}>
@@ -133,6 +111,7 @@ export default function SettingsScreen() {
       {/* Recordatorios de Horarios de Comidas Chilenas */}
       <Text style={styles.sectionHeader}>Horarios y Recordatorios (Chile)</Text>
       <View style={styles.actionsCard}>
+        {Platform.OS === "web" && <Text style={[styles.actionSubtitle, { padding: 16 }]}>Los recordatorios están disponibles en la app instalada para iOS o Android.</Text>}
         {reminders.map((rem, idx) => (
           <React.Fragment key={rem.id}>
             <View style={styles.reminderRow}>
@@ -144,6 +123,7 @@ export default function SettingsScreen() {
                 </Text>
               </View>
               <Switch
+                disabled={Platform.OS === "web"}
                 value={rem.enabled}
                 onValueChange={(val) => handleToggleReminder(rem.id, val)}
                 trackColor={{ false: colors.cardBorder, true: colors.primary }}
@@ -210,7 +190,7 @@ export default function SettingsScreen() {
         <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
       </TouchableOpacity>
 
-      <Text style={styles.versionText}>Nutrición IA v1.0.0 (Fase 4 - Chile)</Text>
+      <Text style={styles.versionText}>Nutrición IA · Beta</Text>
     </ScrollView>
   );
 }

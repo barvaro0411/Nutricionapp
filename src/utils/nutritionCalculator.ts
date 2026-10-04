@@ -60,13 +60,15 @@ export function calculateNutritionGoals(profile: OnboardingProfile): Goals {
 
   let targetCalories = tdee;
   if (profile.objective === "lose_weight") {
-    targetCalories = Math.max(1200, Math.round(tdee * 0.8)); // Déficit del 20%
+    targetCalories = Math.max(1200, tdee - Math.min(500, Math.round(tdee * 0.2)));
   } else if (profile.objective === "gain_muscle") {
     targetCalories = Math.round(tdee * 1.1); // Superávit del 10%
   }
 
+  targetCalories = Math.max(1200, Math.min(8000, targetCalories));
+
   // Proteína: 2.0g por kg de peso
-  const targetProteinG = Math.round(profile.weightKg * 2.0);
+  const targetProteinG = Math.min(400, Math.round(profile.weightKg * 2.0), Math.floor(targetCalories * 0.5 / 4));
   const proteinCalories = targetProteinG * 4;
 
   // Grasas: 28% de calorías totales

@@ -1,15 +1,13 @@
+import { getDateKey } from "@/utils/dates";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { fetchDailyActivity, saveActivityCalories, ActivityLog } from "@/services/activityService";
+import { fetchDailyActivity, saveActivityCalories } from "@/services/activityService";
 
 export function useActivitySync(selectedDate: Date = new Date()) {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const y = selectedDate.getFullYear();
-  const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
-  const d = String(selectedDate.getDate()).padStart(2, "0");
-  const dateStr = `${y}-${m}-${d}`;
+  const dateStr = getDateKey(selectedDate);
 
   const activityQuery = useQuery({
     queryKey: ["dailyActivity", user?.id, dateStr],

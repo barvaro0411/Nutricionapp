@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Modal,
   View,
@@ -8,6 +8,8 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
+import { showAlert } from "@/utils/alerts";
+import { parseDecimal } from "@/utils/dates";
 import { colors } from "@/constants/colors";
 
 interface ActivityModalProps {
@@ -25,27 +27,23 @@ export function ActivityModal({
   onClose,
   onSave,
 }: ActivityModalProps) {
-  const [cals, setCals] = useState(String(currentBurned || 300));
-  const [steps, setSteps] = useState(String(currentSteps || 6000));
+  const [cals, setCals] = useState(String(currentBurned));
+  const [steps, setSteps] = useState(String(currentSteps));
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => { if (visible) { setCals(String(currentBurned)); setSteps(String(currentSteps)); } }, [visible, currentBurned, currentSteps]);
   const handleSave = async () => {
-    const parsedCals = parseInt(cals, 10) || 0;
-    const parsedSteps = parseInt(steps, 10) || 0;
+    const parsedCals = parseDecimal(cals);
+    const parsedSteps = parseDecimal(steps);
 
+    if (!Number.isFinite(parsedCals) || parsedCals < 0 || parsedCals > 10000 || !Number.isInteger(parsedSteps) || parsedSteps < 0 || parsedSteps > 200000) { showAlert("Datos inválidos", "Revisa las calorías y los pasos."); return; }
     setSaving(true);
     try {
       await onSave(parsedCals, parsedSteps);
       onClose();
-    } finally {
+    } catch { showAlert("No se pudo guardar", "Revisa la conexión y vuelve a intentar."); } finally {
       setSaving(false);
     }
-  };
-
-  const handleSimulateAppleHealthSync = () => {
-    // Simulación de lectura de HealthKit
-    setCals("420");
-    setSteps("8450");
   };
 
   return (
@@ -60,18 +58,8 @@ export function ActivityModal({
           </View>
 
           <Text style={styles.subtitle}>
-            Sincroniza con Apple Health o ingresa las calorías activas quemadas en tus entrenamientos.
+            Ingresa las calorías activas y los pasos del día seleccionado.
           </Text>
-
-          {/* Botón de sincronización con Apple Health */}
-          <TouchableOpacity style={styles.appleHealthBtn} onPress={handleSimulateAppleHealthSync}>
-            <Text style={styles.appleHealthIcon}>❤️</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.appleHealthTitle}>Sincronizar con Apple Health</Text>
-              <Text style={styles.appleHealthDesc}>Importar calorías activas y pasos de hoy</Text>
-            </View>
-            <Text style={styles.appleHealthAction}>Sincronizar</Text>
-          </TouchableOpacity>
 
           {/* Entrada de Calorías Quemadas */}
           <View style={styles.inputGroup}>

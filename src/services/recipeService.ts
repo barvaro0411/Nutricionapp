@@ -59,8 +59,7 @@ export async function fetchRecipes(filterMealType?: MealType): Promise<Recipe[]>
   const { data, error } = await query.order("calories_per_serving", { ascending: true });
 
   if (error) {
-    console.error("Error al cargar recetas:", error);
-    return [];
+    throw new Error("No se pudieron cargar las recetas.");
   }
 
   return (data || []).map((r: any) => ({
@@ -117,7 +116,8 @@ export async function fetchRecipeById(id: string): Promise<Recipe | null> {
     .eq("id", id)
     .single();
 
-  if (error || !data) return null;
+  if (error) throw new Error("No se pudo cargar la receta.");
+  if (!data) return null;
 
   return {
     id: data.id,

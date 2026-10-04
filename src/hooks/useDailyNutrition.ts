@@ -1,25 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { getDateKey, getDayRange, getWeekday } from "@/utils/dates";
+import { usePersonalPlan } from "@/hooks/usePersonalPlan";
 import { MealWithItems } from "@/types/meal";
 
 export function useDailyNutrition(selectedDate: Date = new Date()) {
   const { user } = useAuthStore();
 
-  // Formato local YYYY-MM-DD para la consulta
-  const year = selectedDate.getFullYear();
-  const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
-  const day = String(selectedDate.getDate()).padStart(2, "0");
-  const dateString = `${year}-${month}-${day}`;
-
-  const startOfDay = new Date(selectedDate);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(selectedDate);
-  endOfDay.setHours(23, 59, 59, 999);
-
+  const { data: personalPlan } = usePersonalPlan();
+  const dateString = getDateKey(selectedDate);
+  const { start, end } = getDayRange(selectedDate);
   return useQuery({
-    queryKey: ["dailyNutrition", user?.id, dateString],
+    queryKey: ["dailyNutrition", user?.id, dateString, personalPlan?.dailyGoals],
     enabled: !!user?.id,
     queryFn: async () => {
       if (!user) throw new Error("No hay usuario autenticado");
@@ -34,30 +27,13 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
         .limit(1)
         .maybeSingle();
 
-      if (goalErr) {
-        console.error("Error al obtener objetivos:", goalErr);
+      if (goalErr) throw new Error("No se pudieron cargar tus metas.");
+      if (!goalData) throw new Error("Completa tus metas para ver el resumen.");
+      let goal = goalData;
+      if (personalPlan && getWeekday(selectedDate) === 0 && goalData.calories === personalPlan.dailyGoals.standard.calories && goalData.protein_g === personalPlan.dailyGoals.standard.proteinG && goalData.carbs_g === personalPlan.dailyGoals.standard.carbsG && goalData.fat_g === personalPlan.dailyGoals.standard.fatG) {
+        const planGoal = getWeekday(selectedDate) === 0 ? personalPlan.dailyGoals.matchDay : personalPlan.dailyGoals.standard;
+        goal = { ...goalData, calories: planGoal.calories, protein_g: planGoal.proteinG, carbs_g: planGoal.carbsG, fat_g: planGoal.fatG };
       }
-
-      // Default goal o meta base
-      let goal = goalData || {
-        calories: 2175,
-        protein_g: 155,
-        carbs_g: 245,
-        fat_g: 60,
-      };
-
-      // Ciclado de carbohidratos en el Plan Maestro: Domingo día de fútbol y recarga
-      const isSunday = selectedDate.getDay() === 0;
-      if (isSunday && (user?.email === "barvaro0411@gmail.com" || goal.calories === 2175)) {
-        goal = {
-          ...goal,
-          calories: 2550,
-          protein_g: 150,
-          carbs_g: 360,
-          fat_g: 58,
-        };
-      }
-
       // 2. Obtener comidas registradas en el día con sus ítems
       const { data: mealsData, error: mealsErr } = await supabase
         .from("meals")
@@ -85,8 +61,8 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
           )
         `)
         .eq("user_id", user.id)
-        .gte("logged_at", startOfDay.toISOString())
-        .lte("logged_at", endOfDay.toISOString())
+        .gte("logged_at", start)
+        .lt("logged_at", end)
         .order("logged_at", { ascending: true });
 
       if (mealsErr) {

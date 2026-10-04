@@ -17,11 +17,10 @@ import {
   Circle,
   Flame,
   Droplets,
-  Calendar,
   ChevronDown,
   ChevronUp,
 } from "lucide-react-native";
-import { BARVARO_MASTER_PLAN } from "@/data/masterPlan";
+import { usePersonalPlan } from "@/hooks/usePersonalPlan";
 import { colors } from "@/constants/colors";
 
 interface MasterPlanModalProps {
@@ -30,7 +29,7 @@ interface MasterPlanModalProps {
 }
 
 export function MasterPlanModal({ visible, onClose }: MasterPlanModalProps) {
-  const plan = BARVARO_MASTER_PLAN;
+  const { data: plan, isLoading, error } = usePersonalPlan();
   const [activeTab, setActiveTab] = useState<"nutricion" | "rutina" | "habitos">("nutricion");
   const [checkedHabits, setCheckedHabits] = useState<Record<number, boolean>>({});
   const [expandedDay, setExpandedDay] = useState<string>("Lunes");
@@ -42,6 +41,12 @@ export function MasterPlanModal({ visible, onClose }: MasterPlanModalProps) {
     }));
   };
 
+  if (!plan) return <Modal visible={visible} animationType="slide" transparent>
+    <View style={styles.overlay}><View style={styles.container}>
+      <Text style={styles.title}>{isLoading ? "Cargando plan…" : error ? error.message : "No tienes un plan personal asignado."}</Text>
+      <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={styles.cyclingTitle}>Cerrar</Text></TouchableOpacity>
+    </View></View>
+  </Modal>;
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
@@ -53,8 +58,8 @@ export function MasterPlanModal({ visible, onClose }: MasterPlanModalProps) {
                 <Target size={14} color={colors.primary} />
                 <Text style={styles.planBadgeText}>PLAN MAESTRO ACTIVO</Text>
               </View>
-              <Text style={styles.title}>Recomposición Corporal</Text>
-              <Text style={styles.subtitle}>Hipertrofia + Rendimiento (Álvaro)</Text>
+              <Text style={styles.title}>Mi plan personal</Text>
+              <Text style={styles.subtitle}>{plan.user.objectiveTitle}</Text>
             </View>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
               <X size={20} color={colors.text} />

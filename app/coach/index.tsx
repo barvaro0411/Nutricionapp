@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useCoachChat } from "@/hooks/useCoachChat";
+import { showAlert } from "@/utils/alerts";
 import { colors } from "@/constants/colors";
 
 export default function CoachChatScreen() {
@@ -29,7 +30,8 @@ export default function CoachChatScreen() {
     if (!text || isSending) return;
 
     setInputText("");
-    await sendMessage(text);
+    try { await sendMessage(text); }
+    catch (e) { setInputText(text); showAlert("Coach IA", e instanceof Error ? e.message : "No se pudo enviar el mensaje."); }
   };
 
   const quickPrompts = [

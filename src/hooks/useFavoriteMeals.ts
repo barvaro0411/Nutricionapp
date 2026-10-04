@@ -1,7 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { DetectedFoodItem, MealTotals, MealType } from "@/types/meal";
+import { saveMealToDatabase } from "@/services/mealService";
+import { useMealReviewStore } from "@/stores/useMealReviewStore";
+import { randomUUID } from "expo-crypto";
+import { DetectedFoodItemSchema, DetectedFoodItem, MealTotals, MealType } from "@/types/meal";
 
 export interface FavoriteMealWithItems {
   id: string;
@@ -59,8 +62,7 @@ export function useFavoriteMeals() {
         .order("usage_count", { ascending: false });
 
       if (error) {
-        console.error("Error al obtener comidas favoritas:", error);
-        return [];
+        throw new Error("No se pudieron cargar tus favoritas.");
       }
 
       return (data || []).map((fav: any) => ({
@@ -91,7 +93,6 @@ export function useFavoriteMeals() {
       title,
       mealType,
       items,
-      totals,
     }: {
       title: string;
       mealType: MealType;
@@ -100,38 +101,11 @@ export function useFavoriteMeals() {
     }) => {
       if (!user) throw new Error("No hay sesión de usuario");
 
-      const { data: fav, error: favErr } = await supabase
-        .from("favorite_meals")
-        .insert({
-          user_id: user.id,
-          title: title.trim(),
-          meal_type: mealType,
-          total_calories: totals.calories,
-          total_protein: totals.protein,
-          total_carbs: totals.carbs,
-          total_fat: totals.fat,
-        })
-        .select()
-        .single();
-
-      if (favErr || !fav) throw new Error(favErr?.message || "Error al crear favorita");
-
-      const itemsToInsert = items.map((item) => ({
-        favorite_meal_id: fav.id,
-        food_name: item.food,
-        grams: item.grams,
-        calories: item.calories,
-        protein: item.protein,
-        carbs: item.carbs,
-        fat: item.fat,
-      }));
-
-      const { error: itemsErr } = await supabase
-        .from("favorite_meal_items")
-        .insert(itemsToInsert);
-
-      if (itemsErr) throw new Error(itemsErr.message);
-
+      const { data: fav, error: favErr } = await supabase.rpc("save_favorite", {
+        p_title: title.trim(), p_meal_type: mealType,
+        p_items: items.map(item => DetectedFoodItemSchema.parse(item)),
+      });
+      if (favErr || !fav) throw new Error(favErr?.message || "No se pudo guardar la favorita.");
       return fav;
     },
     onSuccess: () => {
@@ -144,45 +118,14 @@ export function useFavoriteMeals() {
     mutationFn: async (favoriteMeal: FavoriteMealWithItems) => {
       if (!user) throw new Error("No hay sesión de usuario");
 
-      // Insertar en 'meals'
-      const { data: newMeal, error: mealErr } = await supabase
-        .from("meals")
-        .insert({
-          user_id: user.id,
-          meal_type: favoriteMeal.meal_type,
-          total_calories: favoriteMeal.total_calories,
-          total_protein: favoriteMeal.total_protein,
-          total_carbs: favoriteMeal.total_carbs,
-          total_fat: favoriteMeal.total_fat,
-          notes: `Registrado desde favorita: ${favoriteMeal.title}`,
-          logged_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (mealErr || !newMeal) throw new Error(mealErr?.message);
-
-      // Insertar ítems
-      const itemsToInsert = favoriteMeal.items.map((i) => ({
-        meal_id: newMeal.id,
-        food_name: i.food_name,
-        grams: i.grams,
-        calories: i.calories,
-        protein: i.protein,
-        carbs: i.carbs,
-        fat: i.fat,
-        confidence: 1.0,
-        ai_detected: false,
-      }));
-
-      await supabase.from("meal_items").insert(itemsToInsert);
-
-      // Incrementar contador de uso de la comida frecuente
-      await supabase
-        .from("favorite_meals")
-        .update({ usage_count: favoriteMeal.usage_count + 1 })
-        .eq("id", favoriteMeal.id);
-
+      const newMeal = await saveMealToDatabase({
+        userId: user.id, mealType: favoriteMeal.meal_type,
+        items: favoriteMeal.items.map(i => ({ food: i.food_name, grams: i.grams, calories: i.calories, protein: i.protein, carbs: i.carbs, fat: i.fat, confidence: 1 })),
+        totals: { calories: favoriteMeal.total_calories, protein: favoriteMeal.total_protein, carbs: favoriteMeal.total_carbs, fat: favoriteMeal.total_fat },
+        imagePath: "", notes: "Registrado desde favorita: " + favoriteMeal.title,
+        loggedAt: useMealReviewStore.getState().loggedAt ? new Date(useMealReviewStore.getState().loggedAt!) : undefined,
+        clientRequestId: randomUUID(),
+      });
       return newMeal;
     },
     onSuccess: () => {
@@ -195,6 +138,7 @@ export function useFavoriteMeals() {
   return {
     favorites: favoritesQuery.data || [],
     isLoading: favoritesQuery.isLoading,
+    error: favoritesQuery.error,
     saveFavorite: saveFavoriteMutation.mutateAsync,
     isSavingFavorite: saveFavoriteMutation.isPending,
     logFavoriteMeal: logFavoriteMealMutation.mutateAsync,

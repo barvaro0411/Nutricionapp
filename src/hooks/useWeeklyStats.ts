@@ -1,3 +1,4 @@
+import { getDateKey, getWeekday } from "@/utils/dates";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -42,11 +43,12 @@ export function useWeeklyStats() {
         .from("v_daily_totals")
         .select("*")
         .eq("user_id", user.id)
-        .gte("log_date", sevenDaysAgo.toISOString().split("T")[0])
+        .gte("log_date", getDateKey(sevenDaysAgo))
+        .lte("log_date", getDateKey(today))
         .order("log_date", { ascending: true });
 
       if (error) {
-        console.error("Error al obtener estadísticas semanales:", error);
+        throw new Error("No se pudieron cargar las estadísticas.");
       }
 
       const rowsByDate: Record<string, any> = {};
@@ -65,10 +67,7 @@ export function useWeeklyStats() {
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(today.getDate() - i);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const dayStr = String(d.getDate()).padStart(2, "0");
-        const dateIso = `${y}-${m}-${dayStr}`;
+        const dateIso = getDateKey(d);
 
         const row = rowsByDate[dateIso];
         const cals = row ? Number(row.total_calories) : 0;
@@ -85,7 +84,7 @@ export function useWeeklyStats() {
 
         days.push({
           date: dateIso,
-          dayLabel: dayNames[d.getDay()],
+          dayLabel: dayNames[getWeekday(d)],
           calories: cals,
           protein: prot,
           carbs: carbs,

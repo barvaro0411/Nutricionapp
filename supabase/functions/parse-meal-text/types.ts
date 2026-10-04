@@ -3,13 +3,13 @@ import {
   AIStructuredOutputSchema,
   MealItemSchema,
   MealTypeEnum,
-} from "../analyze-meal/types";
+} from "../analyze-meal/types.ts";
 
 export const ParseMealTextRequestSchema = z
   .object({
-    text: z.string().optional(),
-    audio_base64: z.string().optional(),
-    audio_mime_type: z.string().default("audio/m4a"),
+    text: z.string().trim().min(1).max(2000).optional(),
+    audio_base64: z.string().min(1).max(6000000).regex(/^[A-Za-z0-9+/]+={0,2}$/).optional(),
+    audio_mime_type: z.enum(["audio/mp4", "audio/m4a", "audio/mpeg", "audio/wav", "audio/webm", "audio/ogg"]).default("audio/mp4"),
     client_time_iso: z.string().datetime().optional(),
   })
   .refine((data) => data.text || data.audio_base64, {

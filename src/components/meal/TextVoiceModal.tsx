@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import { Audio } from "expo-av";
+import * as FileSystem from "expo-file-system";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Modal,
   View,
@@ -24,6 +26,18 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
   const [mode, setMode] = useState<"text" | "voice">("text");
   const [inputText, setInputText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const recording = useRef<Audio.Recording | null>(null);
+  const busy = useRef(false);
+  useEffect(() => {
+    if (visible) return;
+    const pending = recording.current;
+    recording.current = null;
+    setIsRecording(false);
+    if (pending) void pending.stopAndUnloadAsync().catch(() => undefined);
+    if (Platform.OS !== "web") void Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => undefined);
+  }, [visible]);
+  useEffect(() => () => { void recording.current?.stopAndUnloadAsync().catch(() => undefined); }, []);
 
   const { parseTextMeal, parseAudioMeal, processing, error } = useTextAudioMeal();
 
@@ -36,25 +50,52 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
     }
   };
 
-  const handleSimulatedVoiceCapture = async () => {
-    // Modo voz interactivo
-    if (!isRecording) {
-      setIsRecording(true);
-      // En una sesión real se inicia audio recorder; aquí capturamos la simulación
-      setTimeout(async () => {
+  const handleVoiceCapture = async () => {
+    if (busy.current || processing) return;
+    busy.current = true;
+    setCaptureError(null);
+    try {
+      if (!recording.current) {
+        const permission = await Audio.requestPermissionsAsync();
+        if (!permission.granted) throw new Error("Permite el acceso al micrófono para grabar.");
+        if (Platform.OS !== "web") await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+        const result = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+        recording.current = result.recording;
+        setIsRecording(true);
+      } else {
+        const captured = recording.current;
+        recording.current = null;
         setIsRecording(false);
-        // Si el usuario no escribió nada, enviamos una frase de ejemplo o procesamos
-        if (inputText.trim()) {
-          const res = await parseTextMeal(inputText, mealType);
-          if (res.success) onClose();
+        await captured.stopAndUnloadAsync();
+        if (Platform.OS !== "web") await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+        const uri = captured.getURI();
+        if (!uri) throw new Error("No se pudo obtener el audio. Intenta grabar de nuevo.");
+        let base64: string;
+        let mime = "audio/mp4";
+        if (Platform.OS === "web") {
+          const blob = await (await fetch(uri)).blob();
+          mime = blob.type.split(";")[0] || "audio/webm";
+          base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result).split(",")[1]);
+            reader.onerror = () => reject(new Error("No se pudo leer el audio."));
+            reader.readAsDataURL(blob);
+          });
+          URL.revokeObjectURL(uri);
         } else {
-          const sampleAudioDictation = "Me comí dos batidos de marraqueta con palta y un café con leche";
-          setInputText(sampleAudioDictation);
-          const res = await parseTextMeal(sampleAudioDictation, mealType);
-          if (res.success) onClose();
+          base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+          await FileSystem.deleteAsync(uri, { idempotent: true });
         }
-      }, 2500);
-    }
+        if (base64.length > 6000000) throw new Error("El audio es demasiado largo. Graba una descripción más breve.");
+        const res = await parseAudioMeal(base64, mime, mealType);
+        if (res.success) onClose();
+      }
+    } catch (e) {
+      setIsRecording(false);
+      if (recording.current) await recording.current.stopAndUnloadAsync().catch(() => undefined);
+      recording.current = null;
+      setCaptureError(e instanceof Error ? e.message : "No se pudo grabar el audio.");
+    } finally { busy.current = false; }
   };
 
   const handleSelectShortcut = (text: string) => {
@@ -62,7 +103,7 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={() => { if (!processing) onClose(); }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.overlay}
@@ -73,7 +114,7 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
             <View style={styles.tabsRow}>
               <TouchableOpacity
                 style={[styles.tabBtn, mode === "text" && styles.tabBtnActive]}
-                onPress={() => setMode("text")}
+                onPress={() => { if (!isRecording && !processing) setMode("text"); }}
               >
                 <Text style={[styles.tabBtnText, mode === "text" && styles.tabBtnTextActive]}>
                   ✍️ Escribir
@@ -89,14 +130,14 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+            <TouchableOpacity style={styles.closeBtn} onPress={() => { if (!processing) onClose(); }}>
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          {error && (
+          {(error || captureError) && (
             <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
+              <Text style={styles.errorText}>{captureError || error}</Text>
             </View>
           )}
 
@@ -151,12 +192,12 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
           ) : (
             <View style={styles.voiceBody}>
               <Text style={styles.instruction}>
-                Mantén presionado o toca para dictar tu comida:
+                Toca para grabar y vuelve a tocar para enviar. Usa una descripción breve.
               </Text>
 
               <TouchableOpacity
                 style={[styles.micButton, isRecording && styles.micButtonRecording]}
-                onPress={handleSimulatedVoiceCapture}
+                onPress={handleVoiceCapture}
                 disabled={processing}
               >
                 <Text style={styles.micIcon}>{isRecording ? "⏹️" : "🎙️"}</Text>

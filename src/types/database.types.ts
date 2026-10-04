@@ -9,12 +9,19 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      personal_plans: {
+        Row: { user_id: string; plan: Json; updated_at: string };
+        Insert: { user_id: string; plan: Json; updated_at?: string };
+        Update: { plan?: Json; updated_at?: string };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;
           full_name: string | null;
           gender: "male" | "female" | "other" | null;
           birth_date: string | null;
+          age: number | null;
           height_cm: number | null;
           current_weight_kg: number | null;
           activity_level: "sedentary" | "light" | "moderate" | "active" | "very_active" | null;
@@ -27,6 +34,7 @@ export interface Database {
           full_name?: string | null;
           gender?: "male" | "female" | "other" | null;
           birth_date?: string | null;
+          age?: number | null;
           height_cm?: number | null;
           current_weight_kg?: number | null;
           activity_level?: "sedentary" | "light" | "moderate" | "active" | "very_active" | null;
@@ -39,6 +47,7 @@ export interface Database {
           full_name?: string | null;
           gender?: "male" | "female" | "other" | null;
           birth_date?: string | null;
+          age?: number | null;
           height_cm?: number | null;
           current_weight_kg?: number | null;
           activity_level?: "sedentary" | "light" | "moderate" | "active" | "very_active" | null;
@@ -535,6 +544,16 @@ export interface Database {
       };
     };
     Functions: {
+      complete_onboarding: { Args: { p_profile: Json; p_goals: Json }; Returns: Database["public"]["Tables"]["profiles"]["Row"] };
+      save_favorite: { Args: { p_title: string; p_meal_type: string; p_items: Json }; Returns: Database["public"]["Tables"]["favorite_meals"]["Row"] };
+      save_meal: {
+        Args: { p_meal_type: string; p_items: Json; p_image_path?: string | null; p_notes?: string | null; p_logged_at?: string; p_client_request_id?: string };
+        Returns: Json;
+      };
+      set_nutrition_goals: {
+        Args: { p_calories: number; p_protein_g: number; p_carbs_g: number; p_fat_g: number };
+        Returns: Database["public"]["Tables"]["goals"]["Row"];
+      };
       check_and_increment_ai_quota: {
         Args: {
           target_user_id: string;

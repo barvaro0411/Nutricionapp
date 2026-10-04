@@ -3,6 +3,7 @@ import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Database } from "@/types/database.types";
 import { translateAuthError } from "@/utils/authErrors";
+import * as Linking from "expo-linking";
 
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 
@@ -26,20 +27,8 @@ export function useAuth() {
       }
 
       if (data) {
-        setProfile(data);
+        if (useAuthStore.getState().user?.id === userId) setProfile(data);
         return data;
-      }
-
-      // Si el perfil no existe aún (por ejemplo si el trigger tardó), intentamos crearlo
-      const { data: newProfile } = await supabase
-        .from("profiles")
-        .insert({ id: userId, full_name: user?.user_metadata?.full_name || "" })
-        .select()
-        .single();
-
-      if (newProfile) {
-        setProfile(newProfile);
-        return newProfile;
       }
 
       return null;
@@ -47,7 +36,7 @@ export function useAuth() {
       console.error("Error inesperado en fetchProfile:", err);
       return null;
     }
-  }, [setProfile, user]);
+  }, [setProfile]);
 
   const signInWithEmail = async (email: string, password: string) => {
     setLoading(true);
@@ -86,6 +75,7 @@ export function useAuth() {
         email: email.trim(),
         password,
         options: {
+          emailRedirectTo: Linking.createURL("/"),
           data: {
             full_name: fullName.trim(),
           },
@@ -133,11 +123,12 @@ export function useAuth() {
   const signOut = async () => {
     setLoading(true);
     try {
-      await supabase.auth.signOut();
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
       reset();
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message };
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -147,7 +138,9 @@ export function useAuth() {
     setLoading(true);
     setError(null);
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim());
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: Linking.createURL("/reset-password"),
+      });
       if (resetError) {
         const friendlyMsg = translateAuthError(resetError);
         setError(friendlyMsg);

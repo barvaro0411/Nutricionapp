@@ -10,11 +10,11 @@ export async function uploadMealPhoto(
 
     // Convertir URI local a Blob compatible con Supabase Storage
     const response = await fetch(localUri);
-    const blob = await response.blob();
+    const bytes = await response.arrayBuffer();
 
     const { data, error } = await supabase.storage
       .from("meal_photos")
-      .upload(filePath, blob, {
+      .upload(filePath, bytes, {
         contentType: "image/jpeg",
         upsert: false,
       });

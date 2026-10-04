@@ -3,7 +3,7 @@
  */
 export function translateAuthError(error: any): string {
   if (!error) return "Ha ocurrido un error inesperado.";
-  const rawMessage = typeof error === "string" ? error : error?.message || "";
+  const rawMessage = typeof error === "string" ? error : typeof error?.message === "string" ? error.message : "";
   const lower = rawMessage.toLowerCase();
 
   if (
@@ -54,11 +54,12 @@ export function translateAuthError(error: any): string {
 
   if (
     lower.includes("network request failed") ||
+    lower.includes("failed to fetch") ||
     lower.includes("fetch failed") ||
     lower.includes("timeout")
   ) {
     return "Error de conexión. Revisa tu conexión a internet e inténtalo de nuevo.";
   }
 
-  return rawMessage;
+  return rawMessage || "Ha ocurrido un error inesperado.";
 }

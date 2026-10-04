@@ -20,6 +20,7 @@ export interface BarcodeProduct {
  */
 export async function lookupBarcode(barcode: string): Promise<BarcodeProduct | null> {
   const cleanBarcode = barcode.trim();
+  if (!/^[0-9]{8,14}$/.test(cleanBarcode)) throw new Error("Ingresa un código de barras de 8 a 14 dígitos.");
 
   // 1. Consultar base propia en Supabase
   try {
@@ -49,7 +50,8 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeProduct | n
   // 2. Fallback a Open Food Facts
   try {
     const response = await fetch(
-      `https://world.openfoodfacts.org/api/v2/product/${cleanBarcode}.json`
+      `https://world.openfoodfacts.org/api/v2/product/${cleanBarcode}.json`,
+      { signal: AbortSignal.timeout(15000) }
     );
 
     if (response.ok) {
@@ -61,11 +63,12 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeProduct | n
         const productName =
           p.product_name_es || p.product_name || `Producto (${cleanBarcode})`;
         const brand = p.brands || undefined;
-        const cals = Number(nutriments["energy-kcal_100g"] || nutriments["energy-kcal"] || 0);
-        const prot = Number(nutriments.proteins_100g || nutriments.proteins || 0);
-        const carbs = Number(nutriments.carbohydrates_100g || nutriments.carbohydrates || 0);
-        const fat = Number(nutriments.fat_100g || nutriments.fat || 0);
+        const cals = Number(nutriments["energy-kcal_100g"]);
+        const prot = Number(nutriments.proteins_100g);
+        const carbs = Number(nutriments.carbohydrates_100g);
+        const fat = Number(nutriments.fat_100g);
 
+        if (![cals, prot, carbs, fat].every(v => Number.isFinite(v) && v >= 0) || cals > 1000 || [prot, carbs, fat].some(v => v > 100)) return null;
         const productResult: BarcodeProduct = {
           barcode: cleanBarcode,
           productName,
@@ -89,7 +92,7 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeProduct | n
             protein_per_100g: productResult.proteinPer100g,
             carbs_per_100g: productResult.carbsPer100g,
             fat_per_100g: productResult.fatPer100g,
-            country: cleanBarcode.startsWith("780") ? "CL" : null,
+            country: null,
           });
         } catch (cacheErr) {
           console.warn("No se pudo cachear en barcode_products:", cacheErr);
@@ -121,9 +124,11 @@ export async function saveCustomBarcodeProduct(
     fatPer100g: number;
   }
 ) {
+  if (!/^[0-9]{8,14}$/.test(product.barcode) || !product.productName.trim()) throw new Error("Producto inválido.");
+  if (![product.caloriesPer100g, product.proteinPer100g, product.carbsPer100g, product.fatPer100g].every(v => Number.isFinite(v) && v >= 0) || product.caloriesPer100g > 1000 || [product.proteinPer100g, product.carbsPer100g, product.fatPer100g].some(v => v > 100)) throw new Error("Revisa la información nutricional por 100 g.");
   const { data, error } = await supabase
     .from("barcode_products")
-    .upsert({
+    .insert({
       barcode: product.barcode,
       product_name: product.productName,
       brand: product.brand || null,
@@ -133,7 +138,7 @@ export async function saveCustomBarcodeProduct(
       carbs_per_100g: product.carbsPer100g,
       fat_per_100g: product.fatPer100g,
       created_by: userId,
-      country: product.barcode.startsWith("780") ? "CL" : "OTHER",
+      country: null,
       verified: false,
     })
     .select()

@@ -4,7 +4,7 @@ import { WifiOff } from "lucide-react-native";
 import { useOfflineStore, checkConnectivity } from "@/services/offlineService";
 
 export function OfflineBanner() {
-  const { isOffline, setIsOffline, pendingSyncCount } = useOfflineStore();
+  const { isOffline, setIsOffline } = useOfflineStore();
 
   useEffect(() => {
     // En Web, escuchar directamente los eventos del navegador para máxima precisión y reactividad instantánea
@@ -35,7 +35,7 @@ export function OfflineBanner() {
     check();
     const interval = setInterval(check, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [setIsOffline]);
 
   if (!isOffline) return null;
 
@@ -45,9 +45,7 @@ export function OfflineBanner() {
       <View style={styles.textContainer}>
         <Text style={styles.title}>Modo Sin Conexión</Text>
         <Text style={styles.subtitle}>
-          {pendingSyncCount > 0
-            ? `${pendingSyncCount} registros pendientes se guardarán al recuperar señal.`
-            : "Mostrando datos en caché. Tu progreso no se perderá."}
+          Necesitas conexión para guardar registros y usar la IA.
         </Text>
       </View>
     </View>
@@ -79,4 +77,3 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 });
-

@@ -9,6 +9,8 @@ interface AuthState {
   user: User | null;
   profile: Profile | null;
   isLoading: boolean;
+  isRecoveringPassword: boolean;
+  setIsRecoveringPassword: (value: boolean) => void;
   setSession: (session: Session | null) => void;
   setUser: (user: User | null) => void;
   setProfile: (profile: Profile | null) => void;
@@ -21,9 +23,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   profile: null,
   isLoading: true,
+  isRecoveringPassword: false,
+  setIsRecoveringPassword: (isRecoveringPassword) => set({ isRecoveringPassword }),
   setSession: (session) => set({ session, user: session?.user ?? null }),
   setUser: (user) => set({ user }),
   setProfile: (profile) => set({ profile }),
   setIsLoading: (isLoading) => set({ isLoading }),
-  reset: () => set({ session: null, user: null, profile: null, isLoading: false }),
+  reset: () => set({ session: null, user: null, profile: null, isLoading: false, isRecoveringPassword: false }),
 }));

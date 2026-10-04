@@ -11,10 +11,14 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useQueryClient } from "@tanstack/react-query";
+import { GoalsSchema, OnboardingProfileSchema } from "@/types/profile";
+import { parseDecimal } from "@/utils/dates";
 import { colors } from "@/constants/colors";
 
 export default function GoalsReviewScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, setProfile } = useAuthStore();
   const params = useLocalSearchParams<{
     gender: string;
@@ -56,51 +60,24 @@ export default function GoalsReviewScreen() {
     setError(null);
 
     try {
-      const parsedCalories = parseInt(calories, 10);
-      const parsedProtein = parseInt(proteinG, 10);
-      const parsedCarbs = parseInt(carbsG, 10);
-      const parsedFat = parseInt(fatG, 10);
-
-      // 1. Actualizar perfil en Supabase
-      const { data: updatedProfile, error: profileErr } = await supabase
-        .from("profiles")
-        .update({
-          gender: params.gender as any,
-          height_cm: parseFloat(params.heightCm),
-          current_weight_kg: parseFloat(params.weightKg),
-          activity_level: params.activityLevel as any,
-          objective: params.objective as any,
-        })
-        .eq("id", user.id)
-        .select()
-        .single();
-
-      if (profileErr) {
-        throw new Error(`Error al actualizar perfil: ${profileErr.message}`);
-      }
-
-      // 2. Desactivar metas anteriores y guardar nueva meta
-      await supabase
-        .from("goals")
-        .update({ is_active: false })
-        .eq("user_id", user.id);
-
-      const { error: goalsErr } = await supabase.from("goals").insert({
-        user_id: user.id,
-        calories: parsedCalories,
-        protein_g: parsedProtein,
-        carbs_g: parsedCarbs,
-        fat_g: parsedFat,
-        is_active: true,
+      const goals = GoalsSchema.parse({
+        calories: parseDecimal(calories), proteinG: parseDecimal(proteinG),
+        carbsG: parseDecimal(carbsG), fatG: parseDecimal(fatG),
       });
-
-      if (goalsErr) {
-        throw new Error(`Error al guardar objetivos: ${goalsErr.message}`);
-      }
-
-      // Actualizar estado local
+      const profile = OnboardingProfileSchema.parse({
+        fullName: user.user_metadata?.full_name || "Usuario", gender: params.gender,
+        age: parseDecimal(params.age), heightCm: parseDecimal(params.heightCm),
+        weightKg: parseDecimal(params.weightKg), activityLevel: params.activityLevel, objective: params.objective,
+      });
+      const { data: updatedProfile, error } = await supabase.rpc("complete_onboarding", {
+        p_profile: { gender: profile.gender, age: profile.age, height_cm: profile.heightCm,
+          current_weight_kg: profile.weightKg, activity_level: profile.activityLevel, objective: profile.objective },
+        p_goals: { calories: Math.round(goals.calories), protein_g: Math.round(goals.proteinG),
+          carbs_g: Math.round(goals.carbsG), fat_g: Math.round(goals.fatG) },
+      });
+      if (error) throw new Error(error.message);
       setProfile(updatedProfile);
-
+      await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
       // Redirigir al inicio
       router.replace("/(tabs)");
     } catch (err: any) {
@@ -110,7 +87,6 @@ export default function GoalsReviewScreen() {
     }
   };
 
-  const cals = parseInt(calories, 10) || 1;
   const protKcal = (parseInt(proteinG, 10) || 0) * 4;
   const carbsKcal = (parseInt(carbsG, 10) || 0) * 4;
   const fatKcal = (parseInt(fatG, 10) || 0) * 9;

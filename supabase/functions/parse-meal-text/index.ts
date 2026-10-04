@@ -1,170 +1,36 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import {
-  ParseMealTextRequestSchema,
-  AIStructuredOutputSchema,
-} from "./types.ts";
+import { ParseMealTextRequestSchema, AIStructuredOutputSchema } from "./types.ts";
 import { CHILEAN_MEAL_TEXT_PROMPT } from "./prompts/mealTextPrompt.ts";
+import { ApiError, authenticate, errorResponse, json, methodResponse, readBody, reserveAiRequest } from "../_shared/http.ts";
+import { callGemini, getGeminiKey, parseModelJson } from "../_shared/gemini.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  const startTime = Date.now();
-
+export async function handleRequest(req: Request) {
+  const method = methodResponse(req);
+  if (method) return method;
+  const start = Date.now();
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ success: false, error: { code: "UNAUTHORIZED", message: "Falta autorización" } }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const rawBody = await req.json();
-    const parseResult = ParseMealTextRequestSchema.safeParse(rawBody);
-
-    if (!parseResult.success) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: {
-            code: "INVALID_REQUEST",
-            message: parseResult.error.errors.map((e) => e.message).join(", "),
-          },
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { text, audio_base64, audio_mime_type, client_time_iso } = parseResult.data;
-
-    let apiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!apiKey) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-      const { data: vaultKey } = await supabaseAdmin.rpc("get_vault_secret", {
-        secret_name: "GEMINI_API_KEY",
-      });
-      if (vaultKey) apiKey = vaultKey;
-    }
-
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY no encontrada en secrets ni en Supabase Vault.");
-    }
-
-    // Preparar contenido para Gemini 1.5 Flash
-    let promptWithContext = CHILEAN_MEAL_TEXT_PROMPT;
-    if (clientTimeIso) {
-      promptWithContext += `\n[Hora local del cliente: ${clientTimeIso}]`;
-    }
-
-    const parts: any[] = [{ text: promptWithContext }];
-
+    const { client, user } = await authenticate(req);
+    const parsed = ParseMealTextRequestSchema.safeParse(await readBody(req));
+    if (!parsed.success) throw new ApiError(400, "INVALID_REQUEST", "Describe los alimentos o proporciona una grabación válida.");
+    const { text, audio_base64, audio_mime_type, client_time_iso } = parsed.data;
+    const key = await getGeminiKey(client);
+    await reserveAiRequest(client, user.id);
+    const parts: unknown[] = [{ text: CHILEAN_MEAL_TEXT_PROMPT + (client_time_iso ? "\nFecha de referencia: " + client_time_iso : "") }];
     if (audio_base64) {
-      // Entrada de audio multimodal directa
-      parts.push({
-        inline_data: {
-          mime_type: audio_mime_type || "audio/m4a",
-          data: audio_base64,
-        },
-      });
-      parts.push({
-        text: "Transcribe el audio y extrae los alimentos, gramos y macronutrientes en el JSON requerido.",
-      });
-    } else if (text) {
-      parts.push({
-        text: `Descripción del usuario: "${text}"`,
-      });
-    }
-
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts }],
-        generationConfig: {
-          response_mime_type: "application/json",
-          temperature: 0.1,
-        },
-      }),
+      parts.push({ inline_data: { mime_type: audio_mime_type, data: audio_base64 } });
+      parts.push({ text: "Transcribe el audio y extrae los alimentos y sus nutrientes en el JSON requerido." });
+    } else parts.push({ text: "Descripción de la comida: " + text });
+    const result = await callGemini(key, {
+      contents: [{ role: "user", parts }],
+      generationConfig: { response_mime_type: "application/json", temperature: 0.1, maxOutputTokens: 4096 },
     });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Error en API Gemini (${response.status}): ${errText}`);
-    }
-
-    const result = await response.json();
-    const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawText) {
-      throw new Error("No se obtuvo respuesta textual de la IA.");
-    }
-
-    const parsedJson = JSON.parse(rawText);
-    const validatedData = AIStructuredOutputSchema.parse(parsedJson);
-
-    if (!validatedData.items || validatedData.items.length === 0) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: {
-            code: "NO_FOOD_DETECTED",
-            message: "No logramos entender alimentos en la descripción. Por favor intenta ser más específico.",
-          },
-        }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const totals = validatedData.items.reduce(
-      (acc, item) => ({
-        calories: Math.round((acc.calories + item.calories) * 10) / 10,
-        protein: Math.round((acc.protein + item.protein) * 10) / 10,
-        carbs: Math.round((acc.carbs + item.carbs) * 10) / 10,
-        fat: Math.round((acc.fat + item.fat) * 10) / 10,
-      }),
-      { calories: 0, protein: 0, carbs: 0, fat: 0 }
-    );
-
-    const latencyMs = Date.now() - startTime;
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: {
-          meal_type_guess: validatedData.meal_type_guess,
-          items: validatedData.items,
-          totals,
-        },
-        meta: {
-          provider_used: "gemini-1.5-flash",
-          latency_ms: latencyMs,
-        },
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (error: any) {
-    console.error("Error en parse-meal-text:", error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: {
-          code: "SERVER_ERROR",
-          message: error?.message || "Ocurrió un error inesperado al procesar el texto/audio.",
-        },
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-});
+    const output = AIStructuredOutputSchema.safeParse(parseModelJson(result.text));
+    if (!output.success) throw new ApiError(502, "AI_INVALID_RESPONSE", "La IA no devolvió alimentos con datos válidos.");
+    if (!output.data.items.length) throw new ApiError(422, "NO_FOOD_DETECTED", "No se detectaron alimentos. Describe la comida con más detalle.");
+    const totals = output.data.items.reduce((acc, item) => ({
+      calories: acc.calories + item.calories, protein: acc.protein + item.protein,
+      carbs: acc.carbs + item.carbs, fat: acc.fat + item.fat,
+    }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+    return json({ success: true, data: { ...output.data, totals }, meta: { provider_used: result.model, latency_ms: Date.now() - start } }, 200, req);
+  } catch (error) { return errorResponse(error, req); }
+}
+Deno.serve(handleRequest);

@@ -1,3 +1,5 @@
+import { parseDecimal } from "@/utils/dates";
+import { showAlert } from "@/utils/alerts";
 import React, { useState } from "react";
 import {
   View,
@@ -7,7 +9,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { lookupBarcode, saveCustomBarcodeProduct, BarcodeProduct } from "@/services/barcodeService";
@@ -18,7 +19,7 @@ import { colors } from "@/constants/colors";
 export default function BarcodeScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
-  const { addItem, items } = useMealReviewStore();
+  const { addItem } = useMealReviewStore();
 
   const [barcodeInput, setBarcodeInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -42,20 +43,18 @@ export default function BarcodeScreen() {
     setNotFound(false);
     setProduct(null);
 
-    const result = await lookupBarcode(code);
-    setLoading(false);
-
-    if (result) {
-      setProduct(result);
-      setPortionGrams(String(result.servingSizeG || 100));
-    } else {
-      setNotFound(true);
-    }
+    try {
+      const result = await lookupBarcode(code);
+      if (result) { setProduct(result); setPortionGrams(String(result.servingSizeG || 100)); }
+      else { setNotFound(true); }
+    } catch (e) { showAlert("Código de barras", e instanceof Error ? e.message : "No se pudo buscar."); }
+    finally { setLoading(false); }
   };
 
   const handleAddProductToMeal = () => {
     if (!product) return;
-    const grams = parseFloat(portionGrams) || 100;
+    const grams = parseDecimal(portionGrams);
+    if (!Number.isFinite(grams) || grams <= 0 || grams > 20000) { showAlert("Porción inválida", "Ingresa los gramos consumidos."); return; }
     const factor = grams / 100;
 
     addItem({
@@ -73,7 +72,7 @@ export default function BarcodeScreen() {
 
   const handleSaveCustomProduct = async () => {
     if (!customName.trim()) {
-      Alert.alert("Error", "Ingresa el nombre del producto.");
+      showAlert("Error", "Ingresa el nombre del producto.");
       return;
     }
     if (!user) return;
@@ -85,26 +84,26 @@ export default function BarcodeScreen() {
         productName: customName.trim(),
         brand: customBrand.trim() || undefined,
         servingSizeG: 100,
-        caloriesPer100g: parseFloat(customCals) || 0,
-        proteinPer100g: parseFloat(customProt) || 0,
-        carbsPer100g: parseFloat(customCarbs) || 0,
-        fatPer100g: parseFloat(customFat) || 0,
+        caloriesPer100g: parseDecimal(customCals),
+        proteinPer100g: parseDecimal(customProt),
+        carbsPer100g: parseDecimal(customCarbs),
+        fatPer100g: parseDecimal(customFat),
       });
 
       // Añadir directamente a la comida
       addItem({
         food: `${customName.trim()}${customBrand ? ` (${customBrand.trim()})` : ""}`,
         grams: 100,
-        calories: parseFloat(customCals) || 0,
-        protein: parseFloat(customProt) || 0,
-        carbs: parseFloat(customCarbs) || 0,
-        fat: parseFloat(customFat) || 0,
+        calories: parseDecimal(customCals),
+        protein: parseDecimal(customProt),
+        carbs: parseDecimal(customCarbs),
+        fat: parseDecimal(customFat),
         confidence: 1.0,
       });
 
       router.push("/meal/review");
     } catch (err: any) {
-      Alert.alert("Error al guardar", err?.message);
+      showAlert("Error al guardar", err?.message);
     } finally {
       setLoading(false);
     }
@@ -120,13 +119,13 @@ export default function BarcodeScreen() {
         <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
           <Text style={styles.closeBtnText}>‹ Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.navTitle}>Escanear Código de Barras</Text>
+        <Text style={styles.navTitle}>Buscar Código de Barras</Text>
         <View style={{ width: 50 }} />
       </View>
 
       {/* Input de código de barras */}
       <View style={styles.searchCard}>
-        <Text style={styles.searchTitle}>Ingresa o escanea el código (EAN 780)</Text>
+        <Text style={styles.searchTitle}>Ingresa el código de barras del producto</Text>
         <View style={styles.inputRow}>
           <TextInput
             style={styles.barcodeTextInput}
@@ -149,26 +148,6 @@ export default function BarcodeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Atajos de prueba de supermercados chilenos */}
-        <Text style={styles.quickLabel}>Ejemplos de supermercados chilenos (EAN 780):</Text>
-        <View style={styles.quickChipsRow}>
-          {[
-            { label: "Leche Soprole 1L", code: "7802900001015" },
-            { label: "Manjar Colun 400g", code: "7802110001234" },
-            { label: "Pan Pita Ideal", code: "7801610000456" },
-          ].map((item) => (
-            <TouchableOpacity
-              key={item.code}
-              style={styles.quickChip}
-              onPress={() => {
-                setBarcodeInput(item.code);
-                handleSearch(item.code);
-              }}
-            >
-              <Text style={styles.quickChipText}>{item.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
       </View>
 
       {/* Resultado Encontrado */}

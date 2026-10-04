@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { randomUUID } from "expo-crypto";
 import { DetectedFoodItem, MealTotals, MealType } from "@/types/meal";
 
 interface MealReviewState {
@@ -7,6 +8,9 @@ interface MealReviewState {
   mealType: MealType;
   items: DetectedFoodItem[];
   userNotes: string;
+  loggedAt: string | null;
+  clientRequestId: string;
+  setLoggedAt: (date: string | null) => void;
 
   // Acciones
   initializeReview: (params: {
@@ -41,6 +45,9 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
   mealType: "almuerzo",
   items: [],
   userNotes: "",
+  loggedAt: null,
+  clientRequestId: randomUUID(),
+  setLoggedAt: (loggedAt) => set({ loggedAt }),
 
   initializeReview: ({ imagePath, localImageUri, mealType, items }) => {
     // Calculamos los ratios por gramo para cada ítem detectado
@@ -62,6 +69,7 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
       mealType,
       items: enrichedItems,
       userNotes: "",
+      clientRequestId: randomUUID(),
     });
   },
 
@@ -70,7 +78,8 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
   setUserNotes: (userNotes) => set({ userNotes }),
 
   updateItemGrams: (index, newGrams) => {
-    const safeGrams = Math.max(0, Math.round(newGrams));
+    if (!Number.isFinite(newGrams) || newGrams < 0 || newGrams > 20000) return;
+    const safeGrams = Math.round(newGrams * 10) / 10;
     set((state) => {
       const updated = [...state.items];
       const item = updated[index];
@@ -165,5 +174,7 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
       mealType: "almuerzo",
       items: [],
       userNotes: "",
+      loggedAt: null,
+      clientRequestId: randomUUID(),
     }),
 }));

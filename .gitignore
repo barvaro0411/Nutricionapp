@@ -32,3 +32,9 @@ supabase/.branches/
 expo-env.d.ts
 # @end expo-cli
 .vercel
+supabase/.private/
+audit-dist/
+audit-*.png
+auditoria/*.json
+.env.*
+!.env.example

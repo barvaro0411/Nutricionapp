@@ -1,0 +1,14 @@
+node_modules/
+.git/
+.expo/
+.vercel/
+dist/
+audit-dist/
+auditoria/
+supabase/
+.env
+.env.*
+*.pem
+*.log
+*.png.log
+({placeholder

@@ -17,7 +17,7 @@ import { DetectedFoodItem } from "@/types/meal";
 export default function RecipeDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: recipe, isLoading } = useRecipeDetail(id || "");
+  const { data: recipe, isLoading, error } = useRecipeDetail(id || "");
   const { initializeReview } = useMealReviewStore();
 
   const handleLogRecipe = () => {
@@ -27,14 +27,15 @@ export default function RecipeDetailScreen() {
     const detectedItems: DetectedFoodItem[] = recipe.ingredients.map((ing, idx) => ({
       id: `recipe_ing_${idx}_${Date.now()}`,
       food: ing.foodName,
-      grams: ing.grams,
-      calories: ing.calories,
-      protein: ing.protein,
-      carbs: ing.carbs,
-      fat: ing.fat,
+      grams: ing.grams / recipe.servings,
+      calories: ing.calories / recipe.servings,
+      protein: ing.protein / recipe.servings,
+      carbs: ing.carbs / recipe.servings,
+      fat: ing.fat / recipe.servings,
       confidence: 1.0,
     }));
 
+    useMealReviewStore.getState().reset();
     initializeReview({
       imagePath: "",
       localImageUri: "",
@@ -45,7 +46,7 @@ export default function RecipeDetailScreen() {
     router.push("/meal/review");
   };
 
-  if (isLoading || !recipe) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator color={colors.primary} size="large" />
@@ -53,6 +54,7 @@ export default function RecipeDetailScreen() {
     );
   }
 
+  if (!recipe || error) return <View style={styles.loadingContainer}><Text>{error?.message || "Receta no disponible."}</Text><TouchableOpacity onPress={() => router.back()}><Text>Volver</Text></TouchableOpacity></View>;
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}

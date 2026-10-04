@@ -2,7 +2,7 @@ project_id = "nutricionapp"
 
 [api]
 port = 54321
-schemas = ["public", "storage", "graphql_public"]
+schemas = ["public", "graphql_public"]
 
 [db]
 port = 54322
@@ -12,7 +12,16 @@ enabled = true
 
 [auth]
 enabled = true
-site_url = "http://localhost:3000"
+site_url = "https://nutricionapp-barvaro0411s-projects.vercel.app"
+additional_redirect_urls = ["https://nutricionapp-barvaro0411s-projects.vercel.app/**", "https://dist-two-alpha-18.vercel.app/**", "http://localhost:8081/**", "http://127.0.0.1:8081/**", "nutricionapp://**"]
 
+# Each handler verifies the user's token with auth.getUser (supports new signing keys).
 [functions.analyze-meal]
-verify_jwt = true
+verify_jwt = false
+import_map = "./functions/deno.json"
+[functions.parse-meal-text]
+verify_jwt = false
+import_map = "./functions/deno.json"
+[functions.nutrition-coach]
+verify_jwt = false
+import_map = "./functions/deno.json"

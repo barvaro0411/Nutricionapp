@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { colors } from "@/constants/colors";
 import { Gender, ActivityLevel, Objective } from "@/types/profile";
+import { parseDecimal } from "@/utils/dates";
 import { calculateNutritionGoals } from "@/utils/nutritionCalculator";
 
 export default function ProfileSetupScreen() {
@@ -19,7 +20,7 @@ export default function ProfileSetupScreen() {
   const { profile } = useAuthStore();
 
   const [gender, setGender] = useState<Gender>(profile?.gender || "male");
-  const [age, setAge] = useState(profile?.birth_date ? "28" : "28");
+  const [age, setAge] = useState(profile?.age ? String(profile.age) : "");
   const [heightCm, setHeightCm] = useState(profile?.height_cm ? String(profile.height_cm) : "175");
   const [weightKg, setWeightKg] = useState(profile?.current_weight_kg ? String(profile.current_weight_kg) : "75");
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>(
@@ -29,11 +30,11 @@ export default function ProfileSetupScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const handleCalculateGoals = () => {
-    const parsedAge = parseInt(age, 10);
-    const parsedHeight = parseFloat(heightCm);
-    const parsedWeight = parseFloat(weightKg);
+    const parsedAge = parseDecimal(age);
+    const parsedHeight = parseDecimal(heightCm);
+    const parsedWeight = parseDecimal(weightKg);
 
-    if (isNaN(parsedAge) || parsedAge < 14 || parsedAge > 100) {
+    if (!Number.isInteger(parsedAge) || parsedAge < 14 || parsedAge > 100) {
       setError("Ingresa una edad válida (entre 14 y 100 años).");
       return;
     }
