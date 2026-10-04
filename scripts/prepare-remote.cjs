@@ -5,8 +5,7 @@ fs.writeFileSync("supabase/bootstrap.sql", "-- Fresh database only. Existing pro
 fs.writeFileSync("supabase/full_schema.sql", fs.readFileSync("supabase/bootstrap.sql"));
 const plan = JSON.parse(fs.readFileSync("supabase/.private/personal-plan.json", "utf8"));
 const quote = value => "'" + String(value).replace(/'/g, "''") + "'";
-const repairs = files.filter(f => f.includes("000004_") || f.includes("000005_"));
-if (repairs.length !== 2) throw new Error("Expected two incremental migrations.");
+const repairs = files.filter(f => !f.includes("000000_") && !f.includes("000001_") && !f.includes("000002_") && !f.includes("000003_"));
 const body = repairs.map(f => fs.readFileSync("supabase/migrations/" + f,"utf8")).join("\n");
 const history = [
   "CREATE SCHEMA IF NOT EXISTS supabase_migrations;",
