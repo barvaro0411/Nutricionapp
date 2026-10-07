@@ -1,4 +1,5 @@
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
+import { useQuickLogStore } from "@/stores/useQuickLogStore";
 import { usePersonalPlan } from "@/hooks/usePersonalPlan";
 import { getDateKey, loggedAtForDate, APP_TIME_ZONE } from "@/utils/dates";
 import { showAlert } from "@/utils/alerts";
@@ -44,6 +45,12 @@ export default function DashboardScreen() {
   const { data: personalPlan } = usePersonalPlan();
   const beginMeal = () => { useMealReviewStore.getState().reset(); useMealReviewStore.getState().setLoggedAt(loggedAtForDate(selectedDate)); };
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const {
+    showTextVoice,
+    showFavorites,
+    closeTextVoice,
+    closeFavorites,
+  } = useQuickLogStore();
   const [showTextVoiceModal, setShowTextVoiceModal] = useState(false);
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
@@ -280,15 +287,21 @@ export default function DashboardScreen() {
 
       {/* Modal de Texto / Voz */}
       <TextVoiceModal
-        visible={showTextVoiceModal}
+        visible={showTextVoiceModal || showTextVoice}
         mealType={activeMealType}
-        onClose={() => setShowTextVoiceModal(false)}
+        onClose={() => {
+          setShowTextVoiceModal(false);
+          closeTextVoice();
+        }}
       />
 
       {/* Modal de Comidas Frecuentes */}
       <FavoritesModal
-        visible={showFavoritesModal}
-        onClose={() => setShowFavoritesModal(false)}
+        visible={showFavoritesModal || showFavorites}
+        onClose={() => {
+          setShowFavoritesModal(false);
+          closeFavorites();
+        }}
       />
 
       {/* Modal de Actividad Física y Apple Health */}

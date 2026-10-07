@@ -1,12 +1,26 @@
-import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import React from "react";
 import { Tabs, useRouter } from "expo-router";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
-import { LayoutDashboard, CalendarDays, Settings, Camera } from "lucide-react-native";
+import { View, StyleSheet, TouchableOpacity, Platform } from "react-native";
+import { LayoutDashboard, CalendarDays, Plus, Sparkles, Settings } from "lucide-react-native";
 import { colors } from "@/constants/colors";
+import { useQuickLogStore } from "@/stores/useQuickLogStore";
+import { useMealReviewStore } from "@/stores/useMealReviewStore";
+import { QuickLogModal } from "@/components/dashboard/QuickLogModal";
 
 export default function TabLayout() {
   const router = useRouter();
+  const {
+    isOpen: isQuickLogOpen,
+    openQuickLog,
+    closeQuickLog,
+    openTextVoice,
+    openFavorites,
+  } = useQuickLogStore();
+
+  const handleOpenQuickLog = () => {
+    useMealReviewStore.getState().reset();
+    openQuickLog();
+  };
 
   return (
     <>
@@ -15,101 +29,169 @@ export default function TabLayout() {
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textMuted,
           tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: "600",
-            marginBottom: 4,
+            fontSize: 10.5,
+            fontWeight: "700",
+            marginBottom: Platform.OS === "ios" ? 0 : 4,
           },
           tabBarStyle: {
-            backgroundColor: colors.card,
+            backgroundColor: "#FFFFFF",
             borderTopColor: colors.cardBorder,
             borderTopWidth: 1,
-            height: 68,
-            paddingBottom: 8,
-            paddingTop: 6,
-            elevation: 8,
+            height: Platform.OS === "ios" ? 84 : 68,
+            paddingBottom: Platform.OS === "ios" ? 22 : 8,
+            paddingTop: 8,
             shadowColor: "#0F172A",
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
+            shadowOffset: { width: 0, height: -3 },
+            shadowOpacity: 0.05,
+            shadowRadius: 10,
+            elevation: 10,
           },
           headerStyle: {
-            backgroundColor: colors.card,
+            backgroundColor: "#FFFFFF",
             elevation: 0,
             shadowOpacity: 0,
             borderBottomWidth: 1,
             borderBottomColor: colors.cardBorder,
           },
           headerTitleStyle: {
-            fontWeight: "700",
+            fontWeight: "800",
             fontSize: 18,
             color: colors.text,
+            letterSpacing: -0.3,
           },
         }}
       >
+        {/* Tab 1: Hoy */}
         <Tabs.Screen
           name="index"
           options={{
             title: "Hoy",
             headerTitle: "Nutrición Hoy",
             tabBarIcon: ({ color, focused }) => (
-              <LayoutDashboard size={22} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+              <LayoutDashboard
+                size={22}
+                color={color}
+                strokeWidth={focused ? 2.5 : 1.8}
+              />
             ),
           }}
         />
+
+        {/* Tab 2: Historial */}
         <Tabs.Screen
           name="history"
           options={{
             title: "Historial",
-            headerTitle: "Historial y Semanal",
+            headerTitle: "Progreso Semanal",
             tabBarIcon: ({ color, focused }) => (
-              <CalendarDays size={22} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+              <CalendarDays
+                size={22}
+                color={color}
+                strokeWidth={focused ? 2.5 : 1.8}
+              />
             ),
           }}
         />
+
+        {/* Tab 3: Botón Central de Registro Rápido */}
+        <Tabs.Screen
+          name="record"
+          options={{
+            title: "",
+            tabBarButton: () => (
+              <View style={styles.centerButtonWrapper} pointerEvents="box-none">
+                <TouchableOpacity
+                  style={styles.centerButton}
+                  onPress={handleOpenQuickLog}
+                  activeOpacity={0.85}
+                  accessibilityLabel="Registrar comida"
+                  accessibilityRole="button"
+                >
+                  <Plus size={26} color="#FFFFFF" strokeWidth={2.8} />
+                </TouchableOpacity>
+              </View>
+            ),
+          }}
+        />
+
+        {/* Tab 4: Coach IA */}
+        <Tabs.Screen
+          name="coach"
+          options={{
+            title: "Coach IA",
+            headerTitle: "Coach Nutricional IA",
+            tabBarIcon: ({ color, focused }) => (
+              <Sparkles
+                size={22}
+                color={color}
+                strokeWidth={focused ? 2.5 : 1.8}
+              />
+            ),
+          }}
+        />
+
+        {/* Tab 5: Ajustes */}
         <Tabs.Screen
           name="settings"
           options={{
             title: "Ajustes",
             headerTitle: "Mi Perfil y Metas",
             tabBarIcon: ({ color, focused }) => (
-              <Settings size={22} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+              <Settings
+                size={22}
+                color={color}
+                strokeWidth={focused ? 2.5 : 1.8}
+              />
             ),
           }}
         />
       </Tabs>
 
-      {/* Botón flotante de cámara inteligente IA posicionado ergonómicamente */}
-      <View style={styles.floatingButtonContainer} pointerEvents="box-none">
-        <TouchableOpacity
-          style={styles.floatingButton}
-          onPress={() => { useMealReviewStore.getState().reset(); router.push("/meal/camera"); }}
-          activeOpacity={0.85}
-        >
-          <Camera size={26} color="#FFFFFF" strokeWidth={2.2} />
-        </TouchableOpacity>
-      </View>
+      {/* Modal de Registro Rápido */}
+      <QuickLogModal
+        visible={isQuickLogOpen}
+        onClose={closeQuickLog}
+        onSelectCamera={() => {
+          useMealReviewStore.getState().reset();
+          router.push("/meal/camera");
+        }}
+        onSelectBarcode={() => {
+          useMealReviewStore.getState().reset();
+          router.push("/meal/barcode");
+        }}
+        onSelectTextVoice={() => {
+          useMealReviewStore.getState().reset();
+          router.push("/(tabs)");
+          openTextVoice();
+        }}
+        onSelectFavorites={() => {
+          useMealReviewStore.getState().reset();
+          router.push("/(tabs)");
+          openFavorites();
+        }}
+      />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  floatingButtonContainer: {
-    position: "absolute",
-    bottom: 80,
-    right: 20,
-    zIndex: 99,
+  centerButtonWrapper: {
+    top: -14,
+    justifyContent: "center",
+    alignItems: "center",
+    width: 60,
   },
-  floatingButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  centerButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 3,
+    borderWidth: 3.5,
     borderColor: "#FFFFFF",
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 8,

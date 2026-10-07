@@ -10,7 +10,7 @@ interface MacroCardProps {
   lightBg: string;
 }
 
-function MacroCard({ label, consumed, goal, color }: MacroCardProps) {
+function MacroCard({ label, consumed, goal, color, lightBg }: MacroCardProps) {
   const safeGoal = goal || 1;
   const progressPct = Math.min(100, Math.round((consumed / safeGoal) * 100));
   const remaining = Math.max(0, goal - consumed);
@@ -18,8 +18,13 @@ function MacroCard({ label, consumed, goal, color }: MacroCardProps) {
   return (
     <View style={styles.macroCard}>
       <View style={styles.macroHeader}>
-        <View style={[styles.dot, { backgroundColor: color }]} />
-        <Text style={styles.macroName}>{label}</Text>
+        <View style={styles.headerLeft}>
+          <View style={[styles.dot, { backgroundColor: color }]} />
+          <Text style={styles.macroName}>{label}</Text>
+        </View>
+        <View style={[styles.pctBadge, { backgroundColor: lightBg }]}>
+          <Text style={[styles.pctText, { color }]}>{progressPct}%</Text>
+        </View>
       </View>
 
       <View style={styles.numberRow}>
@@ -27,7 +32,7 @@ function MacroCard({ label, consumed, goal, color }: MacroCardProps) {
         <Text style={styles.goalNumber}>/{goal}g</Text>
       </View>
 
-      {/* Barra de progreso delgada */}
+      {/* Barra de progreso moderna */}
       <View style={styles.track}>
         <View
           style={[
@@ -38,7 +43,7 @@ function MacroCard({ label, consumed, goal, color }: MacroCardProps) {
       </View>
 
       <Text style={styles.remainingText}>
-        {remaining > 0 ? `-${Math.round(remaining)}g` : "Completado"}
+        {remaining > 0 ? `${Math.round(remaining)}g restantes` : "Meta alcanzada ✓"}
       </Text>
     </View>
   );
@@ -64,7 +69,7 @@ export function MacroProgressBar({
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.sectionOverline}>MACRONUTRIENTES</Text>
+        <Text style={styles.sectionOverline}>MACRONUTRIENTES CLAVE</Text>
       </View>
 
       <View style={styles.grid}>
@@ -109,7 +114,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: colors.textSecondary,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   grid: {
     flexDirection: "row",
@@ -117,60 +122,74 @@ const styles = StyleSheet.create({
   },
   macroCard: {
     flex: 1,
-    backgroundColor: colors.card,
+    backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 14,
+    padding: 13,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    shadowColor: "#000000",
+    shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 6,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
     elevation: 1,
   },
   macroHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
   macroName: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  pctBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  pctText: {
+    fontSize: 10,
+    fontWeight: "800",
   },
   numberRow: {
     flexDirection: "row",
     alignItems: "baseline",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   consumedNumber: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: "800",
     color: colors.text,
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
   },
   goalNumber: {
-    fontSize: 12,
-    fontWeight: "500",
+    fontSize: 11.5,
+    fontWeight: "600",
     color: colors.textMuted,
     marginLeft: 2,
   },
   track: {
-    height: 4,
+    height: 5,
     backgroundColor: colors.surfaceMuted,
-    borderRadius: 2,
+    borderRadius: 3,
     overflow: "hidden",
-    marginBottom: 6,
+    marginBottom: 8,
   },
   fill: {
     height: "100%",
-    borderRadius: 2,
+    borderRadius: 3,
   },
   remainingText: {
     fontSize: 10,

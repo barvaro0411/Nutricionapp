@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { cancelMealReminders } from "@/services/notificationService";
 import { colors } from "@/constants/colors";
+import { ToastContainer } from "@/components/common/ToastContainer";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 2, staleTime: 300000 } } });
 
@@ -111,6 +112,7 @@ function RootNavigationLayout() {
   if (!initialized || isLoading) return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
   return <>
     <StatusBar style="auto" />
+    <ToastContainer />
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="meal/review" options={{ presentation: "modal", title: "Confirmar comida", headerShown: true }} />
       <Stack.Screen name="meal/camera" options={{ presentation: "fullScreenModal" }} />
