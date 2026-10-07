@@ -1,6 +1,6 @@
 import { parseDecimal } from "@/utils/dates";
 import { showAlert } from "@/utils/alerts";
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -12,19 +12,21 @@ import {
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
+import {
+  BrowserMultiFormatReader,
+  BarcodeFormat,
+  DecodeHintType,
+} from "@zxing/library";
 import {
   Camera,
   Keyboard,
-  Flashlight,
-  FlashlightOff,
   RotateCcw,
   Sparkles,
   ArrowLeft,
   CheckCircle2,
-  Scan,
   AlertCircle,
+  Camera as CameraIcon,
 } from "lucide-react-native";
 import {
   lookupBarcode,
@@ -34,6 +36,7 @@ import {
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useMealAnalysis } from "@/hooks/useMealAnalysis";
+import { BarcodeScannerView } from "@/components/meal/BarcodeScannerView";
 import { colors } from "@/constants/colors";
 
 export default function BarcodeScreen() {
@@ -43,8 +46,6 @@ export default function BarcodeScreen() {
   const { analyzePhoto } = useMealAnalysis();
 
   const [activeTab, setActiveTab] = useState<"camera" | "manual">("camera");
-  const [permission, requestPermission] = useCameraPermissions();
-  const [torchEnabled, setTorchEnabled] = useState(false);
   const [scanned, setScanned] = useState(false);
 
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -85,11 +86,11 @@ export default function BarcodeScreen() {
     }
   };
 
-  const handleBarcodeScanned = ({ data }: { data: string }) => {
-    if (scanned || loading || !data) return;
+  const handleBarcodeDetected = (code: string) => {
+    if (scanned || loading || !code) return;
     setScanned(true);
-    setBarcodeInput(data);
-    void handleSearch(data);
+    setBarcodeInput(code);
+    void handleSearch(code);
   };
 
   const handleResetScanner = () => {
@@ -99,12 +100,77 @@ export default function BarcodeScreen() {
     setBarcodeInput("");
   };
 
+  const handleTakePhotoOfBarcode = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.9,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setLoading(true);
+        let codeFound: string | null = null;
+
+        try {
+          const hints = new Map();
+          hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+            BarcodeFormat.EAN_13,
+            BarcodeFormat.EAN_8,
+            BarcodeFormat.UPC_A,
+            BarcodeFormat.UPC_E,
+            BarcodeFormat.CODE_128,
+          ]);
+          const reader = new BrowserMultiFormatReader(hints);
+          const decoded = await reader.decodeFromImageUrl(result.assets[0].uri);
+          if (decoded) {
+            codeFound = decoded.getText();
+          }
+        } catch {}
+
+        if (codeFound) {
+          setBarcodeInput(codeFound);
+          await handleSearch(codeFound);
+        } else {
+          // Si no se decodificó ópticamente, usar IA para reconocer el alimento directamente
+          const analysis = await analyzePhoto(
+            result.assets[0].uri,
+            "snack",
+            "Identifica este producto de supermercado chileno y sus macronutrientes por cada 100g."
+          );
+
+          if (analysis.success && analysis.data?.items?.[0]) {
+            const item = analysis.data.items[0];
+            setProduct({
+              barcode: "FOTO-IA",
+              productName: item.food,
+              servingSizeG: 100,
+              caloriesPer100g: item.calories,
+              proteinPer100g: item.protein,
+              carbsPer100g: item.carbs,
+              fatPer100g: item.fat,
+              source: "local",
+            });
+            setPortionGrams(String(Math.round(item.grams || 100)));
+          } else {
+            showAlert("No se reconoció el código", "Intenta escribir los números del código manualmente abajo.");
+            setActiveTab("manual");
+          }
+        }
+      }
+    } catch (e: any) {
+      showAlert("Cámara", e?.message || "No se pudo tomar la foto");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleScanNutritionLabel = async () => {
     try {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ["images"],
         allowsEditing: true,
-        quality: 0.8,
+        quality: 0.85,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -112,7 +178,7 @@ export default function BarcodeScreen() {
         const analysis = await analyzePhoto(
           result.assets[0].uri,
           "snack",
-          "Esta foto es de una etiqueta nutricional de un producto chileno. Lee la tabla por cada 100g."
+          "Esta foto es de una etiqueta nutricional de un producto chileno. Lee la información por cada 100g."
         );
 
         if (analysis.success && analysis.data?.items?.[0]) {
@@ -123,8 +189,8 @@ export default function BarcodeScreen() {
           setCustomCarbs(String(Math.round(item.carbs * 10) / 10));
           setCustomFat(String(Math.round(item.fat * 10) / 10));
           showAlert(
-            "¡Etiqueta Leída!",
-            "La IA completó los datos nutricionales según la foto. Revisa y confirma."
+            "¡Etiqueta Leída con IA!",
+            "Completamos los datos nutricionales según la foto. Confirma los valores."
           );
         }
       }
@@ -198,6 +264,13 @@ export default function BarcodeScreen() {
   const grams = parseFloat(portionGrams) || 100;
   const factor = grams / 100;
 
+  // Productos chilenos frecuentes para probar en 1 toque
+  const demoProducts = [
+    { label: "Leche Colun Entera", code: "7802900001001" },
+    { label: "Galletas Salvado Costa", code: "7802800000123" },
+    { label: "Atún Lomitos San José", code: "7801810000456" },
+  ];
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Top Navigation */}
@@ -205,11 +278,11 @@ export default function BarcodeScreen() {
         <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
           <ArrowLeft size={18} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>Código de Barras</Text>
+        <Text style={styles.navTitle}>Escanear Código de Barras</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Tabs Selector: Cámara vs Manual */}
+      {/* Selector de Modo: Cámara vs Manual */}
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tabBtn, activeTab === "camera" && styles.tabBtnActive]}
@@ -226,7 +299,7 @@ export default function BarcodeScreen() {
               activeTab === "camera" && styles.tabBtnTextActive,
             ]}
           >
-            Escanear Cámara
+            Escáner en Vivo
           </Text>
         </TouchableOpacity>
 
@@ -250,89 +323,44 @@ export default function BarcodeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* TAB 1: ESCANEAR CON CÁMARA */}
+      {/* TAB 1: ESCÁNER EN VIVO CON CÁMARA */}
       {activeTab === "camera" && (
         <View style={styles.cameraSection}>
-          {!permission?.granted ? (
-            <View style={styles.permissionCard}>
-              <Scan size={44} color={colors.primary} />
-              <Text style={styles.permissionTitle}>Permiso de Cámara</Text>
-              <Text style={styles.permissionDesc}>
-                Apunta tu cámara a cualquier código de barras chileno para reconocerlo al instante.
-              </Text>
+          <BarcodeScannerView
+            onBarcodeScanned={handleBarcodeDetected}
+            isPaused={scanned || loading}
+          />
+
+          <View style={styles.cameraActionsRow}>
+            {scanned ? (
               <TouchableOpacity
-                style={styles.permissionBtn}
-                onPress={requestPermission}
+                style={styles.rescanBtn}
+                onPress={handleResetScanner}
+                activeOpacity={0.85}
               >
-                <Text style={styles.permissionBtnText}>Activar Cámara</Text>
+                <RotateCcw size={16} color={colors.text} />
+                <Text style={styles.rescanBtnText}>Escanear otro código</Text>
               </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.cameraViewportWrap}>
-              <CameraView
-                style={styles.cameraView}
-                facing="back"
-                enableTorch={torchEnabled}
-                barcodeScannerSettings={{
-                  barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128"],
-                }}
-                onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
+            ) : (
+              <TouchableOpacity
+                style={styles.snapPhotoBtn}
+                onPress={handleTakePhotoOfBarcode}
+                activeOpacity={0.85}
               >
-                {/* Overlay HUD del Escáner */}
-                <View style={styles.hudOverlay}>
-                  {/* Botón de linterna */}
-                  <TouchableOpacity
-                    style={styles.torchBtn}
-                    onPress={() => setTorchEnabled(!torchEnabled)}
-                    activeOpacity={0.8}
-                  >
-                    {torchEnabled ? (
-                      <FlashlightOff size={20} color="#FFFFFF" />
-                    ) : (
-                      <Flashlight size={20} color="#FFFFFF" />
-                    )}
-                  </TouchableOpacity>
-
-                  {/* Retícula de escaneo */}
-                  <View
-                    style={[
-                      styles.scanFrame,
-                      scanned && styles.scanFrameSuccess,
-                    ]}
-                  >
-                    <View style={styles.laserLine} />
-                  </View>
-
-                  <View style={styles.scanInstructionPill}>
-                    <Text style={styles.scanInstructionText}>
-                      {scanned
-                        ? "Código detectado ✓"
-                        : "Apunta al código de barras"}
-                    </Text>
-                  </View>
-                </View>
-              </CameraView>
-
-              {/* Botón para volver a escanear */}
-              {scanned && (
-                <TouchableOpacity
-                  style={styles.rescanBtn}
-                  onPress={handleResetScanner}
-                  activeOpacity={0.8}
-                >
-                  <RotateCcw size={16} color={colors.text} />
-                  <Text style={styles.rescanBtnText}>Escanear otro código</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+                <CameraIcon size={16} color="#FFFFFF" />
+                <Text style={styles.snapPhotoBtnText}>
+                  Tomar foto al código o producto
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
 
       {/* TAB 2: INGRESO MANUAL */}
       {activeTab === "manual" && (
         <View style={styles.searchCard}>
-          <Text style={styles.searchTitle}>Ingresa el código numérico</Text>
+          <Text style={styles.searchTitle}>Ingresa los números del código de barras</Text>
           <View style={styles.inputRow}>
             <TextInput
               style={styles.barcodeTextInput}
@@ -357,18 +385,37 @@ export default function BarcodeScreen() {
               )}
             </TouchableOpacity>
           </View>
+
+          {/* Chips de ejemplo */}
+          <Text style={styles.demoHeader}>O prueba con un producto chileno:</Text>
+          <View style={styles.demoChipsRow}>
+            {demoProducts.map((p) => (
+              <TouchableOpacity
+                key={p.code}
+                style={styles.demoChip}
+                onPress={() => {
+                  setBarcodeInput(p.code);
+                  void handleSearch(p.code);
+                }}
+              >
+                <Text style={styles.demoChipText}>{p.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       )}
 
-      {/* Estado de Carga */}
+      {/* ESTADO DE CARGA */}
       {loading && (
         <View style={styles.loadingCard}>
           <ActivityIndicator color={colors.primary} size="large" />
-          <Text style={styles.loadingText}>Buscando en catálogo chileno e internacional...</Text>
+          <Text style={styles.loadingText}>
+            Consultando catálogo chileno e internacional...
+          </Text>
         </View>
       )}
 
-      {/* RESULTADO ENCONTRADO */}
+      {/* PRODUCTO ENCONTRADO */}
       {product && (
         <View style={styles.resultCard}>
           <View style={styles.resultHeader}>
@@ -379,10 +426,10 @@ export default function BarcodeScreen() {
             </View>
             <Text style={styles.productName}>{product.productName}</Text>
             {product.brand && <Text style={styles.productBrand}>{product.brand}</Text>}
-            <Text style={styles.productCode}>EAN: {product.barcode}</Text>
+            <Text style={styles.productCode}>Código: {product.barcode}</Text>
           </View>
 
-          {/* Selector de porción consumida */}
+          {/* Selector de porción en gramos */}
           <View style={styles.portionSection}>
             <Text style={styles.portionLabel}>¿Cuántos gramos consumiste?</Text>
             <View style={styles.portionInputRow}>
@@ -435,12 +482,12 @@ export default function BarcodeScreen() {
         </View>
       )}
 
-      {/* NO ENCONTRADO: OPCIÓN OCR CON FOTO O GUARDADO MANUAL */}
+      {/* PRODUCTO NO ENCONTRADO EN LA BASE DE DATOS */}
       {notFound && (
         <View style={styles.notFoundCard}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
             <AlertCircle size={18} color="#D97706" />
-            <Text style={styles.notFoundTitle}>Producto no registrado aún</Text>
+            <Text style={styles.notFoundTitle}>Producto no registrado en catálogo</Text>
           </View>
           <Text style={styles.notFoundDesc}>
             No encontramos el código {barcodeInput}. Puedes fotografiar la tabla nutricional con IA o ingresar los datos:
@@ -595,97 +642,8 @@ const styles = StyleSheet.create({
   cameraSection: {
     marginBottom: 16,
   },
-  permissionCard: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  permissionTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: colors.text,
+  cameraActionsRow: {
     marginTop: 12,
-    marginBottom: 6,
-  },
-  permissionDesc: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginBottom: 16,
-    lineHeight: 18,
-  },
-  permissionBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 14,
-  },
-  permissionBtnText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  cameraViewportWrap: {
-    borderRadius: 20,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  cameraView: {
-    width: "100%",
-    height: 300,
-  },
-  hudOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.25)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  torchBtn: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scanFrame: {
-    width: 240,
-    height: 140,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.8)",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  scanFrameSuccess: {
-    borderColor: "#10B981",
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
-  },
-  laserLine: {
-    width: "90%",
-    height: 2,
-    backgroundColor: "#EF4444",
-  },
-  scanInstructionPill: {
-    position: "absolute",
-    bottom: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.65)",
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-  },
-  scanInstructionText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "600",
   },
   rescanBtn: {
     flexDirection: "row",
@@ -693,12 +651,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     backgroundColor: colors.surfaceMuted,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
   rescanBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
     color: colors.text,
+  },
+  snapPhotoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  snapPhotoBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   searchCard: {
     backgroundColor: colors.card,
@@ -741,6 +716,31 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "700",
+  },
+  demoHeader: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  demoChipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  demoChip: {
+    backgroundColor: colors.surfaceMuted,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  demoChipText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.text,
   },
   loadingCard: {
     padding: 24,
