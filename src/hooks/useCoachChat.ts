@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { extractFunctionErrorMessage } from "@/utils/functionErrors";
 
 export interface CoachMessage {
   id: string;
@@ -56,7 +57,11 @@ export function useCoachChat() {
       });
 
       if (error) {
-        throw new Error(error.message || "Error al conectar con el Coach");
+        const readableMsg = await extractFunctionErrorMessage(
+          error,
+          "No pudimos conectar con el Coach. Inténtalo de nuevo."
+        );
+        throw new Error(readableMsg);
       }
 
       if (!data || !data.success) {

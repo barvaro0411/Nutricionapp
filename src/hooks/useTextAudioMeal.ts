@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { supabase } from "@/services/supabase";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { AnalyzeMealResponse, MealType } from "@/types/meal";
+import { extractFunctionErrorMessage } from "@/utils/functionErrors";
 
 export function useTextAudioMeal() {
   const router = useRouter();
@@ -34,7 +35,11 @@ export function useTextAudioMeal() {
       );
 
       if (funcErr) {
-        throw new Error(funcErr.message || "Error al comunicarse con la IA");
+        const readableMsg = await extractFunctionErrorMessage(
+          funcErr,
+          "No pudimos interpretar la descripción. Intenta detallar un poco más los alimentos."
+        );
+        throw new Error(readableMsg);
       }
 
       if (!data || !data.success || !data.data) {
@@ -88,7 +93,11 @@ export function useTextAudioMeal() {
       );
 
       if (funcErr) {
-        throw new Error(funcErr.message || "Error al procesar el audio con la IA");
+        const readableMsg = await extractFunctionErrorMessage(
+          funcErr,
+          "No pudimos procesar el audio. Asegúrate de hablar claro y cerca del micrófono."
+        );
+        throw new Error(readableMsg);
       }
 
       if (!data || !data.success || !data.data) {

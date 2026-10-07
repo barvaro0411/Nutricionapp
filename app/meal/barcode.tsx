@@ -1,6 +1,6 @@
 import { parseDecimal } from "@/utils/dates";
 import { showAlert } from "@/utils/alerts";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -9,17 +9,43 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { lookupBarcode, saveCustomBarcodeProduct, BarcodeProduct } from "@/services/barcodeService";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
+import {
+  Camera,
+  Keyboard,
+  Flashlight,
+  FlashlightOff,
+  RotateCcw,
+  Sparkles,
+  ArrowLeft,
+  CheckCircle2,
+  Scan,
+  AlertCircle,
+} from "lucide-react-native";
+import {
+  lookupBarcode,
+  saveCustomBarcodeProduct,
+  BarcodeProduct,
+} from "@/services/barcodeService";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useMealAnalysis } from "@/hooks/useMealAnalysis";
 import { colors } from "@/constants/colors";
 
 export default function BarcodeScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { addItem } = useMealReviewStore();
+  const { analyzePhoto } = useMealAnalysis();
+
+  const [activeTab, setActiveTab] = useState<"camera" | "manual">("camera");
+  const [permission, requestPermission] = useCameraPermissions();
+  const [torchEnabled, setTorchEnabled] = useState(false);
+  const [scanned, setScanned] = useState(false);
 
   const [barcodeInput, setBarcodeInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,6 +60,7 @@ export default function BarcodeScreen() {
   const [customProt, setCustomProt] = useState("5");
   const [customCarbs, setCustomCarbs] = useState("20");
   const [customFat, setCustomFat] = useState("3");
+  const [scanningLabel, setScanningLabel] = useState(false);
 
   const handleSearch = async (codeToSearch?: string) => {
     const code = (codeToSearch || barcodeInput).trim();
@@ -45,16 +72,76 @@ export default function BarcodeScreen() {
 
     try {
       const result = await lookupBarcode(code);
-      if (result) { setProduct(result); setPortionGrams(String(result.servingSizeG || 100)); }
-      else { setNotFound(true); }
-    } catch (e) { showAlert("Código de barras", e instanceof Error ? e.message : "No se pudo buscar."); }
-    finally { setLoading(false); }
+      if (result) {
+        setProduct(result);
+        setPortionGrams(String(result.servingSizeG || 100));
+      } else {
+        setNotFound(true);
+      }
+    } catch (e) {
+      showAlert("Código de barras", e instanceof Error ? e.message : "No se pudo buscar.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    if (scanned || loading || !data) return;
+    setScanned(true);
+    setBarcodeInput(data);
+    void handleSearch(data);
+  };
+
+  const handleResetScanner = () => {
+    setScanned(false);
+    setProduct(null);
+    setNotFound(false);
+    setBarcodeInput("");
+  };
+
+  const handleScanNutritionLabel = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setScanningLabel(true);
+        const analysis = await analyzePhoto(
+          result.assets[0].uri,
+          "snack",
+          "Esta foto es de una etiqueta nutricional de un producto chileno. Lee la tabla por cada 100g."
+        );
+
+        if (analysis.success && analysis.data?.items?.[0]) {
+          const item = analysis.data.items[0];
+          setCustomName(item.food);
+          setCustomCals(String(Math.round(item.calories)));
+          setCustomProt(String(Math.round(item.protein * 10) / 10));
+          setCustomCarbs(String(Math.round(item.carbs * 10) / 10));
+          setCustomFat(String(Math.round(item.fat * 10) / 10));
+          showAlert(
+            "¡Etiqueta Leída!",
+            "La IA completó los datos nutricionales según la foto. Revisa y confirma."
+          );
+        }
+      }
+    } catch (err: any) {
+      showAlert("Cámara", err?.message || "No se pudo fotografiar la etiqueta.");
+    } finally {
+      setScanningLabel(false);
+    }
   };
 
   const handleAddProductToMeal = () => {
     if (!product) return;
     const grams = parseDecimal(portionGrams);
-    if (!Number.isFinite(grams) || grams <= 0 || grams > 20000) { showAlert("Porción inválida", "Ingresa los gramos consumidos."); return; }
+    if (!Number.isFinite(grams) || grams <= 0 || grams > 20000) {
+      showAlert("Porción inválida", "Ingresa los gramos consumidos.");
+      return;
+    }
     const factor = grams / 100;
 
     addItem({
@@ -80,7 +167,7 @@ export default function BarcodeScreen() {
     try {
       setLoading(true);
       await saveCustomBarcodeProduct(user.id, {
-        barcode: barcodeInput.trim(),
+        barcode: barcodeInput.trim() || "000000000000",
         productName: customName.trim(),
         brand: customBrand.trim() || undefined,
         servingSizeG: 100,
@@ -90,7 +177,6 @@ export default function BarcodeScreen() {
         fatPer100g: parseDecimal(customFat),
       });
 
-      // Añadir directamente a la comida
       addItem({
         food: `${customName.trim()}${customBrand ? ` (${customBrand.trim()})` : ""}`,
         grams: 100,
@@ -114,43 +200,175 @@ export default function BarcodeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Top Header */}
+      {/* Top Navigation */}
       <View style={styles.topNav}>
         <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
-          <Text style={styles.closeBtnText}>‹ Volver</Text>
+          <ArrowLeft size={18} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>Buscar Código de Barras</Text>
-        <View style={{ width: 50 }} />
+        <Text style={styles.navTitle}>Código de Barras</Text>
+        <View style={{ width: 40 }} />
       </View>
 
-      {/* Input de código de barras */}
-      <View style={styles.searchCard}>
-        <Text style={styles.searchTitle}>Ingresa el código de barras del producto</Text>
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.barcodeTextInput}
-            placeholder="Ej: 7802900000001"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="number-pad"
-            value={barcodeInput}
-            onChangeText={setBarcodeInput}
+      {/* Tabs Selector: Cámara vs Manual */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === "camera" && styles.tabBtnActive]}
+          onPress={() => setActiveTab("camera")}
+          activeOpacity={0.8}
+        >
+          <Camera
+            size={16}
+            color={activeTab === "camera" ? colors.primary : colors.textSecondary}
           />
-          <TouchableOpacity
-            style={[styles.searchBtn, (!barcodeInput.trim() || loading) && styles.btnDisabled]}
-            onPress={() => handleSearch()}
-            disabled={!barcodeInput.trim() || loading}
+          <Text
+            style={[
+              styles.tabBtnText,
+              activeTab === "camera" && styles.tabBtnTextActive,
+            ]}
           >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text style={styles.searchBtnText}>Buscar</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+            Escanear Cámara
+          </Text>
+        </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === "manual" && styles.tabBtnActive]}
+          onPress={() => setActiveTab("manual")}
+          activeOpacity={0.8}
+        >
+          <Keyboard
+            size={16}
+            color={activeTab === "manual" ? colors.primary : colors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.tabBtnText,
+              activeTab === "manual" && styles.tabBtnTextActive,
+            ]}
+          >
+            Ingreso Manual
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Resultado Encontrado */}
+      {/* TAB 1: ESCANEAR CON CÁMARA */}
+      {activeTab === "camera" && (
+        <View style={styles.cameraSection}>
+          {!permission?.granted ? (
+            <View style={styles.permissionCard}>
+              <Scan size={44} color={colors.primary} />
+              <Text style={styles.permissionTitle}>Permiso de Cámara</Text>
+              <Text style={styles.permissionDesc}>
+                Apunta tu cámara a cualquier código de barras chileno para reconocerlo al instante.
+              </Text>
+              <TouchableOpacity
+                style={styles.permissionBtn}
+                onPress={requestPermission}
+              >
+                <Text style={styles.permissionBtnText}>Activar Cámara</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.cameraViewportWrap}>
+              <CameraView
+                style={styles.cameraView}
+                facing="back"
+                enableTorch={torchEnabled}
+                barcodeScannerSettings={{
+                  barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128"],
+                }}
+                onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
+              >
+                {/* Overlay HUD del Escáner */}
+                <View style={styles.hudOverlay}>
+                  {/* Botón de linterna */}
+                  <TouchableOpacity
+                    style={styles.torchBtn}
+                    onPress={() => setTorchEnabled(!torchEnabled)}
+                    activeOpacity={0.8}
+                  >
+                    {torchEnabled ? (
+                      <FlashlightOff size={20} color="#FFFFFF" />
+                    ) : (
+                      <Flashlight size={20} color="#FFFFFF" />
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Retícula de escaneo */}
+                  <View
+                    style={[
+                      styles.scanFrame,
+                      scanned && styles.scanFrameSuccess,
+                    ]}
+                  >
+                    <View style={styles.laserLine} />
+                  </View>
+
+                  <View style={styles.scanInstructionPill}>
+                    <Text style={styles.scanInstructionText}>
+                      {scanned
+                        ? "Código detectado ✓"
+                        : "Apunta al código de barras"}
+                    </Text>
+                  </View>
+                </View>
+              </CameraView>
+
+              {/* Botón para volver a escanear */}
+              {scanned && (
+                <TouchableOpacity
+                  style={styles.rescanBtn}
+                  onPress={handleResetScanner}
+                  activeOpacity={0.8}
+                >
+                  <RotateCcw size={16} color={colors.text} />
+                  <Text style={styles.rescanBtnText}>Escanear otro código</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* TAB 2: INGRESO MANUAL */}
+      {activeTab === "manual" && (
+        <View style={styles.searchCard}>
+          <Text style={styles.searchTitle}>Ingresa el código numérico</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.barcodeTextInput}
+              placeholder="Ej: 7802900000001"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              value={barcodeInput}
+              onChangeText={setBarcodeInput}
+            />
+            <TouchableOpacity
+              style={[
+                styles.searchBtn,
+                (!barcodeInput.trim() || loading) && styles.btnDisabled,
+              ]}
+              onPress={() => handleSearch()}
+              disabled={!barcodeInput.trim() || loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.searchBtnText}>Buscar</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Estado de Carga */}
+      {loading && (
+        <View style={styles.loadingCard}>
+          <ActivityIndicator color={colors.primary} size="large" />
+          <Text style={styles.loadingText}>Buscando en catálogo chileno e internacional...</Text>
+        </View>
+      )}
+
+      {/* RESULTADO ENCONTRADO */}
       {product && (
         <View style={styles.resultCard}>
           <View style={styles.resultHeader}>
@@ -161,6 +379,7 @@ export default function BarcodeScreen() {
             </View>
             <Text style={styles.productName}>{product.productName}</Text>
             {product.brand && <Text style={styles.productBrand}>{product.brand}</Text>}
+            <Text style={styles.productCode}>EAN: {product.barcode}</Text>
           </View>
 
           {/* Selector de porción consumida */}
@@ -205,19 +424,46 @@ export default function BarcodeScreen() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.addToMealBtn} onPress={handleAddProductToMeal}>
+          <TouchableOpacity
+            style={styles.addToMealBtn}
+            onPress={handleAddProductToMeal}
+            activeOpacity={0.85}
+          >
+            <CheckCircle2 size={18} color="#FFFFFF" />
             <Text style={styles.addToMealBtnText}>Añadir a mi Comida ✓</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Si no se encontró el producto: Formulario Comunitario */}
+      {/* NO ENCONTRADO: OPCIÓN OCR CON FOTO O GUARDADO MANUAL */}
       {notFound && (
         <View style={styles.notFoundCard}>
-          <Text style={styles.notFoundTitle}>Producto chileno no registrado</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            <AlertCircle size={18} color="#D97706" />
+            <Text style={styles.notFoundTitle}>Producto no registrado aún</Text>
+          </View>
           <Text style={styles.notFoundDesc}>
-            No encontramos el código {barcodeInput}. Ingresa sus datos para guardarlo y agregarlo a tu comida:
+            No encontramos el código {barcodeInput}. Puedes fotografiar la tabla nutricional con IA o ingresar los datos:
           </Text>
+
+          {/* Botón de Escanear Tabla con Foto IA */}
+          <TouchableOpacity
+            style={styles.labelScanBtn}
+            onPress={handleScanNutritionLabel}
+            disabled={scanningLabel}
+            activeOpacity={0.85}
+          >
+            {scanningLabel ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Sparkles size={16} color="#FFFFFF" />
+                <Text style={styles.labelScanBtnText}>
+                  Fotografiar Tabla Nutricional con IA
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
 
           <TextInput
             style={styles.customInput}
@@ -234,7 +480,7 @@ export default function BarcodeScreen() {
             onChangeText={setCustomBrand}
           />
 
-          <Text style={styles.customMacroHeader}>Información por cada 100g (según etiqueta):</Text>
+          <Text style={styles.customMacroHeader}>Información por cada 100g (etiqueta):</Text>
           <View style={styles.macroInputsRow}>
             <View style={styles.macroInputCol}>
               <Text style={styles.macroInputLbl}>Calorías</Text>
@@ -278,8 +524,9 @@ export default function BarcodeScreen() {
             style={styles.saveCustomBtn}
             onPress={handleSaveCustomProduct}
             disabled={loading}
+            activeOpacity={0.85}
           >
-            <Text style={styles.saveCustomBtnText}>Guardar y Añadir a la Comida</Text>
+            <Text style={styles.saveCustomBtnText}>Guardar y Añadir a Comida</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -293,141 +540,267 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: 20,
-    paddingTop: 48,
+    padding: 16,
     paddingBottom: 40,
   },
   topNav: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
   closeBtn: {
-    paddingVertical: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  closeBtnText: {
-    fontSize: 16,
+  navTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  tabBar: {
+    flexDirection: "row",
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  tabBtnActive: {
+    backgroundColor: colors.primaryLight,
+  },
+  tabBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  tabBtnTextActive: {
     color: colors.primary,
     fontWeight: "700",
   },
-  navTitle: {
+  cameraSection: {
+    marginBottom: 16,
+  },
+  permissionCard: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  permissionTitle: {
     fontSize: 17,
     fontWeight: "700",
+    color: colors.text,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  permissionDesc: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  permissionBtn: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+  },
+  permissionBtnText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  cameraViewportWrap: {
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  cameraView: {
+    width: "100%",
+    height: 300,
+  },
+  hudOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  torchBtn: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanFrame: {
+    width: 240,
+    height: 140,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.8)",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  scanFrameSuccess: {
+    borderColor: "#10B981",
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+  },
+  laserLine: {
+    width: "90%",
+    height: 2,
+    backgroundColor: "#EF4444",
+  },
+  scanInstructionPill: {
+    position: "absolute",
+    bottom: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+  },
+  scanInstructionText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  rescanBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.surfaceMuted,
+    paddingVertical: 10,
+  },
+  rescanBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
     color: colors.text,
   },
   searchCard: {
     backgroundColor: colors.card,
     borderRadius: 20,
-    padding: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     marginBottom: 16,
   },
   searchTitle: {
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "600",
     color: colors.text,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   inputRow: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 16,
   },
   barcodeTextInput: {
     flex: 1,
-    backgroundColor: colors.background,
-    borderWidth: 1.5,
-    borderColor: colors.cardBorder,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    height: 46,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
     color: colors.text,
   },
   searchBtn: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 20,
-    borderRadius: 14,
-    justifyContent: "center",
+    paddingHorizontal: 18,
+    borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
   },
   btnDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   searchBtnText: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
   },
-  quickLabel: {
-    fontSize: 12,
-    fontWeight: "600",
+  loadingCard: {
+    padding: 24,
+    alignItems: "center",
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 13,
     color: colors.textSecondary,
-    marginBottom: 8,
-  },
-  quickChipsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  quickChip: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-  quickChipText: {
-    fontSize: 12,
-    color: colors.text,
   },
   resultCard: {
     backgroundColor: colors.card,
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
     marginBottom: 16,
   },
   resultHeader: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   sourceBadge: {
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
     alignSelf: "flex-start",
-    marginBottom: 8,
+    backgroundColor: colors.primaryLight,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    marginBottom: 6,
   },
   sourceBadgeText: {
     fontSize: 11,
     fontWeight: "700",
-    color: colors.primaryDark,
+    color: colors.primary,
   },
   productName: {
     fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "700",
     color: colors.text,
+    marginBottom: 2,
   },
   productBrand: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
-    marginTop: 2,
+    marginBottom: 4,
+  },
+  productCode: {
+    fontSize: 11,
+    color: colors.textMuted,
   },
   portionSection: {
-    backgroundColor: colors.background,
-    padding: 14,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 14,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 14,
   },
   portionLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
     color: colors.textSecondary,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   portionInputRow: {
     flexDirection: "row",
@@ -436,113 +809,127 @@ const styles = StyleSheet.create({
   },
   portionInput: {
     backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
+    height: 38,
+    width: 90,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "700",
     color: colors.text,
-    width: 90,
-    textAlign: "center",
   },
   portionUnit: {
-    fontSize: 15,
-    color: colors.text,
-    fontWeight: "500",
+    fontSize: 13,
+    color: colors.textSecondary,
   },
   nutritionPreview: {
     flexDirection: "row",
     justifyContent: "space-between",
-    backgroundColor: colors.background,
-    padding: 14,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 14,
+    padding: 12,
     marginBottom: 16,
   },
   nutriCol: {
     alignItems: "center",
   },
   nutriVal: {
-    fontSize: 17,
-    fontWeight: "800",
+    fontSize: 15,
+    fontWeight: "700",
     color: colors.text,
   },
   nutriLbl: {
     fontSize: 11,
     color: colors.textSecondary,
-    marginTop: 2,
   },
   addToMealBtn: {
     backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 16,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
   },
   addToMealBtnText: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 14,
+    fontWeight: "700",
   },
   notFoundCard: {
-    backgroundColor: colors.card,
+    backgroundColor: "#FFFBEB",
     borderRadius: 20,
-    padding: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: "#FDE68A",
+    marginBottom: 16,
   },
   notFoundTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: colors.text,
-    marginBottom: 6,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#92400E",
   },
   notFoundDesc: {
     fontSize: 13,
-    color: colors.textSecondary,
+    color: "#B45309",
+    marginBottom: 12,
     lineHeight: 18,
+  },
+  labelScanBtn: {
+    backgroundColor: "#4F46E5",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
     marginBottom: 14,
   },
+  labelScanBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   customInput: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    backgroundColor: colors.card,
+    height: 42,
+    borderRadius: 10,
+    paddingHorizontal: 12,
     fontSize: 14,
     color: colors.text,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
   customMacroHeader: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
-    color: colors.text,
+    color: "#92400E",
     marginVertical: 6,
   },
   macroInputsRow: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   macroInputCol: {
     flex: 1,
   },
   macroInputLbl: {
     fontSize: 11,
-    color: colors.textSecondary,
+    color: "#92400E",
     marginBottom: 4,
+    fontWeight: "600",
   },
   saveCustomBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 14,
+    backgroundColor: "#D97706",
+    paddingVertical: 12,
+    borderRadius: 12,
     alignItems: "center",
-    marginTop: 6,
+    justifyContent: "center",
   },
   saveCustomBtnText: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
   },
 });

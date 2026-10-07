@@ -6,6 +6,8 @@ import { compressMealImage } from "@/utils/imageCompressor";
 import { uploadMealPhoto } from "@/services/storageService";
 import { AnalyzeMealResponse, MealType } from "@/types/meal";
 
+import { extractFunctionErrorMessage } from "@/utils/functionErrors";
+
 export function useMealAnalysis() {
   const [analyzing, setAnalyzing] = useState(false);
   const [stage, setStage] = useState<"compressing" | "uploading" | "analyzing" | null>(null);
@@ -60,7 +62,11 @@ export function useMealAnalysis() {
       );
 
       if (functionErr) {
-        throw new Error(functionErr.message || "Error al conectar con el servicio de IA");
+        const readableMsg = await extractFunctionErrorMessage(
+          functionErr,
+          "No pudimos analizar la foto. Asegúrate de enfocar bien el plato con buena luz."
+        );
+        throw new Error(readableMsg);
       }
 
       if (!data || !data.success || !data.data) {
