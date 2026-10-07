@@ -8,16 +8,17 @@ export interface CompressedImageResult {
 
 /**
  * Comprime y redimensiona la imagen de la comida en el dispositivo antes de subirla.
- * - Limita el ancho/alto a un máximo de 1024px conservando el aspect ratio.
- * - Formato JPEG con compresión 0.7.
- * - Reduce drásticamente el peso a < 300-600 KB para ahorrar datos, tiempo y costos de tokens.
+ * - Limita el ancho a un máximo de 800px conservando el aspect ratio.
+ * - Formato JPEG con compresión 0.65.
+ * - Reduce drásticamente el peso a ~120-220 KB para subida casi instantánea en 4G/5G
+ *   y latencia mínima de procesamiento en el backend.
  */
 export async function compressMealImage(uri: string): Promise<CompressedImageResult> {
   const manipulatedImage = await ImageManipulator.manipulateAsync(
     uri,
-    [{ resize: { width: 1024 } }],
+    [{ resize: { width: 800 } }],
     {
-      compress: 0.7,
+      compress: 0.65,
       format: ImageManipulator.SaveFormat.JPEG,
     }
   );

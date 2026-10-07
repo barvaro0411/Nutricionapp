@@ -1,4 +1,4 @@
-import { showAlert } from "@/utils/alerts";
+import { showAlert, showToast } from "@/utils/alerts";
 import React, { useState } from "react";
 import {
   View,
@@ -109,6 +109,11 @@ export default function MealReviewScreen() {
       await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
       await queryClient.invalidateQueries({ queryKey: ["weeklyStats"] });
 
+      showToast({
+        type: "success",
+        title: "¡Comida registrada!",
+        message: `${Math.round(totals.calories)} kcal agregadas a tu día.`,
+      });
       reset();
       router.replace("/(tabs)");
     } catch (err: any) {
