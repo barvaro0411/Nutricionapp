@@ -1,6 +1,7 @@
 import React from "react";
 import { Tabs, useRouter } from "expo-router";
 import { View, StyleSheet, TouchableOpacity, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LayoutDashboard, CalendarDays, Plus, Sparkles, Settings } from "lucide-react-native";
 import { colors } from "@/constants/colors";
 import { useQuickLogStore } from "@/stores/useQuickLogStore";
@@ -9,6 +10,7 @@ import { QuickLogModal } from "@/components/dashboard/QuickLogModal";
 
 export default function TabLayout() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const {
     isOpen: isQuickLogOpen,
     openQuickLog,
@@ -22,6 +24,11 @@ export default function TabLayout() {
     openQuickLog();
   };
 
+  // En móviles con barra gestual inferior (iOS / Android / PWA), insets.bottom es ~20-34px.
+  // Aseguramos un mínimo de 12px y padding dinámico para que los textos nunca se corten.
+  const bottomInset = Math.max(insets.bottom, Platform.OS === "ios" ? 20 : 10);
+  const barHeight = 56 + bottomInset;
+
   return (
     <>
       <Tabs
@@ -29,17 +36,23 @@ export default function TabLayout() {
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textMuted,
           tabBarLabelStyle: {
-            fontSize: 10.5,
+            fontSize: 10,
             fontWeight: "700",
-            marginBottom: Platform.OS === "ios" ? 0 : 4,
+            marginTop: 2,
+            marginBottom: 2,
+          },
+          tabBarItemStyle: {
+            paddingVertical: 4,
+            justifyContent: "center",
+            alignItems: "center",
           },
           tabBarStyle: {
             backgroundColor: "#FFFFFF",
             borderTopColor: colors.cardBorder,
             borderTopWidth: 1,
-            height: Platform.OS === "ios" ? 84 : 68,
-            paddingBottom: Platform.OS === "ios" ? 22 : 8,
-            paddingTop: 8,
+            height: barHeight,
+            paddingBottom: bottomInset,
+            paddingTop: 6,
             shadowColor: "#0F172A",
             shadowOffset: { width: 0, height: -3 },
             shadowOpacity: 0.05,
@@ -69,7 +82,7 @@ export default function TabLayout() {
             headerTitle: "Nutrición Hoy",
             tabBarIcon: ({ color, focused }) => (
               <LayoutDashboard
-                size={22}
+                size={21}
                 color={color}
                 strokeWidth={focused ? 2.5 : 1.8}
               />
@@ -85,7 +98,7 @@ export default function TabLayout() {
             headerTitle: "Progreso Semanal",
             tabBarIcon: ({ color, focused }) => (
               <CalendarDays
-                size={22}
+                size={21}
                 color={color}
                 strokeWidth={focused ? 2.5 : 1.8}
               />
@@ -98,19 +111,24 @@ export default function TabLayout() {
           name="record"
           options={{
             title: "",
-            tabBarButton: () => (
-              <View style={styles.centerButtonWrapper} pointerEvents="box-none">
+            tabBarButton: (props) => {
+              const { delayLongPress, ...restProps } = props as any;
+              return (
                 <TouchableOpacity
-                  style={styles.centerButton}
+                  {...restProps}
+                  delayLongPress={delayLongPress ?? undefined}
+                  style={[props.style, styles.centerButtonContainer]}
                   onPress={handleOpenQuickLog}
                   activeOpacity={0.85}
                   accessibilityLabel="Registrar comida"
                   accessibilityRole="button"
                 >
-                  <Plus size={26} color="#FFFFFF" strokeWidth={2.8} />
+                  <View style={styles.centerButton}>
+                    <Plus size={24} color="#FFFFFF" strokeWidth={2.8} />
+                  </View>
                 </TouchableOpacity>
-              </View>
-            ),
+              );
+            },
           }}
         />
 
@@ -119,10 +137,10 @@ export default function TabLayout() {
           name="coach"
           options={{
             title: "Coach IA",
-            headerTitle: "Coach Nutricional IA",
+            headerShown: false, // CoachChatScreen ya maneja su propia cabecera
             tabBarIcon: ({ color, focused }) => (
               <Sparkles
-                size={22}
+                size={21}
                 color={color}
                 strokeWidth={focused ? 2.5 : 1.8}
               />
@@ -138,7 +156,7 @@ export default function TabLayout() {
             headerTitle: "Mi Perfil y Metas",
             tabBarIcon: ({ color, focused }) => (
               <Settings
-                size={22}
+                size={21}
                 color={color}
                 strokeWidth={focused ? 2.5 : 1.8}
               />
@@ -175,25 +193,25 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  centerButtonWrapper: {
-    top: -14,
-    justifyContent: "center",
+  centerButtonContainer: {
+    flex: 1,
     alignItems: "center",
-    width: 60,
+    justifyContent: "flex-start",
   },
   centerButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 3.5,
+    marginTop: -14, // Flota suavemente hacia arriba sin recortar
+    borderWidth: 3,
     borderColor: "#FFFFFF",
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
-    shadowRadius: 10,
+    shadowRadius: 8,
     elevation: 8,
   },
 });

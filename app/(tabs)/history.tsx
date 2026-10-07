@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 60,
+    paddingBottom: 110,
   },
   header: {
     marginBottom: 20,
