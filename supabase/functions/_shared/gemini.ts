@@ -7,7 +7,7 @@ export async function getGeminiKey(client: ServerClient): Promise<string> {
   throw new ApiError(503, "CONFIGURATION_ERROR", "Falta configurar GEMINI_API_KEY en Supabase.");
 }
 export async function callGemini(apiKey: string, body: unknown) {
-  const model = Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash";
+  const model = Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite";
   if (!/^gemini-[a-zA-Z0-9.-]+$/.test(model)) throw new ApiError(503, "CONFIGURATION_ERROR", "GEMINI_MODEL no es válido.");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45000);

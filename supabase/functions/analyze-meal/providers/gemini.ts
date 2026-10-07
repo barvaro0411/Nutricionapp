@@ -4,7 +4,7 @@ import { callGemini, parseModelJson } from "../../_shared/gemini.ts";
 import { ApiError } from "../../_shared/http.ts";
 
 export class GeminiVisionProvider implements VisionProvider {
-  readonly name = Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash";
+  readonly name = Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite";
   constructor(private apiKey: string) {}
   async analyzeImage(imageBase64: string, mimeType: string, systemPrompt: string, clientTimeIso?: string, userNote?: string): Promise<VisionProviderResult> {
     const result = await callGemini(this.apiKey, {

@@ -38,3 +38,4 @@ audit-*.png
 auditoria/*.json
 .env.*
 !.env.example
+.env*
