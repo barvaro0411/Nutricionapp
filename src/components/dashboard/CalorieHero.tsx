@@ -1,8 +1,8 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
-import { Flame, Target, Utensils, CheckCircle2, AlertTriangle } from "lucide-react-native";
-import { colors } from "@/constants/colors";
+import { Flame, Target, Utensils, CheckCircle2, AlertTriangle, Zap } from "lucide-react-native";
+import { colors, shadows } from "@/constants/colors";
 
 interface CalorieHeroProps {
   goal: number;
@@ -25,7 +25,7 @@ export function CalorieHero({
   const overCalories = Math.round(consumed - totalBudget);
 
   // Parámetros del anillo SVG
-  const size = 146;
+  const size = 152;
   const strokeWidth = 11;
   const center = size / 2;
   const radius = center - strokeWidth - 2;
@@ -40,6 +40,7 @@ export function CalorieHero({
   let progressColor = colors.primary;
   let statusBadgeBg = colors.primaryLight;
   let statusTextColor = colors.primaryDark;
+  let statusBorderColor = "#A7F3D0";
   let statusText = `${progressPct}% consumido`;
   let StatusIcon = CheckCircle2;
 
@@ -47,13 +48,15 @@ export function CalorieHero({
     progressColor = colors.danger;
     statusBadgeBg = colors.dangerLight;
     statusTextColor = colors.danger;
+    statusBorderColor = "#FECACA";
     statusText = `+${overCalories} kcal superado`;
     StatusIcon = AlertTriangle;
   } else if (progressPct >= 90) {
     progressColor = colors.warning;
     statusBadgeBg = colors.warningLight;
     statusTextColor = "#B45309";
-    statusText = "Cerca del límite";
+    statusBorderColor = "#FDE68A";
+    statusText = "Cerca de la meta";
     StatusIcon = Target;
   }
 
@@ -62,10 +65,18 @@ export function CalorieHero({
       {/* Header superior */}
       <View style={styles.topRow}>
         <View style={styles.headerLeft}>
+          <View style={styles.overlineIconWrap}>
+            <Zap size={12} color={colors.primary} />
+          </View>
           <Text style={styles.sectionOverline}>ENERGÍA DEL DÍA</Text>
         </View>
 
-        <View style={[styles.statusBadge, { backgroundColor: statusBadgeBg }]}>
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: statusBadgeBg, borderColor: statusBorderColor },
+          ]}
+        >
           <StatusIcon size={12} color={statusTextColor} />
           <Text style={[styles.statusBadgeText, { color: statusTextColor }]}>
             {statusText}
@@ -84,7 +95,7 @@ export function CalorieHero({
                 cx={center}
                 cy={center}
                 r={radius}
-                stroke={colors.surfaceMuted}
+                stroke="#F1F5F9"
                 strokeWidth={strokeWidth}
                 fill="none"
               />
@@ -113,7 +124,9 @@ export function CalorieHero({
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              {isOverBudget ? `+${overCalories}` : Math.round(effectiveRemaining)}
+              {isOverBudget
+                ? `+${overCalories.toLocaleString("es-CL")}`
+                : Math.round(effectiveRemaining).toLocaleString("es-CL")}
             </Text>
             <Text style={styles.remainingLabel}>
               {isOverBudget ? "kcal extra" : "kcal restantes"}
@@ -124,21 +137,40 @@ export function CalorieHero({
         {/* Panel lateral de desglose energético */}
         <View style={styles.sideMetrics}>
           {/* Base Calórica */}
-          <View style={styles.metricRow}>
-            <View style={[styles.metricDot, { backgroundColor: colors.textSecondary }]} />
+          <View style={styles.metricCard}>
+            <View style={styles.metricIconWrap}>
+              <Target size={13} color={colors.textSecondary} />
+            </View>
             <View style={styles.metricTexts}>
               <Text style={styles.metricLabel}>Meta base</Text>
-              <Text style={styles.metricVal}>{Math.round(goal)} kcal</Text>
+              <Text style={styles.metricVal}>
+                {Math.round(goal).toLocaleString("es-CL")} kcal
+              </Text>
             </View>
           </View>
 
           {/* Consumidas */}
-          <View style={styles.metricRow}>
-            <View style={[styles.metricDot, { backgroundColor: progressColor }]} />
+          <View style={styles.metricCard}>
+            <View
+              style={[
+                styles.metricIconWrap,
+                { backgroundColor: isOverBudget ? colors.dangerLight : colors.primaryLight },
+              ]}
+            >
+              <Utensils
+                size={13}
+                color={isOverBudget ? colors.danger : colors.primary}
+              />
+            </View>
             <View style={styles.metricTexts}>
               <Text style={styles.metricLabel}>Consumidas</Text>
-              <Text style={[styles.metricVal, { color: colors.text }]}>
-                {Math.round(consumed)} kcal
+              <Text
+                style={[
+                  styles.metricVal,
+                  isOverBudget && { color: colors.danger },
+                ]}
+              >
+                {Math.round(consumed).toLocaleString("es-CL")} kcal
               </Text>
             </View>
           </View>
@@ -151,21 +183,34 @@ export function CalorieHero({
             ]}
             onPress={onExercisePress}
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Registrar o ver ejercicio"
           >
-            <Flame
-              size={15}
-              color={burnedCalories > 0 ? "#D97706" : colors.textMuted}
-              fill={burnedCalories > 0 ? "#F59E0B" : "none"}
-            />
-            <View style={styles.exerciseTexts}>
-              <Text style={styles.exerciseLabel}>Ejercicio</Text>
+            <View
+              style={[
+                styles.metricIconWrap,
+                burnedCalories > 0
+                  ? { backgroundColor: "#FEF3C7" }
+                  : { backgroundColor: colors.surfaceMuted },
+              ]}
+            >
+              <Flame
+                size={13}
+                color={burnedCalories > 0 ? "#D97706" : colors.textMuted}
+                fill={burnedCalories > 0 ? "#F59E0B" : "none"}
+              />
+            </View>
+            <View style={styles.metricTexts}>
+              <Text style={styles.metricLabel}>Ejercicio</Text>
               <Text
                 style={[
-                  styles.exerciseVal,
-                  burnedCalories > 0 && { color: "#D97706" },
+                  styles.metricVal,
+                  burnedCalories > 0
+                    ? { color: "#D97706", fontWeight: "800" }
+                    : { color: colors.textMuted },
                 ]}
               >
-                +{Math.round(burnedCalories)} kcal
+                +{Math.round(burnedCalories).toLocaleString("es-CL")} kcal
               </Text>
             </View>
           </TouchableOpacity>
@@ -175,10 +220,16 @@ export function CalorieHero({
       {/* Footer informativo con presupuesto neto disponible */}
       <View style={styles.cardFooter}>
         <View style={styles.footerItem}>
-          <Utensils size={13} color={colors.textMuted} />
           <Text style={styles.footerText}>
-            Presupuesto total activo:{" "}
-            <Text style={styles.footerHighlight}>{totalBudget} kcal</Text>
+            Presupuesto diario activo:{" "}
+            <Text style={styles.footerHighlight}>
+              {totalBudget.toLocaleString("es-CL")} kcal
+            </Text>
+          </Text>
+        </View>
+        <View style={styles.footerPill}>
+          <Text style={styles.footerPillText}>
+            {progressPct > 100 ? `${progressPct}% (Exceso)` : `${100 - progressPct}% libre`}
           </Text>
         </View>
       </View>
@@ -193,11 +244,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
+    ...shadows.card,
     marginBottom: 16,
   },
   topRow: {
@@ -209,11 +256,19 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 7,
+  },
+  overlineIconWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
   },
   sectionOverline: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.textSecondary,
     letterSpacing: 0.8,
   },
@@ -223,6 +278,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 9,
     borderRadius: 12,
+    borderWidth: 1,
     gap: 5,
   },
   statusBadgeText: {
@@ -237,8 +293,8 @@ const styles = StyleSheet.create({
   },
   ringWrapper: {
     position: "relative",
-    width: 146,
-    height: 146,
+    width: 152,
+    height: 152,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -250,9 +306,9 @@ const styles = StyleSheet.create({
   },
   remainingNumber: {
     fontSize: 32,
-    fontWeight: "800",
+    fontWeight: "900",
     color: colors.text,
-    letterSpacing: -1,
+    letterSpacing: -1.2,
     lineHeight: 36,
   },
   remainingLabel: {
@@ -260,21 +316,31 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.textSecondary,
     marginTop: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
   },
   sideMetrics: {
     flex: 1,
-    gap: 10,
+    gap: 8,
   },
-  metricRow: {
+  metricCard: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
     gap: 8,
-    paddingVertical: 2,
   },
-  metricDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+  metricIconWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
   },
   metricTexts: {
     flex: 1,
@@ -288,44 +354,30 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   metricVal: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: "700",
     color: colors.text,
   },
   exerciseCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    paddingVertical: 7,
+    backgroundColor: "#F8FAFC",
+    paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
     gap: 8,
-    marginTop: 2,
   },
   exerciseCardActive: {
-    backgroundColor: "#FEF3C7",
-  },
-  exerciseTexts: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  exerciseLabel: {
-    fontSize: 11.5,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  exerciseVal: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.textMuted,
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FDE68A",
   },
   cardFooter: {
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.surfaceMuted,
+    borderTopColor: "#F1F5F9",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -340,7 +392,18 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   footerHighlight: {
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.text,
+  },
+  footerPill: {
+    backgroundColor: colors.surfaceMuted,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  footerPillText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: colors.textSecondary,
   },
 });

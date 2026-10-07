@@ -39,3 +39,4 @@ auditoria/*.json
 .env.*
 !.env.example
 .env*
+artifacts/

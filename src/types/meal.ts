@@ -3,10 +3,14 @@ import { z } from "zod";
 export const MealTypeSchema = z.enum(["desayuno", "almuerzo", "cena", "snack"]);
 export type MealType = z.infer<typeof MealTypeSchema>;
 
+export type FoodUnit = "g" | "ml";
+
 export const DetectedFoodItemSchema = z.object({
   id: z.string().optional(),
   food: z.string().min(1, "El nombre del alimento es requerido"),
+  // Cantidad base: gramos si unit = "g", mililitros si unit = "ml".
   grams: z.number().finite().min(0, "Los gramos no pueden ser negativos").max(20000),
+  unit: z.enum(["g", "ml"]).default("g"),
   calories: z.number().finite().min(0).max(50000),
   protein: z.number().finite().min(0).max(10000),
   carbs: z.number().finite().min(0).max(10000),
@@ -17,7 +21,8 @@ export const DetectedFoodItemSchema = z.object({
   ratioCarbs: z.number().optional(),
   ratioFat: z.number().optional(),
 });
-export type DetectedFoodItem = z.infer<typeof DetectedFoodItemSchema>;
+export type DetectedFoodItem = z.output<typeof DetectedFoodItemSchema>;
+export type DetectedFoodItemInput = z.input<typeof DetectedFoodItemSchema>;
 
 export interface MealTotals {
   calories: number;
@@ -62,6 +67,7 @@ export interface MealWithItems {
     id: string;
     food_name: string;
     grams: number;
+    unit?: FoodUnit;
     calories: number;
     protein: number;
     carbs: number;

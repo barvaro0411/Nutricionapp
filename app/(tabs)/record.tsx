@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import {
@@ -16,7 +15,6 @@ import {
   Sparkles,
   ChevronRight,
   ArrowLeft,
-  Utensils,
 } from "lucide-react-native";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { TextVoiceModal } from "@/components/meal/TextVoiceModal";

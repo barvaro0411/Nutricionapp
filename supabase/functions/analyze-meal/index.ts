@@ -4,6 +4,7 @@ import { GeminiVisionProvider } from "./providers/gemini.ts";
 import { OpenAIVisionProvider } from "./providers/openai.ts";
 import { ApiError, authenticate, errorResponse, json, methodResponse, readBody, reserveAiRequest } from "../_shared/http.ts";
 import { getGeminiKey } from "../_shared/gemini.ts";
+import { resolveItemUnit } from "../_shared/liquidUnits.ts";
 import type { VisionProvider } from "./providers/provider.interface.ts";
 
 export async function handleRequest(req: Request) {
@@ -41,11 +42,15 @@ export async function handleRequest(req: Request) {
     }
     if (!analysis) throw failure || new ApiError(503, "CONFIGURATION_ERROR", "No hay un proveedor de IA configurado.");
     if (!analysis.data.items.length) throw new ApiError(422, "NO_FOOD_DETECTED", "No se detectaron alimentos. Prueba con otra foto.");
-    const totals = analysis.data.items.reduce((acc, item) => ({
+    const normalizedItems = analysis.data.items.map((item) => ({
+      ...item,
+      unit: resolveItemUnit(item),
+    }));
+    const totals = normalizedItems.reduce((acc, item) => ({
       calories: acc.calories + item.calories, protein: acc.protein + item.protein,
       carbs: acc.carbs + item.carbs, fat: acc.fat + item.fat,
     }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
-    return json({ success: true, data: { ...analysis.data, totals }, meta: {
+    return json({ success: true, data: { ...analysis.data, items: normalizedItems, totals }, meta: {
       provider_used: analysis.providerName, tokens_prompt: analysis.tokensPrompt,
       tokens_completion: analysis.tokensCompletion, latency_ms: Date.now() - start,
     } }, 200, req);

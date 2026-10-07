@@ -2,6 +2,7 @@ import { ParseMealTextRequestSchema, AIStructuredOutputSchema } from "./types.ts
 import { CHILEAN_MEAL_TEXT_PROMPT } from "./prompts/mealTextPrompt.ts";
 import { ApiError, authenticate, errorResponse, json, methodResponse, readBody, reserveAiRequest } from "../_shared/http.ts";
 import { callGemini, getGeminiKey, parseModelJson } from "../_shared/gemini.ts";
+import { resolveItemUnit } from "../_shared/liquidUnits.ts";
 
 export async function handleRequest(req: Request) {
   const method = methodResponse(req);
@@ -26,11 +27,15 @@ export async function handleRequest(req: Request) {
     const output = AIStructuredOutputSchema.safeParse(parseModelJson(result.text));
     if (!output.success) throw new ApiError(502, "AI_INVALID_RESPONSE", "La IA no devolvió alimentos con datos válidos.");
     if (!output.data.items.length) throw new ApiError(422, "NO_FOOD_DETECTED", "No se detectaron alimentos. Describe la comida con más detalle.");
-    const totals = output.data.items.reduce((acc, item) => ({
+    const normalizedItems = output.data.items.map((item) => ({
+      ...item,
+      unit: resolveItemUnit(item),
+    }));
+    const totals = normalizedItems.reduce((acc, item) => ({
       calories: acc.calories + item.calories, protein: acc.protein + item.protein,
       carbs: acc.carbs + item.carbs, fat: acc.fat + item.fat,
     }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
-    return json({ success: true, data: { ...output.data, totals }, meta: { provider_used: result.model, latency_ms: Date.now() - start } }, 200, req);
+    return json({ success: true, data: { ...output.data, items: normalizedItems, totals }, meta: { provider_used: result.model, latency_ms: Date.now() - start } }, 200, req);
   } catch (error) { return errorResponse(error, req); }
 }
 Deno.serve(handleRequest);

@@ -1,13 +1,42 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Sunrise, Sun, Moon, Apple, Plus, LucideIcon } from "lucide-react-native";
 import { MealWithItems, MealType } from "@/types/meal";
-import { colors } from "@/constants/colors";
+import { colors, shadows } from "@/constants/colors";
+import { formatQuantityDisplay, resolveItemUnit } from "@/utils/liquidUnits";
 
-const MEAL_TITLES: Record<MealType, string> = {
-  desayuno: "Desayuno",
-  almuerzo: "Almuerzo",
-  cena: "Once / Cena",
-  snack: "Colación",
+interface MealMeta {
+  title: string;
+  Icon: LucideIcon;
+  color: string;
+  bg: string;
+}
+
+const MEAL_META: Record<MealType, MealMeta> = {
+  desayuno: {
+    title: "Desayuno",
+    Icon: Sunrise,
+    color: "#D97706",
+    bg: "#FEF3C7",
+  },
+  almuerzo: {
+    title: "Almuerzo",
+    Icon: Sun,
+    color: "#059669",
+    bg: "#ECFDF5",
+  },
+  cena: {
+    title: "Once / Cena",
+    Icon: Moon,
+    color: "#4F46E5",
+    bg: "#EEF2FF",
+  },
+  snack: {
+    title: "Colación",
+    Icon: Apple,
+    color: "#0284C7",
+    bg: "#F0F9FF",
+  },
 };
 
 interface MealCardProps {
@@ -18,6 +47,8 @@ interface MealCardProps {
 }
 
 export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardProps) {
+  const meta = MEAL_META[mealType];
+  const { Icon } = meta;
   const filteredMeals = meals.filter((m) => m.meal_type === mealType);
   const hasMeals = filteredMeals.length > 0;
 
@@ -29,26 +60,49 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardP
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
-        <View style={styles.titleWrapper}>
-          <Text style={styles.title}>{MEAL_TITLES[mealType]}</Text>
-          {hasMeals && (
-            <Text style={styles.macroSummary}>
-              {Math.round(totalProtein)}g P  •  {Math.round(totalCarbs)}g C  •  {Math.round(totalFat)}g G
-            </Text>
-          )}
+        <View style={styles.headerLeft}>
+          <View style={[styles.iconWrap, { backgroundColor: meta.bg }]}>
+            <Icon size={18} color={meta.color} />
+          </View>
+          <View style={styles.titleWrapper}>
+            <Text style={styles.title}>{meta.title}</Text>
+            {hasMeals ? (
+              <View style={styles.macrosRow}>
+                <View style={styles.macroPill}>
+                  <View style={[styles.macroDot, { backgroundColor: colors.protein }]} />
+                  <Text style={styles.macroText}>{Math.round(totalProtein)}g P</Text>
+                </View>
+                <View style={styles.macroPill}>
+                  <View style={[styles.macroDot, { backgroundColor: colors.carbs }]} />
+                  <Text style={styles.macroText}>{Math.round(totalCarbs)}g C</Text>
+                </View>
+                <View style={styles.macroPill}>
+                  <View style={[styles.macroDot, { backgroundColor: colors.fat }]} />
+                  <Text style={styles.macroText}>{Math.round(totalFat)}g G</Text>
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.emptySubtitle}>Sin registro aún</Text>
+            )}
+          </View>
         </View>
 
         {hasMeals ? (
           <View style={styles.calPill}>
-            <Text style={styles.calText}>{Math.round(totalCalories)} kcal</Text>
+            <Text style={styles.calText}>
+              {Math.round(totalCalories).toLocaleString("es-CL")} <Text style={styles.calUnit}>kcal</Text>
+            </Text>
           </View>
         ) : (
           <TouchableOpacity
             style={styles.addBtn}
             onPress={() => onAddPress(mealType)}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Registrar ${meta.title}`}
           >
-            <Text style={styles.addBtnText}>+ Registrar</Text>
+            <Plus size={13} color={colors.primaryDark} />
+            <Text style={styles.addBtnText}>Registrar</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -64,12 +118,21 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardP
             >
               {meal.items.map((item) => (
                 <View key={item.id} style={styles.itemRow}>
-                  <Text style={styles.itemName} numberOfLines={1}>
-                    {item.food_name}
-                  </Text>
+                  <View style={styles.itemNameWrap}>
+                    <View style={styles.itemBullet} />
+                    <Text style={styles.itemName} numberOfLines={1}>
+                      {item.food_name}
+                    </Text>
+                  </View>
                   <View style={styles.itemMetrics}>
-                    <Text style={styles.itemGrams}>{Math.round(item.grams)}g</Text>
-                    <Text style={styles.itemCalories}>{Math.round(item.calories)} kcal</Text>
+                    <View style={styles.quantityTag}>
+                      <Text style={styles.itemGrams}>
+                        {formatQuantityDisplay(item.grams, resolveItemUnit(item))}
+                      </Text>
+                    </View>
+                    <Text style={styles.itemCalories}>
+                      {Math.round(item.calories).toLocaleString("es-CL")} kcal
+                    </Text>
                   </View>
                 </View>
               ))}
@@ -80,8 +143,13 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardP
             style={styles.addMoreRow}
             onPress={() => onAddPress(mealType)}
             activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityLabel={`Añadir alimento a ${meta.title}`}
           >
-            <Text style={styles.addMoreText}>+ Añadir alimento</Text>
+            <View style={styles.addMoreIconWrap}>
+              <Plus size={13} color={colors.primary} />
+            </View>
+            <Text style={styles.addMoreText}>Añadir alimento</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -91,16 +159,12 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardP
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    padding: 18,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 6,
-    elevation: 1,
+    ...shadows.card,
     marginBottom: 12,
   },
   headerRow: {
@@ -108,37 +172,82 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 12,
+  },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   titleWrapper: {
     flex: 1,
   },
   title: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 15.5,
+    fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.3,
   },
-  macroSummary: {
-    fontSize: 12,
+  macrosRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  macroPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  macroDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  macroText: {
+    fontSize: 11,
     color: colors.textSecondary,
+    fontWeight: "600",
+  },
+  emptySubtitle: {
+    fontSize: 12,
+    color: colors.textMuted,
     marginTop: 2,
     fontWeight: "500",
   },
   calPill: {
     backgroundColor: colors.primaryLight,
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
     paddingVertical: 5,
-    borderRadius: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#DCFCE7",
   },
   calText: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.primaryDark,
+  },
+  calUnit: {
+    fontSize: 11,
+    fontWeight: "600",
   },
   addBtn: {
     backgroundColor: colors.primaryLight,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#DCFCE7",
   },
   addBtnText: {
     fontSize: 12,
@@ -146,10 +255,10 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
   },
   itemsList: {
-    marginTop: 14,
+    marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.cardBorder,
+    borderTopColor: "#F1F5F9",
   },
   mealBlock: {
     marginBottom: 4,
@@ -160,36 +269,65 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 6,
   },
-  itemName: {
-    fontSize: 14,
-    color: colors.text,
-    fontWeight: "500",
+  itemNameWrap: {
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
-    marginRight: 12,
+    marginRight: 10,
+    gap: 8,
+  },
+  itemBullet: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.textMuted,
+  },
+  itemName: {
+    fontSize: 13.5,
+    color: colors.text,
+    fontWeight: "600",
+    flex: 1,
   },
   itemMetrics: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
+  },
+  quantityTag: {
+    backgroundColor: colors.surfaceMuted,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   itemGrams: {
-    fontSize: 13,
-    color: colors.textMuted,
-    fontWeight: "500",
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    fontWeight: "600",
   },
   itemCalories: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 12.5,
+    fontWeight: "700",
     color: colors.text,
-    width: 65,
+    minWidth: 58,
     textAlign: "right",
   },
   addMoreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingTop: 10,
-    alignItems: "flex-start",
+    marginTop: 2,
+  },
+  addMoreIconWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
   },
   addMoreText: {
-    fontSize: 13,
+    fontSize: 12.5,
     color: colors.primaryDark,
     fontWeight: "700",
   },

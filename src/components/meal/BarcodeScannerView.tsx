@@ -12,7 +12,7 @@ import {
   BarcodeFormat,
   DecodeHintType,
 } from "@zxing/library";
-import { Flashlight, FlashlightOff, Camera, AlertCircle, RotateCcw } from "lucide-react-native";
+import { Flashlight, FlashlightOff, AlertCircle, RotateCcw } from "lucide-react-native";
 import { colors } from "@/constants/colors";
 
 interface BarcodeScannerViewProps {
@@ -81,7 +81,7 @@ export function BarcodeScannerView({
             },
           },
           videoRef.current,
-          (result, err) => {
+          (result, _err) => {
             if (result && !isPaused) {
               const code = result.getText();
               if (code && code.trim().length >= 4) {
@@ -90,6 +90,14 @@ export function BarcodeScannerView({
             }
           }
         );
+
+        const track = (videoRef.current?.srcObject as MediaStream)?.getVideoTracks()[0];
+        if (track && typeof (track as any).getCapabilities === "function") {
+          const caps = (track as any).getCapabilities();
+          if (caps && "torch" in caps) {
+            setTorchAvailable(true);
+          }
+        }
       }
       setLoading(false);
     } catch (err: any) {

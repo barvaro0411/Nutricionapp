@@ -19,10 +19,16 @@ import { useFavoriteMeals } from "@/hooks/useFavoriteMeals";
 import { saveMealToDatabase } from "@/services/mealService";
 import { VariantModal } from "@/components/meal/VariantModal";
 import { findFamilyForFood } from "@/constants/chileanPresets";
-import { colors } from "@/constants/colors";
-import { MealType } from "@/types/meal";
-import { DetectedFoodItemSchema } from "@/types/meal";
+import { colors, shadows } from "@/constants/colors";
+import { FoodUnit, MealType, DetectedFoodItemSchema } from "@/types/meal";
 import { parseDecimal } from "@/utils/dates";
+import {
+  getStandardPortions,
+  isLiquidFood,
+  parseQuantityInput,
+  resolveItemUnit,
+} from "@/utils/liquidUnits";
+import { getVariant } from "@/utils/drinkVariants";
 
 export default function MealReviewScreen() {
   const router = useRouter();
@@ -41,6 +47,8 @@ export default function MealReviewScreen() {
     setMealType,
     updateItemGrams,
     adjustItemGramsDelta,
+    updateItemUnit,
+    applyDrinkVariant,
     updateItemVariant,
     removeItem,
     addItem,
@@ -54,11 +62,14 @@ export default function MealReviewScreen() {
   const [showFavModal, setShowFavModal] = useState(false);
   const [favTitle, setFavTitle] = useState("");
   const [newFoodName, setNewFoodName] = useState("");
+  const [newFoodUnit, setNewFoodUnit] = useState<FoodUnit>("g");
   const [newFoodGrams, setNewFoodGrams] = useState("100");
   const [newFoodCals, setNewFoodCals] = useState("150");
   const [newFoodProt, setNewFoodProt] = useState("10");
   const [newFoodCarbs, setNewFoodCarbs] = useState("15");
   const [newFoodFat, setNewFoodFat] = useState("5");
+  const [inputValues, setInputValues] = useState<Record<number, string>>({});
+  const [inputErrors, setInputErrors] = useState<Record<number, string>>({});
 
   const totals = getTotals();
 
@@ -126,19 +137,33 @@ export default function MealReviewScreen() {
 
   const handleAddNewItem = () => {
     if (!newFoodName.trim()) return;
-    const grams = parseDecimal(newFoodGrams);
+    const parseRes = parseQuantityInput(newFoodGrams, newFoodUnit);
+    if (!parseRes.ok) {
+      showAlert("Cantidad inválida", parseRes.error);
+      return;
+    }
     const calories = parseDecimal(newFoodCals);
     const protein = parseDecimal(newFoodProt);
     const carbs = parseDecimal(newFoodCarbs);
     const fat = parseDecimal(newFoodFat);
-    if (!DetectedFoodItemSchema.safeParse({ food: newFoodName.trim(), grams, calories, protein, carbs, fat }).success) {
+    const validation = DetectedFoodItemSchema.safeParse({
+      food: newFoodName.trim(),
+      grams: parseRes.value,
+      unit: parseRes.unit,
+      calories,
+      protein,
+      carbs,
+      fat,
+    });
+    if (!validation.success) {
       showAlert("Datos inválidos", "Ingresa cantidades y nutrientes válidos, sin números negativos.");
       return;
     }
 
     addItem({
       food: newFoodName.trim(),
-      grams,
+      grams: parseRes.value,
+      unit: parseRes.unit,
       calories,
       protein,
       carbs,
@@ -147,6 +172,7 @@ export default function MealReviewScreen() {
     });
 
     setNewFoodName("");
+    setNewFoodGrams(newFoodUnit === "ml" ? "250" : "100");
     setShowAddModal(false);
   };
 
@@ -198,19 +224,61 @@ export default function MealReviewScreen() {
             <Text style={styles.manualAddTitle}>Agregar Alimento Manual</Text>
             <TextInput
               style={styles.manualInput}
-              placeholder="Nombre (ej: Palta Hass)"
+              placeholder="Nombre (ej: Palta Hass o Gatorade)"
               placeholderTextColor={colors.textMuted}
               value={newFoodName}
-              onChangeText={setNewFoodName}
+              onChangeText={(val) => {
+                setNewFoodName(val);
+                if (isLiquidFood(val) && newFoodUnit !== "ml") {
+                  setNewFoodUnit("ml");
+                  setNewFoodGrams("250");
+                }
+              }}
             />
+            {/* Selector de unidad [ g | ml ] */}
+            <View style={styles.manualUnitRow}>
+              <Text style={styles.manualColLabel}>Tipo de alimento:</Text>
+              <View style={styles.unitToggleGroup}>
+                <TouchableOpacity
+                  style={[styles.unitToggleBtn, newFoodUnit === "g" && styles.unitToggleBtnActive]}
+                  onPress={() => {
+                    setNewFoodUnit("g");
+                    setNewFoodGrams("100");
+                  }}
+                  accessibilityLabel="Unidad gramos"
+                  accessibilityState={{ selected: newFoodUnit === "g" }}
+                >
+                  <Text style={[styles.unitToggleText, newFoodUnit === "g" && styles.unitToggleTextActive]}>
+                    g (Sólido)
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.unitToggleBtn, newFoodUnit === "ml" && styles.unitToggleBtnActive]}
+                  onPress={() => {
+                    setNewFoodUnit("ml");
+                    setNewFoodGrams("250");
+                  }}
+                  accessibilityLabel="Unidad mililitros"
+                  accessibilityState={{ selected: newFoodUnit === "ml" }}
+                >
+                  <Text style={[styles.unitToggleText, newFoodUnit === "ml" && styles.unitToggleTextActive]}>
+                    ml (Bebida)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <View style={styles.manualRow}>
               <View style={styles.manualCol}>
-                <Text style={styles.manualColLabel}>Gramos</Text>
+                <Text style={styles.manualColLabel}>
+                  {newFoodUnit === "ml" ? "Volumen (ml / L)" : "Gramos (g)"}
+                </Text>
                 <TextInput
                   style={styles.manualInput}
-                  keyboardType="numeric"
                   value={newFoodGrams}
                   onChangeText={setNewFoodGrams}
+                  placeholder={newFoodUnit === "ml" ? "ej: 250 o 1L" : "ej: 100"}
+                  placeholderTextColor={colors.textMuted}
                 />
               </View>
               <View style={styles.manualCol}>
@@ -316,6 +384,10 @@ export default function MealReviewScreen() {
         {items.map((item, index) => {
           const hasVariants = !!findFamilyForFood(item.food);
           const isLowConfidence = item.confidence && item.confidence < 0.75;
+          const itemUnit = resolveItemUnit(item);
+          const isMl = itemUnit === "ml";
+          const drinkVariant = getVariant(item.food);
+          const standardPortions = getStandardPortions(itemUnit);
 
           return (
             <View key={item.id || index} style={styles.itemCard}>
@@ -347,51 +419,128 @@ export default function MealReviewScreen() {
                 </TouchableOpacity>
               )}
 
-              {/* Ajuste de Gramos (Botones [-10] [+10] y Entrada) */}
+              {/* Botón de variante Zero / Sin Azúcar si es bebida reconocida */}
+              {drinkVariant && (
+                <TouchableOpacity
+                  style={styles.drinkVariantBtn}
+                  onPress={() => applyDrinkVariant(index, drinkVariant.target)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.drinkVariantBtnText}>{drinkVariant.label}</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Selector de unidad [ g | ml ] */}
+              <View style={styles.quantityHeaderRow}>
+                <Text style={styles.quantityHeaderLabel}>
+                  {isMl ? "Volumen de bebida:" : "Porción consumida:"}
+                </Text>
+                <View style={styles.unitToggleGroup}>
+                  <TouchableOpacity
+                    style={[styles.unitToggleBtn, !isMl && styles.unitToggleBtnActive]}
+                    onPress={() => {
+                      updateItemUnit(index, "g");
+                      setInputErrors((prev) => ({ ...prev, [index]: "" }));
+                    }}
+                    accessibilityLabel="Cambiar a gramos"
+                    accessibilityState={{ selected: !isMl }}
+                  >
+                    <Text style={[styles.unitToggleText, !isMl && styles.unitToggleTextActive]}>g</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.unitToggleBtn, isMl && styles.unitToggleBtnActive]}
+                    onPress={() => {
+                      updateItemUnit(index, "ml");
+                      setInputErrors((prev) => ({ ...prev, [index]: "" }));
+                    }}
+                    accessibilityLabel="Cambiar a mililitros"
+                    accessibilityState={{ selected: isMl }}
+                  >
+                    <Text style={[styles.unitToggleText, isMl && styles.unitToggleTextActive]}>ml</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Ajuste de Cantidad (Botones [-50ml/-10g] [+50ml/+10g] y Entrada) */}
               <View style={styles.gramsControlRow}>
                 <TouchableOpacity
                   style={styles.stepBtn}
-                  onPress={() => adjustItemGramsDelta(index, -10)}
+                  onPress={() => adjustItemGramsDelta(index, isMl ? -50 : -10)}
                 >
-                  <Text style={styles.stepBtnText}>-10g</Text>
+                  <Text style={styles.stepBtnText}>{isMl ? "-50ml" : "-10g"}</Text>
                 </TouchableOpacity>
 
                 <View style={styles.gramsDisplay}>
                   <TextInput
                     style={styles.gramsInput}
-                    keyboardType="numeric"
-                    value={String(Math.round(item.grams))}
-                    onChangeText={(val) => updateItemGrams(index, parseDecimal(val))}
+                    keyboardType="default"
+                    value={
+                      inputValues[index] !== undefined
+                        ? inputValues[index]
+                        : String(Math.round(item.grams))
+                    }
+                    onChangeText={(val) => {
+                      setInputValues((prev) => ({ ...prev, [index]: val }));
+                      const res = parseQuantityInput(val, itemUnit);
+                      if (res.ok) {
+                        updateItemGrams(index, res.value);
+                        if (res.unit !== itemUnit) {
+                          updateItemUnit(index, res.unit);
+                        }
+                        setInputErrors((prev) => ({ ...prev, [index]: "" }));
+                      } else {
+                        setInputErrors((prev) => ({ ...prev, [index]: res.error }));
+                      }
+                    }}
+                    onBlur={() => {
+                      setInputValues((prev) => {
+                        const next = { ...prev };
+                        delete next[index];
+                        return next;
+                      });
+                    }}
                   />
-                  <Text style={styles.gramsUnit}>g</Text>
+                  <Text style={styles.gramsUnit}>{isMl ? "ml" : "g"}</Text>
                 </View>
 
                 <TouchableOpacity
                   style={styles.stepBtn}
-                  onPress={() => adjustItemGramsDelta(index, 10)}
+                  onPress={() => adjustItemGramsDelta(index, isMl ? 50 : 10)}
                 >
-                  <Text style={styles.stepBtnText}>+10g</Text>
+                  <Text style={styles.stepBtnText}>{isMl ? "+50ml" : "+10g"}</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Atajos rápidos de gramos */}
+              {inputErrors[index] ? (
+                <Text style={styles.inlineErrorText}>{inputErrors[index]}</Text>
+              ) : null}
+
+              {/* Atajos rápidos por envase / porción */}
               <View style={styles.shortcutsRow}>
-                {[100, 150, 180, 200, 250].map((shortcut) => (
+                {standardPortions.map((shortcut) => (
                   <TouchableOpacity
-                    key={shortcut}
+                    key={shortcut.value}
                     style={[
                       styles.shortcutChip,
-                      Math.round(item.grams) === shortcut && styles.shortcutChipActive,
+                      Math.round(item.grams) === shortcut.value && styles.shortcutChipActive,
                     ]}
-                    onPress={() => updateItemGrams(index, shortcut)}
+                    onPress={() => {
+                      updateItemGrams(index, shortcut.value);
+                      setInputValues((prev) => {
+                        const next = { ...prev };
+                        delete next[index];
+                        return next;
+                      });
+                      setInputErrors((prev) => ({ ...prev, [index]: "" }));
+                    }}
                   >
                     <Text
                       style={[
                         styles.shortcutChipText,
-                        Math.round(item.grams) === shortcut && styles.shortcutChipTextActive,
+                        Math.round(item.grams) === shortcut.value && styles.shortcutChipTextActive,
                       ]}
                     >
-                      {shortcut}g
+                      {shortcut.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -676,11 +825,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   itemCard: {
-    backgroundColor: colors.card,
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+    ...shadows.card,
     marginBottom: 14,
   },
   itemHeader: {
@@ -694,16 +844,19 @@ const styles = StyleSheet.create({
   },
   itemNameText: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.text,
+    letterSpacing: -0.3,
   },
   warningPill: {
     backgroundColor: colors.warningLight,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 8,
     alignSelf: "flex-start",
     marginTop: 4,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
   },
   warningPillText: {
     fontSize: 11,
@@ -711,18 +864,23 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   removeBtn: {
-    padding: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
   },
   removeBtnText: {
-    fontSize: 16,
-    color: colors.textMuted,
+    fontSize: 14,
+    color: colors.textSecondary,
     fontWeight: "700",
   },
   variantBtn: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceMuted,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     alignSelf: "flex-start",
     marginTop: 8,
     borderWidth: 1,
@@ -731,21 +889,27 @@ const styles = StyleSheet.create({
   variantBtnText: {
     fontSize: 12,
     color: colors.primaryDark,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   gramsControlRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginVertical: 14,
+    backgroundColor: "#F8FAFC",
+    padding: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
   },
   stepBtn: {
-    backgroundColor: colors.background,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: colors.cardBorder,
     paddingVertical: 8,
     paddingHorizontal: 14,
-    borderRadius: 10,
+    borderRadius: 12,
+    ...shadows.sm,
   },
   stepBtnText: {
     fontSize: 13,
@@ -758,14 +922,14 @@ const styles = StyleSheet.create({
   },
   gramsInput: {
     fontSize: 22,
-    fontWeight: "800",
+    fontWeight: "900",
     color: colors.text,
     textAlign: "right",
     minWidth: 50,
   },
   gramsUnit: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
     color: colors.textSecondary,
     marginLeft: 4,
   },
@@ -776,15 +940,15 @@ const styles = StyleSheet.create({
   },
   shortcutChip: {
     flex: 1,
-    paddingVertical: 6,
-    backgroundColor: colors.background,
-    borderRadius: 8,
+    paddingVertical: 7,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     alignItems: "center",
   },
   shortcutChipActive: {
-    borderColor: colors.primary,
+    borderColor: "#86EFAC",
     backgroundColor: colors.primaryLight,
   },
   shortcutChipText: {
@@ -794,7 +958,7 @@ const styles = StyleSheet.create({
   },
   shortcutChipTextActive: {
     color: colors.primaryDark,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   itemTotalsFooter: {
     flexDirection: "row",
@@ -802,7 +966,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: colors.cardBorder,
+    borderTopColor: "#F1F5F9",
   },
   itemCals: {
     fontSize: 14,
@@ -811,6 +975,7 @@ const styles = StyleSheet.create({
   },
   itemMacrosDetail: {
     fontSize: 12,
+    fontWeight: "600",
     color: colors.textSecondary,
   },
   bottomBar: {
@@ -818,17 +983,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.card,
+    backgroundColor: "#FFFFFF",
     padding: 16,
     paddingBottom: 28,
     borderTopWidth: 1,
     borderTopColor: colors.cardBorder,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 8,
   },
   confirmBtn: {
     backgroundColor: colors.primary,
-    paddingVertical: 16,
+    paddingVertical: 15,
     borderRadius: 16,
     alignItems: "center",
+    ...shadows.glow,
   },
   confirmBtnDisabled: {
     opacity: 0.7,
@@ -837,16 +1008,21 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "800",
+    letterSpacing: -0.2,
   },
   favStarBtn: {
-    paddingVertical: 10,
+    paddingVertical: 9,
     alignItems: "center",
     marginBottom: 8,
+    backgroundColor: "#FFFBEB",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
   },
   favStarBtnText: {
     color: "#B45309",
     fontWeight: "700",
-    fontSize: 13,
+    fontSize: 12.5,
   },
   modalOverlay: {
     flex: 1,
@@ -969,5 +1145,71 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
     fontWeight: "700",
     fontSize: 15,
+  },
+  drinkVariantBtn: {
+    backgroundColor: "#F0FDF4",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#86EFAC",
+  },
+  drinkVariantBtnText: {
+    fontSize: 12,
+    color: "#166534",
+    fontWeight: "700",
+  },
+  quantityHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  quantityHeaderLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  unitToggleGroup: {
+    flexDirection: "row",
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  unitToggleBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+  unitToggleBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  unitToggleText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  unitToggleTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  inlineErrorText: {
+    fontSize: 11,
+    color: colors.danger,
+    marginTop: -6,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  manualUnitRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 4,
   },
 });

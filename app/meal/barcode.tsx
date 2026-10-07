@@ -9,7 +9,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -35,9 +34,16 @@ import {
 } from "@/services/barcodeService";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { FoodUnit } from "@/types/meal";
 import { useMealAnalysis } from "@/hooks/useMealAnalysis";
 import { BarcodeScannerView } from "@/components/meal/BarcodeScannerView";
-import { colors } from "@/constants/colors";
+import {
+  isLiquidFood,
+  parseQuantityInput,
+  getStandardPortions,
+  formatQuantityDisplay,
+} from "@/utils/liquidUnits";
+import { colors, shadows } from "@/constants/colors";
 
 export default function BarcodeScreen() {
   const router = useRouter();
@@ -52,6 +58,7 @@ export default function BarcodeScreen() {
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState<BarcodeProduct | null>(null);
   const [portionGrams, setPortionGrams] = useState("100");
+  const [portionUnit, setPortionUnit] = useState<FoodUnit>("g");
   const [notFound, setNotFound] = useState(false);
 
   // Formulario si no se encuentra
@@ -75,7 +82,10 @@ export default function BarcodeScreen() {
       const result = await lookupBarcode(code);
       if (result) {
         setProduct(result);
-        setPortionGrams(String(result.servingSizeG || 100));
+        const isLiquid = result.unit === "ml" || isLiquidFood(result.productName);
+        const unit: FoodUnit = isLiquid ? "ml" : "g";
+        setPortionUnit(unit);
+        setPortionGrams(String(result.servingSizeG || (isLiquid ? 250 : 100)));
       } else {
         setNotFound(true);
       }
@@ -141,6 +151,9 @@ export default function BarcodeScreen() {
 
           if (analysis.success && analysis.data?.items?.[0]) {
             const item = analysis.data.items[0];
+            const isLiquid = item.unit === "ml" || isLiquidFood(item.food);
+            const unit: FoodUnit = (item.unit as FoodUnit) || (isLiquid ? "ml" : "g");
+            const initialPortion = item.grams || (isLiquid ? 250 : 100);
             setProduct({
               barcode: "FOTO-IA",
               productName: item.food,
@@ -150,8 +163,11 @@ export default function BarcodeScreen() {
               carbsPer100g: item.carbs,
               fatPer100g: item.fat,
               source: "local",
+              unit,
+              containerSize: isLiquid ? initialPortion : undefined,
             });
-            setPortionGrams(String(Math.round(item.grams || 100)));
+            setPortionUnit(unit);
+            setPortionGrams(String(Math.round(initialPortion)));
           } else {
             showAlert("No se reconoció el código", "Intenta escribir los números del código manualmente abajo.");
             setActiveTab("manual");
@@ -183,15 +199,48 @@ export default function BarcodeScreen() {
 
         if (analysis.success && analysis.data?.items?.[0]) {
           const item = analysis.data.items[0];
-          setCustomName(item.food);
-          setCustomCals(String(Math.round(item.calories)));
-          setCustomProt(String(Math.round(item.protein * 10) / 10));
-          setCustomCarbs(String(Math.round(item.carbs * 10) / 10));
-          setCustomFat(String(Math.round(item.fat * 10) / 10));
-          showAlert(
-            "¡Etiqueta Leída con IA!",
-            "Completamos los datos nutricionales según la foto. Confirma los valores."
-          );
+          if (product && user) {
+            const updatedProduct: BarcodeProduct = {
+              ...product,
+              caloriesPer100g: Math.round(item.calories),
+              proteinPer100g: Math.round(item.protein * 10) / 10,
+              carbsPer100g: Math.round(item.carbs * 10) / 10,
+              fatPer100g: Math.round(item.fat * 10) / 10,
+              source: "custom",
+            };
+            setProduct(updatedProduct);
+            try {
+              await saveCustomBarcodeProduct(user.id, {
+                barcode: product.barcode,
+                productName: product.productName,
+                brand: product.brand,
+                servingSizeG: product.servingSizeG,
+                caloriesPer100g: updatedProduct.caloriesPer100g,
+                proteinPer100g: updatedProduct.proteinPer100g,
+                carbsPer100g: updatedProduct.carbsPer100g,
+                fatPer100g: updatedProduct.fatPer100g,
+              });
+              showAlert(
+                "¡Tabla Nutricional Actualizada!",
+                "La IA leyó la tabla del envase y guardó estos valores exactos para este código de barras."
+              );
+            } catch {
+              showAlert(
+                "¡Tabla Nutricional Leída!",
+                "Valores actualizados según la foto de tu envase."
+              );
+            }
+          } else {
+            setCustomName(item.food);
+            setCustomCals(String(Math.round(item.calories)));
+            setCustomProt(String(Math.round(item.protein * 10) / 10));
+            setCustomCarbs(String(Math.round(item.carbs * 10) / 10));
+            setCustomFat(String(Math.round(item.fat * 10) / 10));
+            showAlert(
+              "¡Etiqueta Leída con IA!",
+              "Completamos los datos nutricionales según la foto. Confirma los valores."
+            );
+          }
         }
       }
     } catch (err: any) {
@@ -203,16 +252,19 @@ export default function BarcodeScreen() {
 
   const handleAddProductToMeal = () => {
     if (!product) return;
-    const grams = parseDecimal(portionGrams);
-    if (!Number.isFinite(grams) || grams <= 0 || grams > 20000) {
-      showAlert("Porción inválida", "Ingresa los gramos consumidos.");
+    const parsed = parseQuantityInput(portionGrams, portionUnit);
+    if (!parsed.ok) {
+      showAlert("Porción inválida", parsed.error);
       return;
     }
-    const factor = grams / 100;
+    const finalAmount = parsed.value;
+    const finalUnit = parsed.unit;
+    const factor = finalAmount / 100;
 
     addItem({
       food: `${product.productName}${product.brand ? ` (${product.brand})` : ""}`,
-      grams,
+      grams: finalAmount,
+      unit: finalUnit,
       calories: Math.round(product.caloriesPer100g * factor * 10) / 10,
       protein: Math.round(product.proteinPer100g * factor * 10) / 10,
       carbs: Math.round(product.carbsPer100g * factor * 10) / 10,
@@ -232,6 +284,9 @@ export default function BarcodeScreen() {
 
     try {
       setLoading(true);
+      const isLiquid = isLiquidFood(customName);
+      const unit: FoodUnit = isLiquid ? "ml" : "g";
+
       await saveCustomBarcodeProduct(user.id, {
         barcode: barcodeInput.trim() || "000000000000",
         productName: customName.trim(),
@@ -246,6 +301,7 @@ export default function BarcodeScreen() {
       addItem({
         food: `${customName.trim()}${customBrand ? ` (${customBrand.trim()})` : ""}`,
         grams: 100,
+        unit,
         calories: parseDecimal(customCals),
         protein: parseDecimal(customProt),
         carbs: parseDecimal(customCarbs),
@@ -261,8 +317,8 @@ export default function BarcodeScreen() {
     }
   };
 
-  const grams = parseFloat(portionGrams) || 100;
-  const factor = grams / 100;
+  const parsedPortion = parseQuantityInput(portionGrams, portionUnit);
+  const factor = parsedPortion.ok ? parsedPortion.value / 100 : 1;
 
   // Productos chilenos frecuentes para probar en 1 toque
   const demoProducts = [
@@ -421,7 +477,11 @@ export default function BarcodeScreen() {
           <View style={styles.resultHeader}>
             <View style={styles.sourceBadge}>
               <Text style={styles.sourceBadgeText}>
-                {product.source === "local" ? "🇨🇱 Catálogo Chileno" : "🌐 Open Food Facts"}
+                {product.source === "custom"
+                  ? "⭐ Mi Producto Guardado"
+                  : product.source === "local"
+                  ? "🇨🇱 Catálogo Chileno"
+                  : "🌐 Open Food Facts"}
               </Text>
             </View>
             <Text style={styles.productName}>{product.productName}</Text>
@@ -429,18 +489,110 @@ export default function BarcodeScreen() {
             <Text style={styles.productCode}>Código: {product.barcode}</Text>
           </View>
 
-          {/* Selector de porción en gramos */}
+          {/* Selector de porción */}
           <View style={styles.portionSection}>
-            <Text style={styles.portionLabel}>¿Cuántos gramos consumiste?</Text>
+            <View style={styles.portionHeaderRow}>
+              <Text style={styles.portionLabel}>
+                {portionUnit === "ml" ? "¿Cuánto volumen consumiste?" : "¿Cuántos gramos consumiste?"}
+              </Text>
+              {/* Selector [ g | ml ] */}
+              <View style={styles.unitToggle}>
+                <TouchableOpacity
+                  style={[styles.unitToggleBtn, portionUnit === "g" && styles.unitToggleBtnActive]}
+                  onPress={() => setPortionUnit("g")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cambiar unidad a gramos"
+                  accessibilityState={{ selected: portionUnit === "g" }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.unitToggleText, portionUnit === "g" && styles.unitToggleTextActive]}>
+                    g
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.unitToggleBtn, portionUnit === "ml" && styles.unitToggleBtnActive]}
+                  onPress={() => setPortionUnit("ml")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cambiar unidad a mililitros"
+                  accessibilityState={{ selected: portionUnit === "ml" }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.unitToggleText, portionUnit === "ml" && styles.unitToggleTextActive]}>
+                    ml
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <View style={styles.portionInputRow}>
               <TextInput
-                style={styles.portionInput}
-                keyboardType="numeric"
+                style={[styles.portionInput, !parsedPortion.ok && styles.portionInputError]}
                 value={portionGrams}
-                onChangeText={setPortionGrams}
+                onChangeText={(text) => {
+                  setPortionGrams(text);
+                  const parsed = parseQuantityInput(text, portionUnit);
+                  if (parsed.ok && parsed.unit !== portionUnit) {
+                    setPortionUnit(parsed.unit);
+                  }
+                }}
+                placeholder={portionUnit === "ml" ? "ej. 250, 1L" : "ej. 150"}
+                placeholderTextColor={colors.textMuted}
+                accessibilityLabel="Cantidad consumida"
               />
-              <Text style={styles.portionUnit}>gramos</Text>
+              <Text style={styles.portionUnitLabel}>{portionUnit}</Text>
             </View>
+
+            {!parsedPortion.ok && portionGrams.trim().length > 0 && (
+              <Text style={styles.portionErrorText}>{parsedPortion.error}</Text>
+            )}
+
+            {/* Chips de envase si existe tamaño conocido */}
+            {product.containerSize && product.containerSize > 0 && (
+              <View style={styles.containerChipsRow}>
+                <TouchableOpacity
+                  style={styles.containerChip}
+                  onPress={() => setPortionGrams(String(Math.round(product.containerSize! / 2)))}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.containerChipText}>
+                    ½ envase ({formatQuantityDisplay(product.containerSize / 2, portionUnit)})
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.containerChip}
+                  onPress={() => setPortionGrams(String(product.containerSize))}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.containerChipText}>
+                    Envase completo ({formatQuantityDisplay(product.containerSize, portionUnit)})
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Chips de porciones estándar */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.standardChipsScroll}
+              contentContainerStyle={styles.standardChipsContainer}
+            >
+              {getStandardPortions(portionUnit).map((portion) => {
+                const isSelected = parsedPortion.ok && parsedPortion.value === portion.value;
+                return (
+                  <TouchableOpacity
+                    key={portion.label}
+                    style={[styles.portionChip, isSelected && styles.portionChipActive]}
+                    onPress={() => setPortionGrams(String(portion.value))}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.portionChipText, isSelected && styles.portionChipTextActive]}>
+                      {portion.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
 
           {/* Información nutricional calculada */}
@@ -470,6 +622,25 @@ export default function BarcodeScreen() {
               <Text style={styles.nutriLbl}>Grasas</Text>
             </View>
           </View>
+
+          {/* Botón para corregir tabla con foto si no coincide */}
+          <TouchableOpacity
+            style={styles.rescanLabelBtn}
+            onPress={handleScanNutritionLabel}
+            disabled={scanningLabel}
+            activeOpacity={0.8}
+          >
+            {scanningLabel ? (
+              <ActivityIndicator color={colors.primary} size="small" />
+            ) : (
+              <>
+                <CameraIcon size={14} color={colors.primary} />
+                <Text style={styles.rescanLabelBtnText}>
+                  ¿No coincide con tu envase? Leer tabla física con IA
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.addToMealBtn}
@@ -752,11 +923,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   resultCard: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 18,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 20,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+    ...shadows.card,
     marginBottom: 16,
   },
   resultHeader: {
@@ -765,81 +937,195 @@ const styles = StyleSheet.create({
   sourceBadge: {
     alignSelf: "flex-start",
     backgroundColor: colors.primaryLight,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    paddingHorizontal: 9,
     borderRadius: 10,
     marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "#DCFCE7",
   },
   sourceBadgeText: {
     fontSize: 11,
-    fontWeight: "700",
-    color: colors.primary,
+    fontWeight: "800",
+    color: colors.primaryDark,
   },
   productName: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.text,
+    letterSpacing: -0.3,
     marginBottom: 2,
   },
   productBrand: {
     fontSize: 13,
     color: colors.textSecondary,
     marginBottom: 4,
+    fontWeight: "500",
   },
   productCode: {
     fontSize: 11,
     color: colors.textMuted,
   },
   portionSection: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 14,
-    padding: 12,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
     marginBottom: 14,
   },
+  portionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
   portionLabel: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 12.5,
+    fontWeight: "700",
     color: colors.textSecondary,
-    marginBottom: 6,
+  },
+  unitToggle: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  unitToggleBtn: {
+    paddingHorizontal: 11,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  unitToggleBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  unitToggleText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.textSecondary,
+  },
+  unitToggleTextActive: {
+    color: "#FFFFFF",
   },
   portionInputRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    marginBottom: 8,
   },
   portionInput: {
-    backgroundColor: colors.card,
-    height: 38,
-    width: 90,
-    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    height: 40,
+    width: 120,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: "800",
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  portionInputError: {
+    borderColor: colors.danger,
+  },
+  portionUnitLabel: {
+    fontSize: 14,
     fontWeight: "700",
+    color: colors.textSecondary,
+  },
+  portionErrorText: {
+    fontSize: 11,
+    color: colors.danger,
+    marginBottom: 8,
+  },
+  containerChipsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+    flexWrap: "wrap",
+  },
+  containerChip: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#86EFAC",
+  },
+  containerChipText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.primaryDark,
+  },
+  standardChipsScroll: {
+    marginTop: 4,
+  },
+  standardChipsContainer: {
+    gap: 6,
+  },
+  portionChip: {
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  portionChipActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: "#86EFAC",
+  },
+  portionChipText: {
+    fontSize: 11,
+    fontWeight: "600",
     color: colors.text,
   },
-  portionUnit: {
-    fontSize: 13,
-    color: colors.textSecondary,
+  portionChipTextActive: {
+    color: colors.primaryDark,
+    fontWeight: "800",
   },
   nutritionPreview: {
     flexDirection: "row",
     justifyContent: "space-between",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 14,
-    padding: 12,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
     marginBottom: 16,
   },
   nutriCol: {
     alignItems: "center",
   },
   nutriVal: {
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "800",
     color: colors.text,
   },
   nutriLbl: {
     fontSize: 11,
+    fontWeight: "600",
     color: colors.textSecondary,
+    marginTop: 2,
+  },
+  rescanLabelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 11,
+    marginBottom: 12,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+  },
+  rescanLabelBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.primaryDark,
   },
   addToMealBtn: {
     backgroundColor: colors.primary,
@@ -847,13 +1133,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
+    paddingVertical: 15,
+    borderRadius: 16,
+    ...shadows.glow,
   },
   addToMealBtnText: {
     color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: -0.2,
   },
   notFoundCard: {
     backgroundColor: "#FFFBEB",

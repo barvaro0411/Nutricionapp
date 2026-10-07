@@ -58,7 +58,7 @@ export function useUserStreak() {
 
       // 1. Calcular racha actual (hacia atrás desde hoy o ayer)
       let currentStreak = 0;
-      let checkDate = new Date(today);
+      const checkDate = new Date(today);
 
       if (!hasLoggedToday) {
         // Si hoy no ha registrado todavía, verificamos si ayer sí registró

@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { colors } from "@/constants/colors";
+import { colors, shadows } from "@/constants/colors";
 
 interface MacroCardProps {
   label: string;
@@ -14,12 +14,15 @@ function MacroCard({ label, consumed, goal, color, lightBg }: MacroCardProps) {
   const safeGoal = goal || 1;
   const progressPct = Math.min(100, Math.round((consumed / safeGoal) * 100));
   const remaining = Math.max(0, goal - consumed);
+  const isComplete = progressPct >= 100;
 
   return (
     <View style={styles.macroCard}>
       <View style={styles.macroHeader}>
         <View style={styles.headerLeft}>
-          <View style={[styles.dot, { backgroundColor: color }]} />
+          <View style={[styles.haloDot, { backgroundColor: lightBg }]}>
+            <View style={[styles.innerDot, { backgroundColor: color }]} />
+          </View>
           <Text style={styles.macroName}>{label}</Text>
         </View>
         <View style={[styles.pctBadge, { backgroundColor: lightBg }]}>
@@ -32,7 +35,7 @@ function MacroCard({ label, consumed, goal, color, lightBg }: MacroCardProps) {
         <Text style={styles.goalNumber}>/{goal}g</Text>
       </View>
 
-      {/* Barra de progreso moderna */}
+      {/* Barra de progreso moderna tipo cápsula */}
       <View style={styles.track}>
         <View
           style={[
@@ -42,8 +45,15 @@ function MacroCard({ label, consumed, goal, color, lightBg }: MacroCardProps) {
         />
       </View>
 
-      <Text style={styles.remainingText}>
-        {remaining > 0 ? `${Math.round(remaining)}g restantes` : "Meta alcanzada ✓"}
+      <Text
+        style={[
+          styles.remainingText,
+          isComplete && { color: colors.primary, fontWeight: "700" },
+        ]}
+      >
+        {isComplete
+          ? "Meta lista ✓"
+          : `${Math.round(remaining)}g faltan`}
       </Text>
     </View>
   );
@@ -69,7 +79,7 @@ export function MacroProgressBar({
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.sectionOverline}>MACRONUTRIENTES CLAVE</Text>
+        <Text style={styles.sectionOverline}>MACRONUTRIENTES</Text>
       </View>
 
       <View style={styles.grid}>
@@ -112,7 +122,7 @@ const styles = StyleSheet.create({
   },
   sectionOverline: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.textSecondary,
     letterSpacing: 0.8,
   },
@@ -127,11 +137,7 @@ const styles = StyleSheet.create({
     padding: 13,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 1,
+    ...shadows.card,
   },
   macroHeader: {
     flexDirection: "row",
@@ -142,22 +148,30 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 6,
   },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+  haloDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  innerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   macroName: {
     fontSize: 11.5,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.text,
+    letterSpacing: -0.2,
   },
   pctBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
   pctText: {
     fontSize: 10,
@@ -169,10 +183,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   consumedNumber: {
-    fontSize: 19,
-    fontWeight: "800",
+    fontSize: 20,
+    fontWeight: "900",
     color: colors.text,
-    letterSpacing: -0.6,
+    letterSpacing: -0.8,
   },
   goalNumber: {
     fontSize: 11.5,
@@ -181,8 +195,8 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   track: {
-    height: 5,
-    backgroundColor: colors.surfaceMuted,
+    height: 6,
+    backgroundColor: "#F1F5F9",
     borderRadius: 3,
     overflow: "hidden",
     marginBottom: 8,
@@ -192,8 +206,8 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   remainingText: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: "600",
-    color: colors.textMuted,
+    color: colors.textSecondary,
   },
 });

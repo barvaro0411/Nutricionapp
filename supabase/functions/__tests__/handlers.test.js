@@ -29,9 +29,27 @@ test("text handler processes real provider JSON and computes totals", async () =
   const { handleRequest } = require("../parse-meal-text/index.ts");
   const res = await handleRequest(request({ text: "Una manzana", client_time_iso: "2026-10-02T12:00:00Z" }));
   expect(res.status).toBe(200);
-  expect((await res.json()).data.totals.calories).toBe(52);
+  const data = (await res.json()).data;
+  expect(data.totals.calories).toBe(52);
+  expect(data.items[0].unit).toBe("g");
   expect(client.auth.getUser).toHaveBeenCalledWith("user-token");
   expect(client.rpc).toHaveBeenCalledWith("reserve_ai_request", expect.objectContaining({ target_user_id: owner }));
+});
+test("text handler normalizes beverages to ml when unit is omitted or detected as liquid", async () => {
+  const output = {
+    items: [
+      { food: "Lata de Red Bull", grams: 250, calories: 115, protein: 0, carbs: 28, fat: 0, confidence: 0.95 },
+      { food: "Gatorade 1L", grams: 1000, unit: "ml", calories: 240, protein: 0, carbs: 60, fat: 0, confidence: 0.95 },
+    ],
+    meal_type_guess: "snack",
+  };
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(output) }] } }] })));
+  const { handleRequest } = require("../parse-meal-text/index.ts");
+  const res = await handleRequest(request({ text: "Red bull y gatorade", client_time_iso: "2026-10-02T12:00:00Z" }));
+  expect(res.status).toBe(200);
+  const data = (await res.json()).data;
+  expect(data.items[0].unit).toBe("ml");
+  expect(data.items[1].unit).toBe("ml");
 });
 test("quota storage failure denies requests and does not call AI", async () => {
   client.rpc.mockResolvedValue({ data: null, error: new Error("missing migration") });

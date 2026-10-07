@@ -4,7 +4,8 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { saveMealToDatabase } from "@/services/mealService";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { randomUUID } from "expo-crypto";
-import { DetectedFoodItemSchema, DetectedFoodItem, MealTotals, MealType } from "@/types/meal";
+import { DetectedFoodItemSchema, DetectedFoodItem, FoodUnit, MealTotals, MealType } from "@/types/meal";
+import { isLiquidFood } from "@/utils/liquidUnits";
 
 export interface FavoriteMealWithItems {
   id: string;
@@ -19,6 +20,7 @@ export interface FavoriteMealWithItems {
     id: string;
     food_name: string;
     grams: number;
+    unit?: FoodUnit;
     calories: number;
     protein: number;
     carbs: number;
@@ -37,7 +39,8 @@ export function useFavoriteMeals() {
     queryFn: async (): Promise<FavoriteMealWithItems[]> => {
       if (!user) return [];
 
-      const { data, error } = await supabase
+      let favData: any[] | null = null;
+      const primaryQuery = await supabase
         .from("favorite_meals")
         .select(`
           id,
@@ -52,6 +55,7 @@ export function useFavoriteMeals() {
             id,
             food_name,
             grams,
+            unit,
             calories,
             protein,
             carbs,
@@ -61,11 +65,49 @@ export function useFavoriteMeals() {
         .eq("user_id", user.id)
         .order("usage_count", { ascending: false });
 
-      if (error) {
-        throw new Error("No se pudieron cargar tus favoritas.");
+      if (primaryQuery.error) {
+        const isUnitMissing =
+          primaryQuery.error.message.includes("unit") ||
+          primaryQuery.error.code === "42703" ||
+          primaryQuery.error.message.includes("does not exist");
+
+        if (isUnitMissing) {
+          const fallbackQuery = await supabase
+            .from("favorite_meals")
+            .select(`
+              id,
+              title,
+              meal_type,
+              total_calories,
+              total_protein,
+              total_carbs,
+              total_fat,
+              usage_count,
+              favorite_meal_items (
+                id,
+                food_name,
+                grams,
+                calories,
+                protein,
+                carbs,
+                fat
+              )
+            `)
+            .eq("user_id", user.id)
+            .order("usage_count", { ascending: false });
+
+          if (fallbackQuery.error) {
+            throw new Error("No se pudieron cargar tus favoritas.");
+          }
+          favData = fallbackQuery.data;
+        } else {
+          throw new Error("No se pudieron cargar tus favoritas.");
+        }
+      } else {
+        favData = primaryQuery.data;
       }
 
-      return (data || []).map((fav: any) => ({
+      return (favData || []).map((fav: any) => ({
         id: fav.id,
         title: fav.title,
         meal_type: fav.meal_type as MealType,
@@ -78,6 +120,7 @@ export function useFavoriteMeals() {
           id: item.id,
           food_name: item.food_name,
           grams: Number(item.grams),
+          unit: item.unit === "ml" || (!item.unit && isLiquidFood(item.food_name)) ? "ml" : "g",
           calories: Number(item.calories),
           protein: Number(item.protein),
           carbs: Number(item.carbs),
@@ -120,7 +163,7 @@ export function useFavoriteMeals() {
 
       const newMeal = await saveMealToDatabase({
         userId: user.id, mealType: favoriteMeal.meal_type,
-        items: favoriteMeal.items.map(i => ({ food: i.food_name, grams: i.grams, calories: i.calories, protein: i.protein, carbs: i.carbs, fat: i.fat, confidence: 1 })),
+        items: favoriteMeal.items.map(i => ({ food: i.food_name, grams: i.grams, unit: i.unit || "g", calories: i.calories, protein: i.protein, carbs: i.carbs, fat: i.fat, confidence: 1 })),
         totals: { calories: favoriteMeal.total_calories, protein: favoriteMeal.total_protein, carbs: favoriteMeal.total_carbs, fat: favoriteMeal.total_fat },
         imagePath: "", notes: "Registrado desde favorita: " + favoriteMeal.title,
         loggedAt: useMealReviewStore.getState().loggedAt ? new Date(useMealReviewStore.getState().loggedAt!) : undefined,

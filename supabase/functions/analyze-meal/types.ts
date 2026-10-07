@@ -15,7 +15,9 @@ export type AnalyzeMealRequest = z.infer<typeof AnalyzeMealRequestSchema>;
 // Esquema del ítem individual de alimento detectado por la IA
 export const MealItemSchema = z.object({
   food: z.string().min(1, "El nombre del alimento no puede estar vacío"),
+  // Cantidad base: gramos si unit = "g", mililitros si unit = "ml".
   grams: z.number().finite().nonnegative("Los gramos deben ser un número positivo").max(20000),
+  unit: z.enum(["g", "ml"]).default("g"),
   calories: z.number().finite().nonnegative("Las calorías deben ser positivas").max(50000),
   protein: z.number().finite().nonnegative("La proteína debe ser positiva").max(10000),
   carbs: z.number().finite().nonnegative("Los carbohidratos deben ser positivos").max(10000),

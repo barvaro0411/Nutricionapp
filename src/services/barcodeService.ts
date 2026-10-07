@@ -1,10 +1,15 @@
 import { supabase } from "@/services/supabase";
+import { FoodUnit } from "@/types/meal";
+import { isLiquidFood, parseProductQuantity } from "@/utils/liquidUnits";
 
 export interface BarcodeProduct {
   barcode: string;
   productName: string;
   brand?: string;
   servingSizeG: number;
+  unit?: FoodUnit;
+  containerSize?: number;
+  quantityText?: string;
   caloriesPer100g: number;
   proteinPer100g: number;
   carbsPer100g: number;
@@ -31,16 +36,18 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeProduct | n
       .maybeSingle();
 
     if (!error && data) {
+      const isLiquid = isLiquidFood(data.product_name);
       return {
         barcode: data.barcode,
         productName: data.product_name,
         brand: data.brand || undefined,
-        servingSizeG: Number(data.serving_size_g) || 100,
+        servingSizeG: Number(data.serving_size_g) || (isLiquid ? 250 : 100),
+        unit: isLiquid ? "ml" : "g",
         caloriesPer100g: Number(data.calories_per_100g),
         proteinPer100g: Number(data.protein_per_100g),
         carbsPer100g: Number(data.carbs_per_100g),
         fatPer100g: Number(data.fat_per_100g),
-        source: "local",
+        source: data.created_by ? "custom" : "local",
       };
     }
   } catch (dbErr) {
@@ -69,11 +76,25 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeProduct | n
         const fat = Number(nutriments.fat_100g);
 
         if (![cals, prot, carbs, fat].every(v => Number.isFinite(v) && v >= 0) || cals > 1000 || [prot, carbs, fat].some(v => v > 100)) return null;
+
+        const quantityRaw = String(p.quantity || p.serving_size || "");
+        const parsedQty = parseProductQuantity(quantityRaw);
+        const isLiquid =
+          isLiquidFood(productName) ||
+          parsedQty?.unit === "ml" ||
+          /(beverage|drink|bebida|boisson)/i.test(String(p.categories || ""));
+        const unit: FoodUnit = parsedQty?.unit || (isLiquid ? "ml" : "g");
+        const containerSize = parsedQty?.value;
+        const servingSize = containerSize || (isLiquid ? 250 : 100);
+
         const productResult: BarcodeProduct = {
           barcode: cleanBarcode,
           productName,
           brand,
-          servingSizeG: 100,
+          servingSizeG: servingSize,
+          unit,
+          containerSize,
+          quantityText: quantityRaw || undefined,
           caloriesPer100g: Math.round(cals * 10) / 10,
           proteinPer100g: Math.round(prot * 10) / 10,
           carbsPer100g: Math.round(carbs * 10) / 10,
@@ -128,19 +149,22 @@ export async function saveCustomBarcodeProduct(
   if (![product.caloriesPer100g, product.proteinPer100g, product.carbsPer100g, product.fatPer100g].every(v => Number.isFinite(v) && v >= 0) || product.caloriesPer100g > 1000 || [product.proteinPer100g, product.carbsPer100g, product.fatPer100g].some(v => v > 100)) throw new Error("Revisa la información nutricional por 100 g.");
   const { data, error } = await supabase
     .from("barcode_products")
-    .insert({
-      barcode: product.barcode,
-      product_name: product.productName,
-      brand: product.brand || null,
-      serving_size_g: product.servingSizeG || 100,
-      calories_per_100g: product.caloriesPer100g,
-      protein_per_100g: product.proteinPer100g,
-      carbs_per_100g: product.carbsPer100g,
-      fat_per_100g: product.fatPer100g,
-      created_by: userId,
-      country: null,
-      verified: false,
-    })
+    .upsert(
+      {
+        barcode: product.barcode,
+        product_name: product.productName,
+        brand: product.brand || null,
+        serving_size_g: product.servingSizeG || 100,
+        calories_per_100g: product.caloriesPer100g,
+        protein_per_100g: product.proteinPer100g,
+        carbs_per_100g: product.carbsPer100g,
+        fat_per_100g: product.fatPer100g,
+        created_by: userId,
+        country: "CL",
+        verified: false,
+      },
+      { onConflict: "barcode" }
+    )
     .select()
     .single();
 

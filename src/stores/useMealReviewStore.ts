@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { randomUUID } from "expo-crypto";
-import { DetectedFoodItem, MealTotals, MealType } from "@/types/meal";
+import { DetectedFoodItem, DetectedFoodItemInput, FoodUnit, MealTotals, MealType } from "@/types/meal";
+import { resolveItemUnit } from "@/utils/liquidUnits";
+import { DrinkVariantData } from "@/utils/drinkVariants";
 
 interface MealReviewState {
   imagePath: string | null;
@@ -17,12 +19,14 @@ interface MealReviewState {
     imagePath: string;
     localImageUri: string;
     mealType: MealType;
-    items: DetectedFoodItem[];
+    items: DetectedFoodItemInput[];
   }) => void;
   setMealType: (type: MealType) => void;
   setUserNotes: (notes: string) => void;
   updateItemGrams: (index: number, newGrams: number) => void;
   adjustItemGramsDelta: (index: number, delta: number) => void;
+  updateItemUnit: (index: number, newUnit: FoodUnit) => void;
+  applyDrinkVariant: (index: number, target: DrinkVariantData) => void;
   updateItemVariant: (
     index: number,
     variant: {
@@ -34,7 +38,7 @@ interface MealReviewState {
     }
   ) => void;
   removeItem: (index: number) => void;
-  addItem: (item: DetectedFoodItem) => void;
+  addItem: (item: DetectedFoodItemInput) => void;
   getTotals: () => MealTotals;
   reset: () => void;
 }
@@ -53,8 +57,11 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
     // Calculamos los ratios por gramo para cada ítem detectado
     const enrichedItems: DetectedFoodItem[] = items.map((item, idx) => {
       const g = item.grams > 0 ? item.grams : 100;
+      const effectiveUnit: FoodUnit = item.unit || resolveItemUnit(item);
       return {
         ...item,
+        unit: effectiveUnit,
+        confidence: item.confidence ?? 0.8,
         id: item.id || `item_${idx}_${Date.now()}`,
         ratioCalories: item.calories / g,
         ratioProtein: item.protein / g,
@@ -74,7 +81,6 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
   },
 
   setMealType: (mealType) => set({ mealType }),
-
   setUserNotes: (userNotes) => set({ userNotes }),
 
   updateItemGrams: (index, newGrams) => {
@@ -106,6 +112,48 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
     const item = get().items[index];
     if (!item) return;
     get().updateItemGrams(index, item.grams + delta);
+  },
+
+  updateItemUnit: (index, newUnit) => {
+    set((state) => {
+      if (!state.items[index]) return state;
+      const updated = [...state.items];
+      const item = updated[index];
+      const clamped = Math.min(item.grams, 5000);
+      updated[index] = {
+        ...item,
+        unit: newUnit,
+        grams: clamped,
+      };
+      return { items: updated };
+    });
+  },
+
+  applyDrinkVariant: (index, target) => {
+    set((state) => {
+      if (!state.items[index]) return state;
+      const updated = [...state.items];
+      const item = updated[index];
+      const rCals = target.caloriesPer100g / 100;
+      const rProt = target.proteinPer100g / 100;
+      const rCarbs = target.carbsPer100g / 100;
+      const rFat = target.fatPer100g / 100;
+
+      updated[index] = {
+        ...item,
+        food: target.food,
+        ratioCalories: rCals,
+        ratioProtein: rProt,
+        ratioCarbs: rCarbs,
+        ratioFat: rFat,
+        calories: Math.round(item.grams * rCals * 10) / 10,
+        protein: Math.round(item.grams * rProt * 10) / 10,
+        carbs: Math.round(item.grams * rCarbs * 10) / 10,
+        fat: Math.round(item.grams * rFat * 10) / 10,
+        confidence: target.confidence,
+      };
+      return { items: updated };
+    });
   },
 
   updateItemVariant: (index, variant) => {
@@ -143,8 +191,11 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
 
   addItem: (newItem) => {
     const g = newItem.grams > 0 ? newItem.grams : 100;
+    const effectiveUnit: FoodUnit = newItem.unit || resolveItemUnit(newItem);
     const enriched: DetectedFoodItem = {
       ...newItem,
+      unit: effectiveUnit,
+      confidence: newItem.confidence ?? 0.8,
       id: newItem.id || `custom_${Date.now()}`,
       ratioCalories: newItem.calories / g,
       ratioProtein: newItem.protein / g,

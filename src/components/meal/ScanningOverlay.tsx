@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Animated, Easing } from "react-native";
-import { Sparkles, ScanLine } from "lucide-react-native";
+import { Sparkles } from "lucide-react-native";
 import { colors } from "@/constants/colors";
 
 interface ScanningOverlayProps {

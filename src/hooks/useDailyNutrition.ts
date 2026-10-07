@@ -4,6 +4,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { getDateKey, getDayRange, getWeekday } from "@/utils/dates";
 import { usePersonalPlan } from "@/hooks/usePersonalPlan";
 import { MealWithItems } from "@/types/meal";
+import { isLiquidFood } from "@/utils/liquidUnits";
 
 export function useDailyNutrition(selectedDate: Date = new Date()) {
   const { user } = useAuthStore();
@@ -35,7 +36,8 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
         goal = { ...goalData, calories: planGoal.calories, protein_g: planGoal.proteinG, carbs_g: planGoal.carbsG, fat_g: planGoal.fatG };
       }
       // 2. Obtener comidas registradas en el día con sus ítems
-      const { data: mealsData, error: mealsErr } = await supabase
+      let mealsData: any[] | null = null;
+      const primaryQuery = await supabase
         .from("meals")
         .select(`
           id,
@@ -52,6 +54,7 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
             id,
             food_name,
             grams,
+            unit,
             calories,
             protein,
             carbs,
@@ -65,8 +68,53 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
         .lt("logged_at", end)
         .order("logged_at", { ascending: true });
 
-      if (mealsErr) {
-        throw new Error(`Error al obtener comidas: ${mealsErr.message}`);
+      if (primaryQuery.error) {
+        // Fallback defensivo si la migración de la columna 'unit' aún no se ha ejecutado en Supabase
+        const isUnitMissing =
+          primaryQuery.error.message.includes("unit") ||
+          primaryQuery.error.code === "42703" ||
+          primaryQuery.error.message.includes("does not exist");
+
+        if (isUnitMissing) {
+          const fallbackQuery = await supabase
+            .from("meals")
+            .select(`
+              id,
+              user_id,
+              meal_type,
+              logged_at,
+              image_path,
+              total_calories,
+              total_protein,
+              total_carbs,
+              total_fat,
+              notes,
+              meal_items (
+                id,
+                food_name,
+                grams,
+                calories,
+                protein,
+                carbs,
+                fat,
+                confidence,
+                ai_detected
+              )
+            `)
+            .eq("user_id", user.id)
+            .gte("logged_at", start)
+            .lt("logged_at", end)
+            .order("logged_at", { ascending: true });
+
+          if (fallbackQuery.error) {
+            throw new Error(`Error al obtener comidas: ${fallbackQuery.error.message}`);
+          }
+          mealsData = fallbackQuery.data;
+        } else {
+          throw new Error(`Error al obtener comidas: ${primaryQuery.error.message}`);
+        }
+      } else {
+        mealsData = primaryQuery.data;
       }
 
       const meals: MealWithItems[] = (mealsData || []).map((m: any) => ({
@@ -84,6 +132,7 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
           id: i.id,
           food_name: i.food_name,
           grams: Number(i.grams),
+          unit: i.unit === "ml" || (!i.unit && isLiquidFood(i.food_name)) ? "ml" : "g",
           calories: Number(i.calories),
           protein: Number(i.protein),
           carbs: Number(i.carbs),

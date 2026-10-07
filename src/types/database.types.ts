@@ -157,6 +157,7 @@ export interface Database {
           meal_id: string;
           food_name: string;
           grams: number;
+          unit: "g" | "ml";
           calories: number;
           protein: number;
           carbs: number;
@@ -170,6 +171,7 @@ export interface Database {
           meal_id: string;
           food_name: string;
           grams: number;
+          unit?: "g" | "ml";
           calories: number;
           protein: number;
           carbs: number;
@@ -183,6 +185,7 @@ export interface Database {
           meal_id?: string;
           food_name?: string;
           grams?: number;
+          unit?: "g" | "ml";
           calories?: number;
           protein?: number;
           carbs?: number;
@@ -314,6 +317,7 @@ export interface Database {
           favorite_meal_id: string;
           food_name: string;
           grams: number;
+          unit: "g" | "ml";
           calories: number;
           protein: number;
           carbs: number;
@@ -325,6 +329,7 @@ export interface Database {
           favorite_meal_id: string;
           food_name: string;
           grams: number;
+          unit?: "g" | "ml";
           calories: number;
           protein: number;
           carbs: number;
@@ -336,6 +341,7 @@ export interface Database {
           favorite_meal_id?: string;
           food_name?: string;
           grams?: number;
+          unit?: "g" | "ml";
           calories?: number;
           protein?: number;
           carbs?: number;

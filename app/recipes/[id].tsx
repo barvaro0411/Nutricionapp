@@ -13,6 +13,7 @@ import { useRecipeDetail } from "@/hooks/useRecipes";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { colors } from "@/constants/colors";
 import { DetectedFoodItem } from "@/types/meal";
+import { isLiquidFood, formatQuantityDisplay } from "@/utils/liquidUnits";
 
 export default function RecipeDetailScreen() {
   const router = useRouter();
@@ -24,16 +25,20 @@ export default function RecipeDetailScreen() {
     if (!recipe) return;
 
     // Convertir ingredientes al formato de items de comida
-    const detectedItems: DetectedFoodItem[] = recipe.ingredients.map((ing, idx) => ({
-      id: `recipe_ing_${idx}_${Date.now()}`,
-      food: ing.foodName,
-      grams: ing.grams / recipe.servings,
-      calories: ing.calories / recipe.servings,
-      protein: ing.protein / recipe.servings,
-      carbs: ing.carbs / recipe.servings,
-      fat: ing.fat / recipe.servings,
-      confidence: 1.0,
-    }));
+    const detectedItems: DetectedFoodItem[] = recipe.ingredients.map((ing, idx) => {
+      const isLiquid = isLiquidFood(ing.foodName);
+      return {
+        id: `recipe_ing_${idx}_${Date.now()}`,
+        food: ing.foodName,
+        grams: ing.grams / recipe.servings,
+        unit: isLiquid ? "ml" : "g",
+        calories: ing.calories / recipe.servings,
+        protein: ing.protein / recipe.servings,
+        carbs: ing.carbs / recipe.servings,
+        fat: ing.fat / recipe.servings,
+        confidence: 1.0,
+      };
+    });
 
     useMealReviewStore.getState().reset();
     initializeReview({
@@ -105,7 +110,9 @@ export default function RecipeDetailScreen() {
         {recipe.ingredients.map((ing) => (
           <View key={ing.id} style={styles.ingredientRow}>
             <Text style={styles.ingredientName}>• {ing.foodName}</Text>
-            <Text style={styles.ingredientGrams}>{Math.round(ing.grams)}g</Text>
+            <Text style={styles.ingredientGrams}>
+              {formatQuantityDisplay(ing.grams, isLiquidFood(ing.foodName) ? "ml" : "g")}
+            </Text>
           </View>
         ))}
       </View>

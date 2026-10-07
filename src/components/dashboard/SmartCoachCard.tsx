@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Sparkles, ArrowRight, Bot } from "lucide-react-native";
-import { colors } from "@/constants/colors";
+import { colors, shadows } from "@/constants/colors";
 
 interface SmartCoachCardProps {
   consumedCalories: number;
@@ -128,7 +128,7 @@ export function SmartCoachCard({
         accessibilityRole="button"
         accessibilityLabel={`Preguntar al coach: ${insight.prompt}`}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 7, flex: 1 }}>
           <Sparkles size={15} color="#FFFFFF" />
           <Text style={styles.actionBtnText} numberOfLines={1}>
             Preguntarle al Coach
@@ -142,23 +142,19 @@ export function SmartCoachCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
     marginVertical: 12,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+    ...shadows.card,
   },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 12,
   },
   aiTag: {
     flexDirection: "row",
@@ -166,17 +162,19 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: colors.primaryLight,
     paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#DCFCE7",
   },
   aiTagText: {
     fontSize: 11,
-    fontWeight: "700",
-    color: colors.primary,
+    fontWeight: "800",
+    color: colors.primaryDark,
   },
   categoryTag: {
-    paddingVertical: 3,
-    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    paddingHorizontal: 9,
     borderRadius: 10,
   },
   categoryTagText: {
@@ -184,8 +182,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   title: {
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 15.5,
+    fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.2,
     marginBottom: 6,
@@ -193,21 +191,22 @@ const styles = StyleSheet.create({
   message: {
     fontSize: 13,
     color: colors.textSecondary,
-    lineHeight: 18,
-    marginBottom: 14,
+    lineHeight: 19,
+    marginBottom: 16,
   },
   actionBtn: {
     backgroundColor: colors.primary,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
     borderRadius: 14,
+    ...shadows.glow,
   },
   actionBtnText: {
     color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 });

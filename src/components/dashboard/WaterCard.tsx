@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
-import { Droplets } from "lucide-react-native";
-import { colors } from "@/constants/colors";
+import { Droplets, Plus } from "lucide-react-native";
+import { colors, shadows } from "@/constants/colors";
 
 interface WaterCardProps {
   totalMl: number;
@@ -17,15 +17,19 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
-        <View>
-          <View style={styles.titleRow}>
-            <Droplets size={14} color={colors.water} />
-            <Text style={styles.overline}>HIDRATACIÓN</Text>
+        <View style={styles.headerLeft}>
+          <View style={styles.iconWrap}>
+            <Droplets size={16} color={colors.water} />
           </View>
-          <Text style={styles.valueText}>
-            {totalMl.toLocaleString("es-CL")} <Text style={styles.targetText}>/ {targetMl.toLocaleString("es-CL")} ml</Text>
-          </Text>
+          <View>
+            <Text style={styles.overline}>HIDRATACIÓN</Text>
+            <Text style={styles.valueText}>
+              {totalMl.toLocaleString("es-CL")}{" "}
+              <Text style={styles.targetText}>/ {safeTarget.toLocaleString("es-CL")} ml</Text>
+            </Text>
+          </View>
         </View>
+
         <View style={styles.pctBadge}>
           <Text style={styles.pctText}>{progressPct}%</Text>
         </View>
@@ -36,15 +40,19 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
         <View style={[styles.fill, { width: `${progressPct}%` }]} />
       </View>
 
-      {/* Botones de acción rápida minimalistas */}
+      {/* Botones de acción rápida con estética moderna */}
       <View style={styles.actionsRow}>
         <TouchableOpacity
           style={styles.pillBtn}
           onPress={() => onAddWater(250)}
           disabled={loading}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Añadir 250 ml de agua"
         >
-          <Text style={styles.pillText}>+250 ml</Text>
+          <Plus size={12} color={colors.water} />
+          <Text style={styles.pillText}>250 ml</Text>
+          <Text style={styles.pillSubtext}>Vaso</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -52,11 +60,19 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
           onPress={() => onAddWater(500)}
           disabled={loading}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Añadir 500 ml de agua"
         >
-          <Text style={styles.pillText}>+500 ml</Text>
+          <Plus size={12} color={colors.water} />
+          <Text style={styles.pillText}>500 ml</Text>
+          <Text style={styles.pillSubtext}>Botella</Text>
         </TouchableOpacity>
 
-        {loading && <ActivityIndicator size="small" color={colors.water} style={{ marginLeft: 6 }} />}
+        {loading && (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="small" color={colors.water} />
+          </View>
+        )}
       </View>
     </View>
   );
@@ -64,69 +80,77 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    padding: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 6,
-    elevation: 1,
+    ...shadows.card,
     marginBottom: 16,
   },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     marginBottom: 14,
   },
-  titleRow: {
+  headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 4,
+    gap: 12,
+  },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: colors.waterLight,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E0F2FE",
   },
   overline: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.textSecondary,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   valueText: {
     fontSize: 20,
-    fontWeight: "800",
+    fontWeight: "900",
     color: colors.text,
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
+    marginTop: 1,
   },
   targetText: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 13,
+    fontWeight: "600",
     color: colors.textMuted,
   },
   pctBadge: {
     backgroundColor: colors.waterLight,
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
   },
   pctText: {
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 11.5,
+    fontWeight: "800",
     color: colors.water,
   },
   track: {
-    height: 6,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 3,
+    height: 8,
+    backgroundColor: "#E0F2FE",
+    borderRadius: 4,
     overflow: "hidden",
-    marginBottom: 16,
+    marginBottom: 14,
   },
   fill: {
     height: "100%",
     backgroundColor: colors.water,
-    borderRadius: 3,
+    borderRadius: 4,
   },
   actionsRow: {
     flexDirection: "row",
@@ -134,14 +158,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   pillBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: colors.surfaceMuted,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    gap: 5,
   },
   pillText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     color: colors.text,
+  },
+  pillSubtext: {
+    fontSize: 10.5,
+    fontWeight: "500",
+    color: colors.textSecondary,
+  },
+  loadingWrap: {
+    marginLeft: 6,
   },
 });
