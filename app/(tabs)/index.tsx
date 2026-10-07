@@ -24,6 +24,7 @@ import {
   Barcode,
   Star,
   Target,
+  HelpCircle,
 } from "lucide-react-native";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useWaterTracker } from "@/hooks/useWaterTracker";
@@ -39,6 +40,7 @@ import { MasterPlanModal } from "@/components/dashboard/MasterPlanModal";
 import { StreakBadge } from "@/components/dashboard/StreakBadge";
 import { StreakModal } from "@/components/dashboard/StreakModal";
 import { SmartCoachCard } from "@/components/dashboard/SmartCoachCard";
+import { AppGuideModal } from "@/components/dashboard/AppGuideModal";
 import { OfflineBanner } from "@/components/common/OfflineBanner";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { colors } from "@/constants/colors";
@@ -61,6 +63,7 @@ export default function DashboardScreen() {
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [showMasterPlanModal, setShowMasterPlanModal] = useState(false);
   const [showStreakModal, setShowStreakModal] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>("almuerzo");
 
   const { data, error, isLoading, isRefetching, refetch } = useDailyNutrition(selectedDate);
@@ -80,8 +83,8 @@ export default function DashboardScreen() {
     beginMeal();
     setActiveMealType(mealType);
     router.push({
-      pathname: "/meal/camera",
-      params: { suggestedMealType: mealType },
+      pathname: "/(tabs)/record",
+      params: { mealType },
     });
   };
 
@@ -107,7 +110,7 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* Encabezado con Saludo y Racha */}
+        {/* Encabezado con Saludo, Guía y Racha */}
         <View style={styles.topHeader}>
           <View style={styles.greetingWrap}>
             <Text style={styles.greetingTitle}>
@@ -115,7 +118,17 @@ export default function DashboardScreen() {
             </Text>
             <Text style={styles.greetingSubtitle}>Tu registro nutricional diario</Text>
           </View>
-          <StreakBadge onPress={() => setShowStreakModal(true)} />
+          <View style={styles.headerRightActions}>
+            <TouchableOpacity
+              style={styles.helpGuideBtn}
+              onPress={() => setShowGuideModal(true)}
+              activeOpacity={0.8}
+              accessibilityLabel="¿Cómo funciona la app?"
+            >
+              <HelpCircle size={18} color={colors.primary} />
+            </TouchableOpacity>
+            <StreakBadge onPress={() => setShowStreakModal(true)} />
+          </View>
         </View>
 
         {/* Navegador de Fecha */}
@@ -369,6 +382,12 @@ export default function DashboardScreen() {
           });
         }}
       />
+
+      {/* Modal de Guía de la App y Explicación de Botones */}
+      <AppGuideModal
+        visible={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+      />
     </>
   );
 }
@@ -388,6 +407,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 14,
     marginTop: 4,
+  },
+  headerRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  helpGuideBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#DCFCE7",
   },
   greetingWrap: {
     flex: 1,
