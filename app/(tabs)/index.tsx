@@ -36,12 +36,17 @@ import { ActivityModal } from "@/components/dashboard/ActivityModal";
 import { TextVoiceModal } from "@/components/meal/TextVoiceModal";
 import { FavoritesModal } from "@/components/meal/FavoritesModal";
 import { MasterPlanModal } from "@/components/dashboard/MasterPlanModal";
+import { StreakBadge } from "@/components/dashboard/StreakBadge";
+import { StreakModal } from "@/components/dashboard/StreakModal";
+import { SmartCoachCard } from "@/components/dashboard/SmartCoachCard";
 import { OfflineBanner } from "@/components/common/OfflineBanner";
+import { useAuthStore } from "@/stores/useAuthStore";
 import { colors } from "@/constants/colors";
 import { MealType } from "@/types/meal";
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { profile } = useAuthStore();
   const { data: personalPlan } = usePersonalPlan();
   const beginMeal = () => { useMealReviewStore.getState().reset(); useMealReviewStore.getState().setLoggedAt(loggedAtForDate(selectedDate)); };
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -55,6 +60,7 @@ export default function DashboardScreen() {
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [showMasterPlanModal, setShowMasterPlanModal] = useState(false);
+  const [showStreakModal, setShowStreakModal] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>("almuerzo");
 
   const { data, error, isLoading, isRefetching, refetch } = useDailyNutrition(selectedDate);
@@ -101,6 +107,17 @@ export default function DashboardScreen() {
           />
         }
       >
+        {/* Encabezado con Saludo y Racha */}
+        <View style={styles.topHeader}>
+          <View style={styles.greetingWrap}>
+            <Text style={styles.greetingTitle}>
+              {profile?.full_name ? `¡Hola, ${profile.full_name.split(" ")[0]}!` : "¡Hola!"} 👋
+            </Text>
+            <Text style={styles.greetingSubtitle}>Tu registro nutricional diario</Text>
+          </View>
+          <StreakBadge onPress={() => setShowStreakModal(true)} />
+        </View>
+
         {/* Navegador de Fecha */}
         <View style={styles.dateSelector}>
           <TouchableOpacity style={styles.dateArrow} onPress={() => changeDay(-1)}>
@@ -256,6 +273,25 @@ export default function DashboardScreen() {
               fatGoal={data?.goal.fat_g || 65}
             />
 
+            {/* Smart Coach Proactivo (Fase 3) */}
+            <SmartCoachCard
+              consumedCalories={data?.consumed.calories || 0}
+              goalCalories={data?.goal.calories || 2000}
+              remainingCalories={data?.remaining.calories || 0}
+              consumedProtein={data?.consumed.protein || 0}
+              goalProtein={data?.goal.protein_g || 140}
+              remainingProtein={data?.remaining.protein || 0}
+              waterMl={totalMl}
+              targetWaterMl={targetMl}
+              mealCount={data?.meals.length || 0}
+              onAskCoach={(prompt) => {
+                router.push({
+                  pathname: "/coach",
+                  params: { initialPrompt: prompt },
+                });
+              }}
+            />
+
             {/* Comidas del Día */}
             <Text style={styles.mealsHeaderTitle}>Comidas del Día</Text>
 
@@ -320,6 +356,19 @@ export default function DashboardScreen() {
         visible={showMasterPlanModal}
         onClose={() => setShowMasterPlanModal(false)}
       />
+
+      {/* Modal de Racha de Hábitos (Fase 3) */}
+      <StreakModal
+        visible={showStreakModal}
+        onClose={() => setShowStreakModal(false)}
+        onLogMealPress={() => {
+          beginMeal();
+          router.push({
+            pathname: "/meal/camera",
+            params: { suggestedMealType: "almuerzo" },
+          });
+        }}
+      />
     </>
   );
 }
@@ -332,6 +381,28 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 90,
+  },
+  topHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+    marginTop: 4,
+  },
+  greetingWrap: {
+    flex: 1,
+    marginRight: 10,
+  },
+  greetingTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: -0.4,
+  },
+  greetingSubtitle: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   dateSelector: {
     flexDirection: "row",

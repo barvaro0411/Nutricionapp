@@ -10,16 +10,23 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useCoachChat } from "@/hooks/useCoachChat";
 import { showAlert } from "@/utils/alerts";
 import { colors } from "@/constants/colors";
 
 export default function CoachChatScreen() {
   const router = useRouter();
+  const { initialPrompt } = useLocalSearchParams<{ initialPrompt?: string }>();
   const { messages, isLoading, sendMessage, isSending } = useCoachChat();
   const [inputText, setInputText] = useState("");
   const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (initialPrompt && typeof initialPrompt === "string") {
+      setInputText(initialPrompt);
+    }
+  }, [initialPrompt]);
 
   useEffect(() => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
