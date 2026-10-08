@@ -153,6 +153,7 @@ export interface Database {
       };
       meal_items: {
         Row: {
+          nutrition_reference: Json | null;
           id: string;
           meal_id: string;
           food_name: string;
@@ -167,6 +168,7 @@ export interface Database {
           created_at: string;
         };
         Insert: {
+          nutrition_reference?: Json | null;
           id?: string;
           meal_id: string;
           food_name: string;
@@ -181,6 +183,7 @@ export interface Database {
           created_at?: string;
         };
         Update: {
+          nutrition_reference?: Json | null;
           id?: string;
           meal_id?: string;
           food_name?: string;
@@ -322,6 +325,7 @@ export interface Database {
       };
       favorite_meal_items: {
         Row: {
+          nutrition_reference: Json | null;
           id: string;
           favorite_meal_id: string;
           food_name: string;
@@ -334,6 +338,7 @@ export interface Database {
           created_at: string;
         };
         Insert: {
+          nutrition_reference?: Json | null;
           id?: string;
           favorite_meal_id: string;
           food_name: string;
@@ -346,6 +351,7 @@ export interface Database {
           created_at?: string;
         };
         Update: {
+          nutrition_reference?: Json | null;
           id?: string;
           favorite_meal_id?: string;
           food_name?: string;

@@ -1,52 +1,46 @@
 # Gemini y USDA FoodData Central
 
-Gemini identifica los alimentos, su preparación y la cantidad en fotos, texto y audio.
-Después, las funciones `analyze-meal` y `parse-meal-text` consultan USDA para referencias
-revisadas y calculan calorías, proteínas, carbohidratos y grasas por la porción indicada.
-La cantidad y la confianza de Gemini se conservan: USDA no verifica el peso del plato.
+Gemini identifica alimentos, preparación y cantidad en fotos, texto y audio. USDA aporta los nutrientes de una referencia compatible. El peso sigue siendo una estimación que el usuario debe revisar.
 
-## Alcance de esta primera versión
+## Búsqueda automática y manual
 
-- Once referencias SR Legacy verificadas: arroz blanco crudo/cocido, huevo duro,
-  palta, plátano, zanahoria cruda, tomate crudo, papa hervida sin piel,
-  lentejas hervidas y pechuga sin piel cruda/asada.
-- Coincidencias completas con los nombres de `supabase/functions/_shared/usdaCatalog.ts`.
-  Preparaciones ambiguas, mezclas, platos chilenos, líquidos, cantidades desconocidas
-  e identificaciones con confianza inferior a 0,8 mantienen los nutrientes de IA.
-- Las etiquetas nutricionales y los códigos de barras conservan sus valores propios.
-- La revisión muestra “Nutrientes: USDA” cuando hay referencia; cambiar la preparación
-  o la unidad elimina esa atribución. Cambiar los gramos conserva la referencia.
-- El identificador FDC y la descripción están disponibles en la respuesta y el borrador.
-  Esta versión no agrega campos al historial o favoritos de la base de datos.
+- La búsqueda general consulta Foundation, SR Legacy y Survey (FNDDS). Las once referencias revisadas originalmente se conservan como acceso rápido, sin limitar el resto de alimentos.
+- Gemini genera términos en inglés y puede proponer una segunda formulación. Un paso de selección compara ingredientes, cocción, corte, piel y contenido de grasa/azúcar. Solo se aceptan IDs presentes en los resultados, con confianza de equivalencia de al menos 0,85 y controles adicionales de crudo/cocido/frito.
+- No se usa automáticamente el primer resultado. Los datos completos se validan por ID, descripción, tipo de datos, identificadores de nutrientes y unidades. Un nutriente ausente no se convierte en cero. Se admite energía Atwater de Foundation (2047/2048), además de 1008.
+- Fideos cocidos y salsa con carne se consultan por separado. Una salsa no debe usar los nutrientes de un plato de pasta completo. Preparaciones locales o ingredientes inciertos conservan la estimación si no hay referencia suficientemente compatible.
+- En la revisión, **Agregar desde USDA** permite buscar en español y elegir un alimento; **Buscar nutrientes en USDA / Cambiar referencia USDA** permite corregir uno existente. Se muestran nombre en español, descripción original, nutrientes por 100 g/ml y porción editable.
+- Los líquidos requieren una porción pesada de USDA para derivar gramos por ml. Se usan medidas explícitas en ml o equivalencias domésticas documentadas por USDA (taza: 237 ml). No se supone que todos los líquidos pesen 1 g/ml. Si falta esa información, se puede buscar en gramos o conservar la estimación.
+- Etiquetas nutricionales y productos de código de barras conservan sus datos propios; la búsqueda automática utiliza referencias genéricas, sin sustituir productos de marca.
 
-No se selecciona automáticamente el primer resultado de búsqueda. Las referencias
-se validan por ID, descripción y tipo de datos, y los nutrientes por ID y unidad.
-Un nutriente ausente no se interpreta como cero. Los resultados se escalan desde 100 g.
+## Historial y favoritas
 
-## Configuración y activación
+La migración `20261008000000_usda_complete.sql` agrega `nutrition_reference` a `meal_items` y `favorite_meal_items`, valida su formato y actualiza `save_meal` y `save_favorite`. Los registros existentes quedan sin referencia, sin recalcular sus nutrientes.
 
-La clave se configura **solo como secreto de Supabase**, con nombre `USDA_API_KEY`.
-Nunca agregarla a variables `EXPO_PUBLIC_*`, al repositorio o al bundle de Expo.
-El archivo local `.env.usda.local` está excluido de Git.
+La referencia contiene fuente, ID FDC, descripción y, cuando corresponde, tipo de datos y base de 100 g/ml. El historial muestra USDA; las favoritas conservan la referencia al reutilizarlas. Cambiar la cantidad mantiene y escala los nutrientes; cambiar la preparación o unidad elimina la atribución anterior. Seleccionar otra referencia reconstruye los ratios para la nueva porción.
+
+## Configuración y publicación
+
+La clave se configura **solo como secreto de Supabase**, con nombre `USDA_API_KEY`. Nunca usar `EXPO_PUBLIC_USDA_API_KEY` ni incluir claves en Git. `.env.usda.local` está excluido de Git.
+
+Aplicar primero la migración incremental al proyecto existente; `bootstrap.sql` y `full_schema.sql` son solo para instalaciones nuevas. Después:
 
 ```powershell
 npx supabase secrets set --env-file .env.usda.local --project-ref <project-ref>
 npx supabase functions deploy analyze-meal --project-ref <project-ref>
 npx supabase functions deploy parse-meal-text --project-ref <project-ref>
+npx supabase functions deploy search-foods --project-ref <project-ref>
+npm run build:pwa
 ```
 
-Publicar también la app para mostrar la atribución en la pantalla de revisión.
-No se necesitan migraciones ni nuevas dependencias. Sin clave, la app mantiene
-el análisis existente.
+Publicar el frontend en Vercel. La clave USDA no se necesita en Vercel porque las llamadas se realizan desde Supabase. `search-foods` verifica el token mediante `auth.getUser` y reserva la cuota existente antes de llamar a los proveedores.
 
-## Caché y disponibilidad
+## Disponibilidad y límites
 
-Se agrupan los IDs necesarios en una solicitud `/foods`; las consultas concurrentes
-del mismo proceso comparten la petición. Caché de 24 horas por instancia de Edge
-Function, limitada al catálogo revisado. Esta caché no se comparte entre regiones
-o procesos. Una petición tiene un timeout de 6 segundos; errores conservan la
-estimación de IA. Un 429 suspende consultas durante una hora en esa instancia.
-No se registran URLs con claves ni respuestas de error del proveedor.
+Cada consulta USDA tiene un timeout de seis segundos. Los detalles se agrupan en lotes de hasta veinte IDs. Búsquedas idénticas comparten solicitudes concurrentes y una caché de 24 horas, limitada a 300 entradas por instancia. La caché no se comparte entre procesos ni regiones. Los errores se conservan brevemente; un 429 suspende consultas por una hora en esa instancia.
+
+El enriquecimiento automático procesa hasta veinte alimentos fuera del acceso rápido por análisis, con hasta dos búsquedas por alimento y concurrencia acotada. Los demás conservan su estimación y pueden consultarse manualmente. La búsqueda manual muestra hasta doce resultados completos.
+
+Si USDA o la selección adicional no están disponibles, el análisis inicial sigue disponible para revisión. El buscador muestra un error recuperable o explica que no hay resultados completos. Nunca se registran URLs con claves ni cuerpos de errores del proveedor.
 
 ## Verificación
 
@@ -57,15 +51,6 @@ npm run lint
 npm run build:pwa
 ```
 
-Las pruebas cubren nutrientes/unidades, porciones, coincidencias, caché, concurrencia,
-fallas de USDA, etiquetas y los tres flujos de entrada. Las consultas reales de USDA
-se comprobaron con la clave local; las pruebas automáticas usan proveedores simulados.
+Las pruebas cubren nutrientes, porciones, selección de IDs, incompatibilidades de cocción, densidad, caché, concurrencia, errores, autenticación, cuota, etiquetas y los tres flujos de entrada. La prueba de publicación usa proveedores reales, una cuenta temporal con sesión solo en memoria y eliminación al terminar; verifica además persistencia, favoritas e idempotencia.
 
-La integración quedó activada el 8 de octubre de 2026 en Supabase y en
-[la app publicada](https://dist-two-alpha-18.vercel.app). Se verificó desde el navegador
-el análisis real de arroz cocido, huevo duro y palta, la atribución USDA, el cambio
-de porción de 150 a 300 g de arroz (390 kcal) y el guardado de los totales.
-Las cuentas de prueba se eliminaron al terminar y las sesiones se usaron solo en memoria.
-
-Fuente: U.S. Department of Agriculture, Agricultural Research Service. FoodData Central.
-[Guía de API y licencia CC0](https://fdc.nal.usda.gov/api-guide/).
+Fuentes: [guía de API de USDA](https://fdc.nal.usda.gov/api-guide/), [Foundation Foods y energía Atwater](https://fdc.nal.usda.gov/Foundation_Foods_Documentation/), [equivalencias de volumen, USDA HG72, tabla 1](https://www.ars.usda.gov/ARSUserFiles/80400525/Data/hg72/hg72_2002.pdf). Datos de USDA FoodData Central, Agricultural Research Service, de dominio público (CC0).

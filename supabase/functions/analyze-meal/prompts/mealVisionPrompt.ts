@@ -40,8 +40,12 @@ Devuelve ÚNICAMENTE un bloque JSON válido que cumpla exactamente este esquema,
       "protein": 25.5,
       "carbs": 10.0,
       "fat": 5.0,
-      "confidence": 0.85
+      "confidence": 0.85,
+      "usda_lookup": { "query": "English food description with preparation", "state": "cooked" }
     }
   ]
 }
+### BÚSQUEDA NUTRICIONAL:
+Incluye alternative_query cuando otro nombre inglés pueda ayudar a encontrar la MISMA preparación; para salsa de tomate con carne molida usa query "spaghetti sauce with meat" y alternative_query "tomato meat sauce". Nunca combines pasta y salsa si se identificaron por separado.
+Para CADA alimento incluye usda_lookup con query en inglés (máximo 160 caracteres) y state: raw, cooked, ready_to_eat o unknown. Traduce fielmente el alimento y su preparación, conservando corte, piel, grasa, azúcar e ingredientes principales. Ejemplos: fideos cocidos -> "pasta cooked"; salsa de tomate con carne molida -> "tomato meat sauce"; leche entera -> "whole milk". No inventes equivalencias para platos chilenos, marcas ni IDs USDA. Para pasta, arroz y legumbres servidos en un plato usa cooked salvo evidencia contraria. Conserva la estimación de nutrientes y porción para poder usarla si no hay referencia compatible.
 `.trim();

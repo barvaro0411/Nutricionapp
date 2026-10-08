@@ -59,3 +59,51 @@ test('unauthenticated users never reach either upstream provider', async () => {
   expect((await textHandler(request({ text: 'Arroz cocido' }))).status).toBe(401);
   expect(fetchMock).not.toHaveBeenCalled();
 });
+
+test.each(['text','audio','photo'])('%s looks up pasta and meat sauce dynamically and keeps them separate', async flow => {
+  const candidates = [
+    {fdcId:2708357,description:'Pasta, cooked',dataType:'Survey (FNDDS)'},
+    {fdcId:2706470,description:'Spaghetti sauce with meat',dataType:'Survey (FNDDS)'},
+  ];
+  const items = [
+    { ...aiOutput.items[0],food:'Fideos cocidos',grams:200,usda_lookup:{query:'pasta cooked',state:'cooked'} },
+    { ...aiOutput.items[0],food:'Salsa de tomate con carne molida',grams:100,confidence:.7,usda_lookup:{query:'spaghetti sauce with meat',state:'cooked'} },
+  ];
+  let geminiCalls=0;
+  fetchMock.mockImplementation(async (url,init) => {
+    if(String(url).includes('foods/search')) return new Response(JSON.stringify({foods:JSON.parse(init.body).query.includes('pasta') ? [candidates[0]] : [candidates[1]]}));
+    if(String(url).includes('api.nal.usda.gov')) return new Response(JSON.stringify(candidates.map((candidate,index)=>({...candidate,foodNutrients:[
+      {nutrient:{id:1008,unitName:'kcal'},amount:index===0?158:100},{nutrient:{id:1003,unitName:'g'},amount:5},
+      {nutrient:{id:1004,unitName:'g'},amount:2},{nutrient:{id:1005,unitName:'g'},amount:20},
+    ]}))));
+    const payload=geminiCalls++===0 ? {meal_type_guess:'almuerzo',items} : {matches:[{index:0,fdc_id:2708357,confidence:.99},{index:1,fdc_id:2706470,confidence:.9}]};
+    return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(payload)}]}}]}));
+  });
+  const res=flow==='photo' ? await photoHandler(request({image_path:owner+'/meal.jpg'})) : await textHandler(request(flow==='audio'?{audio_base64:'YXVkaW8=',audio_mime_type:'audio/m4a'}:{text:'Fideos y salsa con carne'}));
+  expect(res.status).toBe(200); const body=await res.json();
+  expect(body.data.items.map(item=>item.nutrition_reference.fdc_id)).toEqual([2708357,2706470]);
+  expect(body.data.totals.calories).toBe(416); expect(body.data.items[1].confidence).toBe(.7);
+  expect(client.rpc).toHaveBeenCalledTimes(1);
+});
+
+test('manual USDA search requires a valid session, enforces quota and returns verified details', async () => {
+  const searchHandler=require('../search-foods/index.ts').handleRequest;
+  client.auth.getUser.mockResolvedValueOnce({data:{user:null},error:null});
+  expect((await searchHandler(request({query:'Fideos cocidos'}))).status).toBe(401); expect(fetchMock).not.toHaveBeenCalled();
+  expect((await searchHandler(request({query:'x'}))).status).toBe(400); expect(fetchMock).not.toHaveBeenCalled();
+  client.rpc.mockResolvedValueOnce({data:{allowed:false},error:null});
+  expect((await searchHandler(request({query:'Fideos cocidos'}))).status).toBe(429); expect(fetchMock).not.toHaveBeenCalled();
+  let geminiCalls=0;
+  fetchMock.mockImplementation(async (url) => {
+    if(String(url).includes('foods/search')) return new Response(JSON.stringify({foods:[{fdcId:2708357,description:'Pasta, cooked',dataType:'Survey (FNDDS)'}]}));
+    if(String(url).includes('api.nal.usda.gov')) return new Response(JSON.stringify([{fdcId:2708357,description:'Pasta, cooked',dataType:'Survey (FNDDS)',foodNutrients:[
+      {nutrient:{id:1008,unitName:'kcal'},amount:158},{nutrient:{id:1003,unitName:'g'},amount:5},{nutrient:{id:1004,unitName:'g'},amount:2},{nutrient:{id:1005,unitName:'g'},amount:30},
+    ]}]));
+    const output=geminiCalls++===0?{query:'pasta cooked'}:{foods:[{fdc_id:2708357,label:'Fideos cocidos'},{fdc_id:999,label:'Inventado'}]};
+    return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(output)}]}}]}));
+  });
+  const res=await searchHandler(request({query:'Fideos cocidos'})); expect(res.status).toBe(200);
+  const body=await res.json(); expect(body.data.foods).toHaveLength(1);
+  expect(body.data.foods[0]).toMatchObject({label:'Fideos cocidos',per100:{calories:158},nutrition_reference:{fdc_id:2708357,basis:'100g'}});
+  expect(JSON.stringify(body)).not.toMatch(/usda-secret|gemini-secret/);
+});

@@ -25,3 +25,7 @@ import_map = "./functions/deno.json"
 [functions.nutrition-coach]
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.search-foods]
+verify_jwt = false
+import_map = "./functions/deno.json"

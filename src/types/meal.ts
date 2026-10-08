@@ -5,6 +5,19 @@ export type MealType = z.infer<typeof MealTypeSchema>;
 
 export type FoodUnit = "g" | "ml";
 
+export const NutritionReferenceSchema = z.object({
+  source: z.literal("USDA FoodData Central"),
+  fdc_id: z.number().int().positive(),
+  description: z.string().min(1).max(500),
+  data_type: z.string().max(100).optional(),
+  basis: z.enum(["100g", "100ml"]).optional(),
+});
+export type NutritionReference = z.infer<typeof NutritionReferenceSchema>;
+export function parseNutritionReference(value: unknown): NutritionReference | undefined {
+  const parsed = NutritionReferenceSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
 export const DetectedFoodItemSchema = z.object({
   id: z.string().optional(),
   food: z.string().min(1, "El nombre del alimento es requerido"),
@@ -16,11 +29,7 @@ export const DetectedFoodItemSchema = z.object({
   carbs: z.number().finite().min(0).max(10000),
   fat: z.number().finite().min(0).max(10000),
   confidence: z.number().min(0).max(1).default(0.8),
-  nutrition_reference: z.object({
-    source: z.literal("USDA FoodData Central"),
-    fdc_id: z.number().int().positive(),
-    description: z.string().min(1).max(500),
-  }).optional(),
+  nutrition_reference: NutritionReferenceSchema.optional(),
   ratioCalories: z.number().optional(),
   ratioProtein: z.number().optional(),
   ratioCarbs: z.number().optional(),
@@ -79,5 +88,6 @@ export interface MealWithItems {
     fat: number;
     confidence: number | null;
     ai_detected: boolean;
+    nutrition_reference?: NutritionReference;
   }[];
 }

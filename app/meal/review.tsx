@@ -18,6 +18,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useFavoriteMeals } from "@/hooks/useFavoriteMeals";
 import { saveMealToDatabase } from "@/services/mealService";
 import { VariantModal } from "@/components/meal/VariantModal";
+import { UsdaSearchModal } from "@/components/meal/UsdaSearchModal";
 import { findFamilyForFood } from "@/constants/chileanPresets";
 import { colors, shadows, layout } from "@/constants/colors";
 import { FoodUnit, MealType, DetectedFoodItemSchema } from "@/types/meal";
@@ -52,6 +53,7 @@ export default function MealReviewScreen() {
     updateItemVariant,
     removeItem,
     addItem,
+    replaceItem,
     getTotals,
     reset,
   } = useMealReviewStore();
@@ -59,6 +61,7 @@ export default function MealReviewScreen() {
   const [saving, setSaving] = useState(false);
   const [activeVariantIndex, setActiveVariantIndex] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [usdaTarget, setUsdaTarget] = useState<string | "new" | null>(null);
   const [showFavModal, setShowFavModal] = useState(false);
   const [favTitle, setFavTitle] = useState("");
   const [newFoodName, setNewFoodName] = useState("");
@@ -219,6 +222,9 @@ export default function MealReviewScreen() {
         </View>
 
         {/* Modal simple de agregado manual */}
+        <TouchableOpacity accessibilityRole="button" onPress={() => setUsdaTarget("new")} style={styles.variantBtn}>
+          <Text style={styles.variantBtnText}>+ Agregar desde USDA</Text>
+        </TouchableOpacity>
         {showAddModal && (
           <View style={styles.manualAddCard}>
             <Text style={styles.manualAddTitle}>Agregar Alimento Manual</Text>
@@ -396,8 +402,12 @@ export default function MealReviewScreen() {
                 <View style={styles.itemTitleBlock}>
                   <Text style={styles.itemNameText}>{item.food}</Text>
                   {item.nutrition_reference && (
-                    <Text style={styles.nutritionSourceText}>Nutrientes: USDA · Revisa la porción</Text>
+                    <View>
+                      <Text style={styles.nutritionSourceText}>Nutrientes: USDA · Revisa la porción</Text>
+                      <Text style={styles.nutritionSourceText}>{item.nutrition_reference.description}</Text>
+                    </View>
                   )}
+                  {!item.nutrition_reference && <Text style={styles.nutritionSourceText}>Sin referencia USDA · Revisa los nutrientes</Text>}
                   {isLowConfidence && (
                     <View style={styles.warningPill}>
                       <Text style={styles.warningPillText}>⚠️ Revisa este alimento</Text>
@@ -413,6 +423,9 @@ export default function MealReviewScreen() {
               </View>
 
               {/* Botón para cambiar variante culinaria si existe */}
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={"Buscar referencia USDA para " + item.food} style={styles.variantBtn} onPress={() => setUsdaTarget(item.id || null)}>
+                <Text style={styles.variantBtnText}>{item.nutrition_reference ? "Cambiar referencia USDA" : "Buscar nutrientes en USDA"}</Text>
+              </TouchableOpacity>
               {hasVariants && (
                 <TouchableOpacity
                   style={styles.variantBtn}
@@ -567,6 +580,17 @@ export default function MealReviewScreen() {
       </ScrollView>
 
       {/* Modal de variantes */}
+      {usdaTarget !== null && (() => {
+        const target = items.find(item => item.id === usdaTarget);
+        return <UsdaSearchModal key={usdaTarget} initialQuery={target?.food} initialAmount={target?.grams} initialUnit={target?.unit}
+          onClose={() => setUsdaTarget(null)} onSelect={selected => {
+            if (usdaTarget === "new") addItem(selected);
+            else {
+              const index = useMealReviewStore.getState().items.findIndex(item => item.id === usdaTarget);
+              if (index >= 0) { replaceItem(index, selected); setInputValues(prev => ({ ...prev, [index]: String(selected.grams) })); setInputErrors(prev => ({ ...prev, [index]: "" })); }
+            }
+          }} />;
+      })()}
       {activeVariantIndex !== null && items[activeVariantIndex] && (
         <VariantModal
           visible={activeVariantIndex !== null}

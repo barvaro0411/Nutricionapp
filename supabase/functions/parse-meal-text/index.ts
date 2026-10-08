@@ -3,7 +3,7 @@ import { CHILEAN_MEAL_TEXT_PROMPT } from "./prompts/mealTextPrompt.ts";
 import { ApiError, authenticate, errorResponse, json, methodResponse, readBody, reserveAiRequest } from "../_shared/http.ts";
 import { callGemini, getGeminiKey, parseModelJson } from "../_shared/gemini.ts";
 import { resolveItemUnit } from "../_shared/liquidUnits.ts";
-import { enrichWithUsda } from "../_shared/usda.ts";
+import { enrichWithUsda } from "../_shared/usdaSearch.ts";
 
 export async function handleRequest(req: Request) {
   const method = methodResponse(req);
@@ -32,7 +32,7 @@ export async function handleRequest(req: Request) {
       ...item,
       unit: resolveItemUnit(item),
     }));
-    const items = await enrichWithUsda(normalizedItems);
+    const items = await enrichWithUsda(normalizedItems, key);
     const totals = items.reduce((acc, item) => ({
       calories: acc.calories + item.calories, protein: acc.protein + item.protein,
       carbs: acc.carbs + item.carbs, fat: acc.fat + item.fat,

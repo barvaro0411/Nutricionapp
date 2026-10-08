@@ -24,6 +24,11 @@ export const MealItemSchema = z.object({
   carbs: z.number().finite().nonnegative("Los carbohidratos deben ser positivos").max(10000),
   fat: z.number().finite().nonnegative("Las grasas deben ser positivas").max(10000),
   confidence: z.number().min(0).max(1).default(0.8),
+  usda_lookup: z.object({
+    query: z.string().min(1).max(160),
+    alternative_query: z.string().min(1).max(160).optional(),
+    state: z.enum(["raw", "cooked", "ready_to_eat", "unknown"]),
+  }).optional(),
 });
 export type MealItem = z.infer<typeof MealItemSchema>;
 

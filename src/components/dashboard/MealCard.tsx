@@ -122,6 +122,7 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardP
                     <View style={styles.itemBullet} />
                     <Text style={styles.itemName} numberOfLines={1}>
                       {item.food_name}
+                      {item.nutrition_reference ? " · USDA" : ""}
                     </Text>
                   </View>
                   <View style={styles.itemMetrics}>

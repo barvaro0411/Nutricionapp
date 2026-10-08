@@ -1,19 +1,22 @@
 import type { MealItem } from "../analyze-meal/types.ts";
 import { findUsdaReference, USDA_REFERENCES } from "./usdaCatalog.ts";
 
-interface Macros { calories: number; protein: number; carbs: number; fat: number }
+export interface Macros { calories: number; protein: number; carbs: number; fat: number }
 export interface UsdaNutritionReference {
   source: "USDA FoodData Central";
   fdc_id: number;
   description: string;
+  data_type?: string;
+  basis?: "100g" | "100ml";
 }
 export type EnrichedMealItem = MealItem & { nutrition_reference?: UsdaNutritionReference };
 interface ReferenceData { macros: Macros; reference: UsdaNutritionReference }
-interface UsdaFood {
+export interface UsdaFood {
   fdcId?: number;
   description?: string;
   dataType?: string;
   foodNutrients?: { amount?: number; nutrient?: { id?: number; unitName?: string } }[];
+  foodPortions?: { amount?: number; gramWeight?: number; modifier?: string; portionDescription?: string; measureUnit?: { name?: string } }[];
 }
 
 // Nutrient IDs, not array positions or translated names. Missing values are not zero.
@@ -25,7 +28,7 @@ export function readUsdaMacros(food: UsdaFood): Macros | null {
     return entry?.nutrient?.unitName?.toLowerCase() === unit && typeof value === "number"
       && Number.isFinite(value) && value >= 0 && value <= max ? value : null;
   };
-  const calories = read(1008, "kcal", 1000);
+  const calories = read(1008, "kcal", 1000) ?? read(2048, "kcal", 1000) ?? read(2047, "kcal", 1000);
   const protein = read(1003, "g", 100);
   const carbs = read(1005, "g", 100);
   const fat = read(1004, "g", 100);
@@ -114,4 +117,4 @@ export function createUsdaEnricher(options: {
 }
 
 // One bounded cache per Edge Function isolate, shared by its requests.
-export const enrichWithUsda = createUsdaEnricher({ apiKey: () => Deno.env.get("USDA_API_KEY"), fetcher: (...args) => fetch(...args) });
+export const enrichReviewedWithUsda = createUsdaEnricher({ apiKey: () => Deno.env.get("USDA_API_KEY"), fetcher: (...args) => fetch(...args) });

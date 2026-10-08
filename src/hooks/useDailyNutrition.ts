@@ -3,7 +3,7 @@ import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { getDateKey, getDayRange, getWeekday } from "@/utils/dates";
 import { usePersonalPlan } from "@/hooks/usePersonalPlan";
-import { MealWithItems } from "@/types/meal";
+import { MealWithItems, parseNutritionReference } from "@/types/meal";
 import { isLiquidFood } from "@/utils/liquidUnits";
 
 export function useDailyNutrition(selectedDate: Date = new Date()) {
@@ -53,6 +53,7 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
             id,
             food_name,
             grams,
+            nutrition_reference,
             unit,
             calories,
             protein,
@@ -173,6 +174,7 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
           fat: Number(i.fat),
           confidence: i.confidence ? Number(i.confidence) : null,
           ai_detected: i.ai_detected,
+          nutrition_reference: parseNutritionReference(i.nutrition_reference),
         })),
       }));
 

@@ -26,3 +26,12 @@ test('changing unit clears a reference expressed per gram', () => {
   useMealReviewStore.getState().updateItemUnit(0, 'ml');
   expect(useMealReviewStore.getState().items[0].nutrition_reference).toBeUndefined();
 });
+
+test('replacing an estimate with a manually selected reference rebuilds ratios and preserves identity', () => {
+  const previousId = useMealReviewStore.getState().items[0].id;
+  const selected = { food: 'Fideos cocidos', grams: 200, unit: 'g' as const, calories: 316, protein: 11.6, carbs: 61.6, fat: 1.8, confidence: 1,
+    nutrition_reference: { ...reference, fdc_id: 2708357, description: 'Pasta, cooked', data_type: 'Survey (FNDDS)', basis: '100g' as const } };
+  useMealReviewStore.getState().replaceItem(0, selected);
+  useMealReviewStore.getState().updateItemGrams(0, 100);
+  expect(useMealReviewStore.getState().items[0]).toMatchObject({id: previousId, calories: 158, grams: 100, nutrition_reference: selected.nutrition_reference});
+});

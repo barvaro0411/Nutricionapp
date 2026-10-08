@@ -4,7 +4,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { saveMealToDatabase } from "@/services/mealService";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { randomUUID } from "expo-crypto";
-import { DetectedFoodItemSchema, DetectedFoodItem, FoodUnit, MealTotals, MealType } from "@/types/meal";
+import { DetectedFoodItemSchema, DetectedFoodItem, FoodUnit, MealTotals, MealType, NutritionReference, parseNutritionReference } from "@/types/meal";
 import { isLiquidFood } from "@/utils/liquidUnits";
 
 export interface FavoriteMealWithItems {
@@ -25,6 +25,7 @@ export interface FavoriteMealWithItems {
     protein: number;
     carbs: number;
     fat: number;
+    nutrition_reference?: NutritionReference;
   }[];
 }
 
@@ -55,6 +56,7 @@ export function useFavoriteMeals() {
             id,
             food_name,
             grams,
+            nutrition_reference,
             unit,
             calories,
             protein,
@@ -125,6 +127,7 @@ export function useFavoriteMeals() {
           protein: Number(item.protein),
           carbs: Number(item.carbs),
           fat: Number(item.fat),
+          nutrition_reference: parseNutritionReference(item.nutrition_reference),
         })),
       }));
     },
@@ -163,7 +166,7 @@ export function useFavoriteMeals() {
 
       const newMeal = await saveMealToDatabase({
         userId: user.id, mealType: favoriteMeal.meal_type,
-        items: favoriteMeal.items.map(i => ({ food: i.food_name, grams: i.grams, unit: i.unit || "g", calories: i.calories, protein: i.protein, carbs: i.carbs, fat: i.fat, confidence: 1 })),
+        items: favoriteMeal.items.map(i => ({ food: i.food_name, grams: i.grams, unit: i.unit || "g", calories: i.calories, protein: i.protein, carbs: i.carbs, fat: i.fat, confidence: 1, nutrition_reference: i.nutrition_reference })),
         totals: { calories: favoriteMeal.total_calories, protein: favoriteMeal.total_protein, carbs: favoriteMeal.total_carbs, fat: favoriteMeal.total_fat },
         imagePath: "", notes: "Registrado desde favorita: " + favoriteMeal.title,
         loggedAt: useMealReviewStore.getState().loggedAt ? new Date(useMealReviewStore.getState().loggedAt!) : undefined,
