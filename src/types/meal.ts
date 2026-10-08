@@ -16,6 +16,11 @@ export const DetectedFoodItemSchema = z.object({
   carbs: z.number().finite().min(0).max(10000),
   fat: z.number().finite().min(0).max(10000),
   confidence: z.number().min(0).max(1).default(0.8),
+  nutrition_reference: z.object({
+    source: z.literal("USDA FoodData Central"),
+    fdc_id: z.number().int().positive(),
+    description: z.string().min(1).max(500),
+  }).optional(),
   ratioCalories: z.number().optional(),
   ratioProtein: z.number().optional(),
   ratioCarbs: z.number().optional(),

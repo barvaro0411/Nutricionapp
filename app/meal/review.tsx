@@ -395,6 +395,9 @@ export default function MealReviewScreen() {
               <View style={styles.itemHeader}>
                 <View style={styles.itemTitleBlock}>
                   <Text style={styles.itemNameText}>{item.food}</Text>
+                  {item.nutrition_reference && (
+                    <Text style={styles.nutritionSourceText}>Nutrientes: USDA · Revisa la porción</Text>
+                  )}
                   {isLowConfidence && (
                     <View style={styles.warningPill}>
                       <Text style={styles.warningPillText}>⚠️ Revisa este alimento</Text>
@@ -898,6 +901,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.primaryDark,
     fontWeight: "700",
+  },
+  nutritionSourceText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
   },
   gramsControlRow: {
     flexDirection: "row",

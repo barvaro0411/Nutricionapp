@@ -2,6 +2,10 @@
 
 Aplicación moderna de seguimiento nutricional con Inteligencia Artificial, adaptada para hábitos y alimentos chilenos. Funciona como **PWA (Progressive Web App)** en web/móvil y en **iOS / Android** mediante Expo y React Native.
 
+La integración opcional con USDA FoodData Central complementa los alimentos identificados
+por Gemini con referencias nutricionales revisadas. Configuración y alcance:
+[Gemini y USDA](docs/usda-integration.md).
+
 ---
 
 ## 🚀 Requisitos Previos

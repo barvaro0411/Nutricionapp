@@ -123,6 +123,7 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
       updated[index] = {
         ...item,
         unit: newUnit,
+        nutrition_reference: undefined,
         grams: clamped,
       };
       return { items: updated };
@@ -142,6 +143,7 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
       updated[index] = {
         ...item,
         food: target.food,
+        nutrition_reference: undefined,
         ratioCalories: rCals,
         ratioProtein: rProt,
         ratioCarbs: rCarbs,
@@ -170,6 +172,7 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
       updated[index] = {
         ...item,
         food: variant.food,
+        nutrition_reference: undefined,
         ratioCalories: rCals,
         ratioProtein: rProt,
         ratioCarbs: rCarbs,
