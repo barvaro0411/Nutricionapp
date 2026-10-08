@@ -15,7 +15,8 @@
     "type-check": "tsc --noEmit",
     "build": "npm run build:pwa",
     "icons": "node scripts/generate-icons.cjs",
-    "postinstall": "patch-package"
+    "check:tooling": "node scripts/check-tooling-security.cjs",
+    "postinstall": "patch-package --error-on-fail && npm run check:tooling"
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",
@@ -73,6 +74,9 @@
     "uuid": "^11.1.1",
     "image-size": "^2.0.4",
     "decode-uri-component": "^0.5.0",
-    "micromatch": "^4.0.8"
+    "micromatch": "^4.0.8",
+    "braces": "3.0.3",
+    "node-forge": "1.4.0",
+    "sprintf-js": "1.1.3"
   }
 }

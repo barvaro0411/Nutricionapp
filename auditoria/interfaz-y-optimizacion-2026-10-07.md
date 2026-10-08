@@ -38,9 +38,9 @@ Los tamaños son mediciones de compilación, no una garantía de tiempo de carga
 
 Capturas con una cuenta ficticia: [acceso](interfaz-2026-10-07/acceso-escritorio.png), [panel móvil](interfaz-2026-10-07/inicio-movil.png), [panel de escritorio](interfaz-2026-10-07/inicio-escritorio.png), [perfil](interfaz-2026-10-07/perfil-movil.png) y [recetas](interfaz-2026-10-07/recetas-movil.png).
 
-La [auditoría de seguridad](seguridad-cuentas-2026-10-07.md) documenta aislamiento de cuentas y persistencia. Siguen pendientes la prueba en teléfonos físicos, la entrega a buzones reales y la verificación de respaldos/restauración. Las migraciones remotas anteriores ausentes se describen en el [informe de correcciones](correcciones-2026-10-07.md).
+La [auditoría de seguridad](seguridad-cuentas-2026-10-07.md) documenta aislamiento de cuentas y persistencia. La revisión posterior validó una copia cifrada y su restauración aislada; véase el [informe de respaldos y compilación](respaldos-y-compilacion-2026-10-07.md). Siguen pendientes la prueba en teléfonos físicos, la entrega a buzones reales y una copia externa automática. Las migraciones remotas anteriores ausentes se describen en el [informe de correcciones](correcciones-2026-10-07.md).
 
-`npm audit` conserva avisos sin parche en herramientas de compilación; los tres paquetes de origen están ausentes del archivo web, comprobado mediante su mapa de fuentes. El detalle y las fuentes están en el informe de seguridad. Los mapas de fuentes usados para esta revisión permanecen en `artifacts`, fuera de Git y de Vercel.
+`npm audit` conserva avisos por versión en herramientas de compilación. Se añadieron parches locales comprobados para los tres casos de origen, con aplicación obligatoria en instalaciones nuevas. Los tres paquetes están ausentes del archivo web, comprobado mediante su mapa de fuentes. El detalle y las fuentes están en el informe de seguridad. Los mapas de fuentes usados para esta revisión permanecen en `artifacts`, fuera de Git y de Vercel.
 
 ## Publicación
 
