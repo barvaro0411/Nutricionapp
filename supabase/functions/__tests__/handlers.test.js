@@ -77,10 +77,31 @@ test("quota storage failure denies requests and does not call AI", async () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 test("provider error details and keys are not returned to the client", async () => {
-  fetchMock.mockResolvedValue(new Response("private upstream error gemini-secret", { status: 500 }));
-  const { handleRequest } = require("../parse-meal-text/index.ts");
-  const res = await handleRequest(request({ text: "Una manzana" }));
-  expect(res.status).toBe(502); expect(await res.text()).not.toContain("gemini-secret");
+  jest.useFakeTimers();
+  const warning = jest.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    fetchMock.mockResolvedValue(new Response("private upstream error gemini-secret", { status: 500 }));
+    const { handleRequest } = require("../parse-meal-text/index.ts");
+    const pending = handleRequest(request({ text: "Una manzana" }));
+    await jest.advanceTimersByTimeAsync(1500);
+    const res = await pending;
+    expect(res.status).toBe(503); expect(await res.text()).not.toContain("gemini-secret");
+    expect(JSON.stringify(warning.mock.calls)).not.toContain("gemini-secret");
+  } finally { jest.useRealTimers(); warning.mockRestore(); }
+});
+test("temporary provider failure retries without charging user quota twice", async () => {
+  jest.useFakeTimers();
+  const warning = jest.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const output = { meal_type_guess: "snack", items: [{ food: "Manzana", grams: 100, calories: 52, protein: 0.3, carbs: 14, fat: 0.2 }] };
+    fetchMock.mockResolvedValueOnce(new Response("busy", { status: 503 })).mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(output) }] } }] })));
+    const { handleRequest } = require("../parse-meal-text/index.ts");
+    const pending = handleRequest(request({ text: "Una manzana" }));
+    await jest.advanceTimersByTimeAsync(500);
+    expect((await pending).status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(client.rpc).toHaveBeenCalledTimes(1);
+  } finally { jest.useRealTimers(); warning.mockRestore(); }
 });
 test("missing session rejects before reading the request; wrong HTTP method rejected", async () => {
   const { handleRequest } = require("../parse-meal-text/index.ts");

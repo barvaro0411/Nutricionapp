@@ -18,7 +18,7 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false,
 function RootNavigationLayout() {
   const router = useRouter();
   const segments = useSegments();
-  const { session, profile, isLoading, isRecoveringPassword, setSession, setProfile, setIsLoading, setIsRecoveringPassword } = useAuthStore();
+  const { session, isLoading, isRecoveringPassword, setSession, setProfile, setIsLoading, setIsRecoveringPassword } = useAuthStore();
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | null>(configurationError);
   const [retry, setRetry] = useState(0);
@@ -94,16 +94,13 @@ function RootNavigationLayout() {
   useEffect(() => {
     if (!initialized || isLoading || error) return;
     const inAuth = segments[0] === "(auth)";
-    const inOnboarding = segments[0] === "(onboarding)";
     const inRecovery = segments[0] === "reset-password";
     if (isRecoveringPassword && session) {
       if (!inRecovery) router.replace("/reset-password");
     } else if (!session) {
       if (!inAuth && !inRecovery) router.replace("/(auth)/login");
-    } else if (!profile?.current_weight_kg || !profile?.height_cm) {
-      if (!inOnboarding && !inRecovery) router.replace("/(onboarding)/profile-setup");
     } else if (inAuth) router.replace("/(tabs)");
-  }, [initialized, isLoading, error, segments, session, profile, isRecoveringPassword, router]);
+  }, [initialized, isLoading, error, segments, session, isRecoveringPassword, router]);
 
   if (error) return <View style={styles.center}>
     <Text style={styles.message}>{error}</Text>
@@ -115,7 +112,8 @@ function RootNavigationLayout() {
   return <>
     <StatusBar style="auto" />
     <ToastContainer />
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack initialRouteName="(tabs)" screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
       <Stack.Screen name="meal/review" options={{ presentation: "modal", title: "Confirmar comida", headerShown: true }} />
       <Stack.Screen name="meal/camera" options={{ presentation: "fullScreenModal" }} />
       <Stack.Screen name="meal/barcode" options={{ presentation: "modal" }} />
