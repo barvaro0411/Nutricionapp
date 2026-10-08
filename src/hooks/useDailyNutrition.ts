@@ -7,39 +7,38 @@ import { MealWithItems } from "@/types/meal";
 import { isLiquidFood } from "@/utils/liquidUnits";
 
 export function useDailyNutrition(selectedDate: Date = new Date()) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
 
   const { data: personalPlan } = usePersonalPlan();
   const dateString = getDateKey(selectedDate);
   const { start, end } = getDayRange(selectedDate);
   return useQuery({
-    queryKey: ["dailyNutrition", user?.id, dateString, personalPlan?.dailyGoals],
+    queryKey: [
+      "dailyNutrition",
+      user?.id,
+      dateString,
+      personalPlan?.dailyGoals,
+    ],
     enabled: !!user?.id,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user) throw new Error("No hay usuario autenticado");
 
-      // 1. Obtener objetivo activo
-      const { data: goalData, error: goalErr } = await supabase
+      // Metas y comidas son independientes: iniciar ambas consultas a la vez.
+      const goalQuery = supabase
         .from("goals")
         .select("*")
         .eq("user_id", user.id)
         .eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(1)
+        .abortSignal(signal)
         .maybeSingle();
-
-      if (goalErr) throw new Error("No se pudieron cargar tus metas.");
-      if (!goalData) throw new Error("Completa tus metas para ver el resumen.");
-      let goal = goalData;
-      if (personalPlan && getWeekday(selectedDate) === 0 && goalData.calories === personalPlan.dailyGoals.standard.calories && goalData.protein_g === personalPlan.dailyGoals.standard.proteinG && goalData.carbs_g === personalPlan.dailyGoals.standard.carbsG && goalData.fat_g === personalPlan.dailyGoals.standard.fatG) {
-        const planGoal = getWeekday(selectedDate) === 0 ? personalPlan.dailyGoals.matchDay : personalPlan.dailyGoals.standard;
-        goal = { ...goalData, calories: planGoal.calories, protein_g: planGoal.proteinG, carbs_g: planGoal.carbsG, fat_g: planGoal.fatG };
-      }
       // 2. Obtener comidas registradas en el día con sus ítems
       let mealsData: any[] | null = null;
-      const primaryQuery = await supabase
+      const mealsQuery = supabase
         .from("meals")
-        .select(`
+        .select(
+          `
           id,
           user_id,
           meal_type,
@@ -62,11 +61,36 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
             confidence,
             ai_detected
           )
-        `)
+        `,
+        )
         .eq("user_id", user.id)
         .gte("logged_at", start)
         .lt("logged_at", end)
-        .order("logged_at", { ascending: true });
+        .order("logged_at", { ascending: true })
+        .abortSignal(signal);
+
+      const [{ data: goalData, error: goalErr }, primaryQuery] =
+        await Promise.all([goalQuery, mealsQuery]);
+      if (goalErr) throw new Error("No se pudieron cargar tus metas.");
+      if (!goalData) throw new Error("Completa tus metas para ver el resumen.");
+      let goal = goalData;
+      if (
+        personalPlan &&
+        getWeekday(selectedDate) === 0 &&
+        goalData.calories === personalPlan.dailyGoals.standard.calories &&
+        goalData.protein_g === personalPlan.dailyGoals.standard.proteinG &&
+        goalData.carbs_g === personalPlan.dailyGoals.standard.carbsG &&
+        goalData.fat_g === personalPlan.dailyGoals.standard.fatG
+      ) {
+        const planGoal = personalPlan.dailyGoals.matchDay;
+        goal = {
+          ...goalData,
+          calories: planGoal.calories,
+          protein_g: planGoal.proteinG,
+          carbs_g: planGoal.carbsG,
+          fat_g: planGoal.fatG,
+        };
+      }
 
       if (primaryQuery.error) {
         // Fallback defensivo si la migración de la columna 'unit' aún no se ha ejecutado en Supabase
@@ -78,7 +102,8 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
         if (isUnitMissing) {
           const fallbackQuery = await supabase
             .from("meals")
-            .select(`
+            .select(
+              `
               id,
               user_id,
               meal_type,
@@ -100,18 +125,24 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
                 confidence,
                 ai_detected
               )
-            `)
+            `,
+            )
             .eq("user_id", user.id)
             .gte("logged_at", start)
             .lt("logged_at", end)
-            .order("logged_at", { ascending: true });
+            .order("logged_at", { ascending: true })
+            .abortSignal(signal);
 
           if (fallbackQuery.error) {
-            throw new Error(`Error al obtener comidas: ${fallbackQuery.error.message}`);
+            throw new Error(
+              `Error al obtener comidas: ${fallbackQuery.error.message}`,
+            );
           }
           mealsData = fallbackQuery.data;
         } else {
-          throw new Error(`Error al obtener comidas: ${primaryQuery.error.message}`);
+          throw new Error(
+            `Error al obtener comidas: ${primaryQuery.error.message}`,
+          );
         }
       } else {
         mealsData = primaryQuery.data;
@@ -132,7 +163,10 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
           id: i.id,
           food_name: i.food_name,
           grams: Number(i.grams),
-          unit: i.unit === "ml" || (!i.unit && isLiquidFood(i.food_name)) ? "ml" : "g",
+          unit:
+            i.unit === "ml" || (!i.unit && isLiquidFood(i.food_name))
+              ? "ml"
+              : "g",
           calories: Number(i.calories),
           protein: Number(i.protein),
           carbs: Number(i.carbs),
@@ -150,7 +184,7 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
           carbs: Math.round((acc.carbs + meal.total_carbs) * 10) / 10,
           fat: Math.round((acc.fat + meal.total_fat) * 10) / 10,
         }),
-        { calories: 0, protein: 0, carbs: 0, fat: 0 }
+        { calories: 0, protein: 0, carbs: 0, fat: 0 },
       );
 
       // 4. Totales restantes

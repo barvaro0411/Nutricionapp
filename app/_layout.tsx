@@ -7,11 +7,13 @@ import { ActivityIndicator, View, Text, TouchableOpacity, StyleSheet, Platform }
 import { supabase, configurationError } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
-import { cancelMealReminders } from "@/services/notificationService";
+import { syncAllScheduledReminders } from "@/services/notificationService";
 import { colors } from "@/constants/colors";
 import { ToastContainer } from "@/components/common/ToastContainer";
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 2, staleTime: 300000 } } });
+// Supabase already retries transient failures on idempotent reads. Avoid
+// repeating that entire retry cycle before showing a recoverable error.
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 300000 } } });
 
 function RootNavigationLayout() {
   const router = useRouter();
@@ -70,7 +72,7 @@ function RootNavigationLayout() {
     let active = true;
     if (previousUser.current !== userId) {
       queryClient.clear();
-      void cancelMealReminders().catch(() => undefined);
+      void syncAllScheduledReminders(userId).catch(() => console.warn("No se pudieron restaurar los recordatorios."));
       useMealReviewStore.getState().reset();
       setProfile(null);
       previousUser.current = userId;

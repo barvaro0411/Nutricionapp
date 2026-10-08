@@ -4,7 +4,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { fetchDailyActivity, saveActivityCalories } from "@/services/activityService";
 
 export function useActivitySync(selectedDate: Date = new Date()) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
 
   const dateStr = getDateKey(selectedDate);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -20,11 +20,13 @@ import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { TextVoiceModal } from "@/components/meal/TextVoiceModal";
 import { FavoritesModal } from "@/components/meal/FavoritesModal";
 import { MealType } from "@/types/meal";
-import { colors } from "@/constants/colors";
+import { colors, layout } from "@/constants/colors";
+import { PageHeading } from "@/components/common/AppUI";
+import { getDateKey, dateForMealRoute, loggedAtForDate, APP_TIME_ZONE } from "@/utils/dates";
 
 export default function RecordScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ mealType?: MealType }>();
+  const params = useLocalSearchParams<{ mealType?: MealType; date?: string }>();
 
   const [selectedMealType, setSelectedMealType] = useState<MealType>(
     params.mealType || "almuerzo"
@@ -32,8 +34,17 @@ export default function RecordScreen() {
   const [showTextVoiceModal, setShowTextVoiceModal] = useState(false);
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
 
+  useEffect(() => {
+    if (params.mealType) setSelectedMealType(params.mealType);
+  }, [params.mealType]);
+
+  const selectedDate = dateForMealRoute(params.date);
+  const dateKey = getDateKey(selectedDate);
+
   const beginMeal = () => {
     useMealReviewStore.getState().reset();
+    useMealReviewStore.getState().setLoggedAt(loggedAtForDate(selectedDate));
+    useMealReviewStore.getState().setMealType(selectedMealType);
   };
 
   const mealTypes: { type: MealType; label: string; emoji: string }[] = [
@@ -46,6 +57,13 @@ export default function RecordScreen() {
   return (
     <>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <PageHeading eyebrow="Tu diario" title="¿Qué comiste?" description="Elige la forma que te resulte más cómoda. Podrás revisar las porciones antes de guardar." />
+        {dateKey !== getDateKey() && <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Registrar para el {selectedDate.toLocaleDateString("es-CL", { timeZone: APP_TIME_ZONE })}</Text>
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.setParams({ date: getDateKey() })}>
+            <Text style={{ color: colors.primary }}>Cambiar a hoy</Text>
+          </TouchableOpacity>
+        </View>}
         {/* Selector de Tiempo de Comida */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>¿Qué comida vas a registrar?</Text>
@@ -56,6 +74,9 @@ export default function RecordScreen() {
                 <TouchableOpacity
                   key={m.type}
                   style={[styles.mealTypeChip, active && styles.mealTypeChipActive]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Elegir ${m.label}`}
+                  accessibilityState={{ selected: active }}
                   onPress={() => setSelectedMealType(m.type)}
                   activeOpacity={0.8}
                 >
@@ -75,11 +96,13 @@ export default function RecordScreen() {
         </View>
 
         {/* Sección de Métodos de Registro */}
-        <Text style={styles.sectionTitle}>Elige cómo registrar:</Text>
+        <Text style={styles.sectionTitle}>Una comida, varias formas de registrarla</Text>
 
         {/* 1. Foto con IA (Destacada) */}
         <TouchableOpacity
           style={[styles.methodCard, styles.methodCardFeatured]}
+          accessibilityRole="button"
+          accessibilityLabel="Registrar con foto de comida"
           onPress={() => {
             beginMeal();
             router.push({
@@ -97,7 +120,7 @@ export default function RecordScreen() {
               <Text style={styles.methodTitle}>Foto IA de tu plato</Text>
               <View style={styles.featuredBadge}>
                 <Sparkles size={11} color="#FFFFFF" />
-                <Text style={styles.featuredBadgeText}>MÁS RÁPIDO</Text>
+                <Text style={styles.featuredBadgeText}>CON IA</Text>
               </View>
             </View>
             <Text style={styles.methodDesc}>
@@ -110,6 +133,8 @@ export default function RecordScreen() {
         {/* 2. Escribir o Dictar por Voz */}
         <TouchableOpacity
           style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Registrar con texto o voz"
           onPress={() => {
             beginMeal();
             setShowTextVoiceModal(true);
@@ -122,7 +147,7 @@ export default function RecordScreen() {
           <View style={styles.methodInfo}>
             <Text style={styles.methodTitle}>Texto o Dictado por Voz</Text>
             <Text style={styles.methodDesc}>
-              Escribe o dicta lo que comiste (ej: "2 huevos revueltos con una marraqueta y café").
+              Describe tu comida con tus palabras, por escrito o con tu voz.
             </Text>
           </View>
           <ChevronRight size={18} color={colors.textMuted} />
@@ -131,6 +156,8 @@ export default function RecordScreen() {
         {/* 3. Escáner de Código de Barras */}
         <TouchableOpacity
           style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Registrar con código de barras"
           onPress={() => {
             beginMeal();
             router.push("/meal/barcode");
@@ -143,7 +170,7 @@ export default function RecordScreen() {
           <View style={styles.methodInfo}>
             <Text style={styles.methodTitle}>Código de Barras</Text>
             <Text style={styles.methodDesc}>
-              Apunta la cámara al envase de cualquier producto chileno o internacional para leer sus datos.
+              Busca los nutrientes del envase por su código o lee la etiqueta.
             </Text>
           </View>
           <ChevronRight size={18} color={colors.textMuted} />
@@ -152,6 +179,8 @@ export default function RecordScreen() {
         {/* 4. Comidas Frecuentes */}
         <TouchableOpacity
           style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Registrar comida frecuente"
           onPress={() => {
             beginMeal();
             setShowFavoritesModal(true);
@@ -177,7 +206,7 @@ export default function RecordScreen() {
           activeOpacity={0.8}
         >
           <ArrowLeft size={16} color={colors.textSecondary} />
-          <Text style={styles.backHomeText}>Volver al Panel Principal (Hoy)</Text>
+          <Text style={styles.backHomeText}>Volver a mi día</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -203,8 +232,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: 16,
-    paddingBottom: 110,
+    ...layout.narrowPage,
   },
   section: {
     marginBottom: 20,
@@ -222,6 +250,8 @@ const styles = StyleSheet.create({
   },
   mealTypeChip: {
     flex: 1,
+    minWidth: 0,
+    minHeight: 64,
     backgroundColor: colors.card,
     borderRadius: 14,
     paddingVertical: 10,
@@ -264,7 +294,7 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 14,
@@ -275,6 +305,7 @@ const styles = StyleSheet.create({
   },
   titleRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 8,
     marginBottom: 4,

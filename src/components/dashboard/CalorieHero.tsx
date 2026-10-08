@@ -1,8 +1,14 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  useWindowDimensions,
+} from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
-import { Flame, Target, Utensils, CheckCircle2, AlertTriangle, Zap } from "lucide-react-native";
-import { colors, shadows } from "@/constants/colors";
+import { ArrowUpRight, Flame, Target, Utensils } from "lucide-react-native";
+import { colors } from "@/constants/colors";
 
 interface CalorieHeroProps {
   goal: number;
@@ -18,392 +24,218 @@ export function CalorieHero({
   burnedCalories = 0,
   onExercisePress,
 }: CalorieHeroProps) {
-  // Ajuste dinámico de energía: Meta + Quemadas - Consumidas
-  const totalBudget = Math.max(1, goal + burnedCalories);
-  const effectiveRemaining = Math.max(0, totalBudget - consumed);
-  const isOverBudget = consumed > totalBudget;
-  const overCalories = Math.round(consumed - totalBudget);
-
-  // Parámetros del anillo SVG
-  const size = 152;
-  const strokeWidth = 11;
+  const budget = Math.max(1, goal + burnedCalories);
+  const remaining = Math.max(0, budget - consumed);
+  const over = Math.max(0, consumed - budget);
+  const progress = Math.min(1, Math.max(0, consumed / budget));
+  const size = useWindowDimensions().width < 380 ? 120 : 144;
+  const stroke = 10;
   const center = size / 2;
-  const radius = center - strokeWidth - 2;
+  const radius = center - stroke;
   const circumference = 2 * Math.PI * radius;
-
-  const rawProgressRatio = consumed / totalBudget;
-  const progressRatio = Math.min(1, Math.max(0, rawProgressRatio));
-  const strokeDashoffset = circumference * (1 - progressRatio);
-  const progressPct = Math.round(rawProgressRatio * 100);
-
-  // Color dinámico según adherencia
-  let progressColor = colors.primary;
-  let statusBadgeBg = colors.primaryLight;
-  let statusTextColor = colors.primaryDark;
-  let statusBorderColor = "#A7F3D0";
-  let statusText = `${progressPct}% consumido`;
-  let StatusIcon = CheckCircle2;
-
-  if (isOverBudget) {
-    progressColor = colors.danger;
-    statusBadgeBg = colors.dangerLight;
-    statusTextColor = colors.danger;
-    statusBorderColor = "#FECACA";
-    statusText = `+${overCalories} kcal superado`;
-    StatusIcon = AlertTriangle;
-  } else if (progressPct >= 90) {
-    progressColor = colors.warning;
-    statusBadgeBg = colors.warningLight;
-    statusTextColor = "#B45309";
-    statusBorderColor = "#FDE68A";
-    statusText = "Cerca de la meta";
-    StatusIcon = Target;
-  }
-
   return (
     <View style={styles.card}>
-      {/* Header superior */}
-      <View style={styles.topRow}>
-        <View style={styles.headerLeft}>
-          <View style={styles.overlineIconWrap}>
-            <Zap size={12} color={colors.primary} />
-          </View>
-          <Text style={styles.sectionOverline}>ENERGÍA DEL DÍA</Text>
+      <View style={styles.header}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.overline}>TU BALANCE DIARIO</Text>
+          <Text style={styles.title}>Cada registro cuenta.</Text>
         </View>
-
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: statusBadgeBg, borderColor: statusBorderColor },
-          ]}
-        >
-          <StatusIcon size={12} color={statusTextColor} />
-          <Text style={[styles.statusBadgeText, { color: statusTextColor }]}>
-            {statusText}
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>
+            {Math.round((consumed / budget) * 100)}%
           </Text>
         </View>
       </View>
-
-      {/* Contenido principal: Anillo circular + Desglose de energía */}
-      <View style={styles.mainLayout}>
-        {/* Anillo de Progreso Circular */}
-        <View style={styles.ringWrapper}>
+      <View style={styles.main}>
+        <View
+          style={[styles.ring, { width: size, height: size }]}
+          accessibilityRole="progressbar"
+          accessibilityLabel="Calorías consumidas"
+          accessibilityValue={{
+            min: 0,
+            max: Math.round(budget),
+            now: Math.round(Math.min(consumed, budget)),
+            text:
+              Math.round(consumed) +
+              " de " +
+              Math.round(budget) +
+              " kilocalorías",
+          }}
+        >
           <Svg width={size} height={size}>
-            <G rotation="-90" origin={`${center}, ${center}`}>
-              {/* Pista de fondo */}
+            <G rotation="-90" origin={center + ", " + center}>
               <Circle
                 cx={center}
                 cy={center}
                 r={radius}
-                stroke="#F1F5F9"
-                strokeWidth={strokeWidth}
                 fill="none"
+                stroke="#355E4D"
+                strokeWidth={stroke}
               />
-              {/* Barra de progreso activa */}
               <Circle
                 cx={center}
                 cy={center}
                 r={radius}
-                stroke={progressColor}
-                strokeWidth={strokeWidth}
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
                 fill="none"
+                stroke={over > 0 ? "#F5C77B" : colors.mint}
+                strokeWidth={stroke}
+                strokeDasharray={circumference + " " + circumference}
+                strokeDashoffset={circumference * (1 - progress)}
+                strokeLinecap="round"
               />
             </G>
           </Svg>
-
-          {/* Información central dentro del anillo */}
-          <View style={styles.innerRingContent}>
+          <View style={styles.ringText}>
             <Text
-              style={[
-                styles.remainingNumber,
-                isOverBudget && { color: colors.danger, fontSize: 26 },
-              ]}
-              numberOfLines={1}
+              style={styles.remaining}
               adjustsFontSizeToFit
+              numberOfLines={1}
             >
-              {isOverBudget
-                ? `+${overCalories.toLocaleString("es-CL")}`
-                : Math.round(effectiveRemaining).toLocaleString("es-CL")}
+              {over > 0
+                ? "+" + Math.round(over).toLocaleString("es-CL")
+                : Math.round(remaining).toLocaleString("es-CL")}
             </Text>
-            <Text style={styles.remainingLabel}>
-              {isOverBudget ? "kcal extra" : "kcal restantes"}
+            <Text style={styles.ringLabel}>
+              {over > 0 ? "kcal sobre la meta" : "kcal disponibles"}
             </Text>
           </View>
         </View>
-
-        {/* Panel lateral de desglose energético */}
-        <View style={styles.sideMetrics}>
-          {/* Base Calórica */}
-          <View style={styles.metricCard}>
-            <View style={styles.metricIconWrap}>
-              <Target size={13} color={colors.textSecondary} />
-            </View>
-            <View style={styles.metricTexts}>
-              <Text style={styles.metricLabel}>Meta base</Text>
-              <Text style={styles.metricVal}>
-                {Math.round(goal).toLocaleString("es-CL")} kcal
-              </Text>
-            </View>
-          </View>
-
-          {/* Consumidas */}
-          <View style={styles.metricCard}>
-            <View
-              style={[
-                styles.metricIconWrap,
-                { backgroundColor: isOverBudget ? colors.dangerLight : colors.primaryLight },
-              ]}
-            >
-              <Utensils
-                size={13}
-                color={isOverBudget ? colors.danger : colors.primary}
-              />
-            </View>
-            <View style={styles.metricTexts}>
+        <View style={styles.metrics}>
+          <View style={styles.metric}>
+            <Utensils size={16} color="#BFD9CA" />
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.metricLabel}>Consumidas</Text>
-              <Text
-                style={[
-                  styles.metricVal,
-                  isOverBudget && { color: colors.danger },
-                ]}
-              >
-                {Math.round(consumed).toLocaleString("es-CL")} kcal
+              <Text style={styles.metricValue}>
+                {Math.round(consumed).toLocaleString("es-CL")}{" "}
+                <Text style={styles.metricUnit}>kcal</Text>
               </Text>
             </View>
           </View>
-
-          {/* Ejercicio Quemado */}
-          <TouchableOpacity
-            style={[
-              styles.exerciseCard,
-              burnedCalories > 0 && styles.exerciseCardActive,
-            ]}
-            onPress={onExercisePress}
-            activeOpacity={0.75}
+          <View style={styles.metric}>
+            <Target size={16} color="#BFD9CA" />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.metricLabel}>Meta diaria</Text>
+              <Text style={styles.metricValue}>
+                {Math.round(goal).toLocaleString("es-CL")}{" "}
+                <Text style={styles.metricUnit}>kcal</Text>
+              </Text>
+            </View>
+          </View>
+          <Pressable
             accessibilityRole="button"
             accessibilityLabel="Registrar o ver ejercicio"
+            onPress={onExercisePress}
+            style={({ pressed }) => [
+              styles.exercise,
+              pressed && { opacity: 0.8 },
+            ]}
           >
-            <View
-              style={[
-                styles.metricIconWrap,
-                burnedCalories > 0
-                  ? { backgroundColor: "#FEF3C7" }
-                  : { backgroundColor: colors.surfaceMuted },
-              ]}
-            >
-              <Flame
-                size={13}
-                color={burnedCalories > 0 ? "#D97706" : colors.textMuted}
-                fill={burnedCalories > 0 ? "#F59E0B" : "none"}
-              />
-            </View>
-            <View style={styles.metricTexts}>
-              <Text style={styles.metricLabel}>Ejercicio</Text>
-              <Text
-                style={[
-                  styles.metricVal,
-                  burnedCalories > 0
-                    ? { color: "#D97706", fontWeight: "800" }
-                    : { color: colors.textMuted },
-                ]}
-              >
-                +{Math.round(burnedCalories).toLocaleString("es-CL")} kcal
-              </Text>
-            </View>
-          </TouchableOpacity>
+            <Flame size={15} color={colors.mint} />
+            <Text style={styles.exerciseText}>
+              Ejercicio +{Math.round(burnedCalories)}
+            </Text>
+            <ArrowUpRight size={14} color={colors.mint} />
+          </Pressable>
         </View>
       </View>
-
-      {/* Footer informativo con presupuesto neto disponible */}
-      <View style={styles.cardFooter}>
-        <View style={styles.footerItem}>
-          <Text style={styles.footerText}>
-            Presupuesto diario activo:{" "}
-            <Text style={styles.footerHighlight}>
-              {totalBudget.toLocaleString("es-CL")} kcal
-            </Text>
-          </Text>
-        </View>
-        <View style={styles.footerPill}>
-          <Text style={styles.footerPillText}>
-            {progressPct > 100 ? `${progressPct}% (Exceso)` : `${100 - progressPct}% libre`}
-          </Text>
-        </View>
+      <View style={styles.footer}>
+        <View style={styles.footerDot} />
+        <Text style={styles.footerText}>
+          {burnedCalories > 0
+            ? "Tu actividad suma " +
+              Math.round(burnedCalories) +
+              " kcal a la meta."
+            : "Tu objetivo diario, a tu ritmo."}
+        </Text>
       </View>
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    backgroundColor: colors.forest,
+    borderRadius: 26,
     padding: 20,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    ...shadows.card,
-    marginBottom: 16,
+    marginBottom: 18,
   },
-  topRow: {
+  header: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
+    gap: 8,
+    marginBottom: 22,
   },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
+  overline: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1.5,
+    color: "#BDDAC8",
+    marginBottom: 6,
   },
-  overlineIconWrap: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    backgroundColor: colors.primaryLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sectionOverline: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: colors.textSecondary,
-    letterSpacing: 0.8,
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 4,
-    paddingHorizontal: 9,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 5,
-  },
-  statusBadgeText: {
-    fontSize: 11,
+  title: {
+    fontSize: 19,
     fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: -0.4,
   },
-  mainLayout: {
+  badge: {
+    backgroundColor: "#2C5B45",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+  },
+  badgeText: { color: colors.mint, fontWeight: "700", fontSize: 12 },
+  main: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 16,
   },
-  ringWrapper: {
-    position: "relative",
-    width: 152,
-    height: 152,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  innerRingContent: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 8,
-  },
-  remainingNumber: {
-    fontSize: 32,
-    fontWeight: "900",
-    color: colors.text,
-    letterSpacing: -1.2,
-    lineHeight: 36,
-  },
-  remainingLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.textSecondary,
-    marginTop: 2,
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-  sideMetrics: {
-    flex: 1,
-    gap: 8,
-  },
-  metricCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#F1F5F9",
-    gap: 8,
-  },
-  metricIconWrap: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceMuted,
+  ring: {
+    width: 144,
+    height: 144,
     alignItems: "center",
     justifyContent: "center",
   },
-  metricTexts: {
-    flex: 1,
+  ringText: { position: "absolute", alignItems: "center", maxWidth: 120 },
+  remaining: {
+    fontSize: 30,
+    lineHeight: 35,
+    fontWeight: "800",
+    letterSpacing: -1,
+    color: "#FFFFFF",
+  },
+  ringLabel: { fontSize: 10, color: "#CBE1D3", marginTop: 4 },
+  metrics: { flex: 1, minWidth: 0, gap: 14 },
+  metric: { flexDirection: "row", alignItems: "center", gap: 10 },
+  metricLabel: { color: "#CBE1D3", fontSize: 11, marginBottom: 3 },
+  metricValue: { color: "#FFFFFF", fontSize: 18, fontWeight: "700" },
+  metricUnit: { fontSize: 11, color: "#CBE1D3", fontWeight: "400" },
+  exercise: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  metricLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontWeight: "500",
-  },
-  metricVal: {
-    fontSize: 12.5,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  exerciseCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#F1F5F9",
-    gap: 8,
-  },
-  exerciseCardActive: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#FDE68A",
-  },
-  cardFooter: {
-    marginTop: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  footerItem: {
-    flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 6,
+    minHeight: 44,
+    paddingVertical: 9,
+    borderTopWidth: 1,
+    borderTopColor: "#355E4D",
   },
-  footerText: {
-    fontSize: 11.5,
-    color: colors.textSecondary,
+  exerciseText: { fontSize: 11, color: colors.mint, fontWeight: "600" },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginTop: 20,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#355E4D",
   },
-  footerHighlight: {
-    fontWeight: "800",
-    color: colors.text,
+  footerDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.mint,
   },
-  footerPill: {
-    backgroundColor: colors.surfaceMuted,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  footerPillText: {
-    fontSize: 10.5,
-    fontWeight: "700",
-    color: colors.textSecondary,
-  },
+  footerText: { flex: 1, fontSize: 11, lineHeight: 17, color: "#CEE1D6" },
 });

@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#10B981"
+      "backgroundColor": "#103E32"
     },
     "ios": {
       "supportsTablet": false,
@@ -20,7 +20,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#10B981"
+        "backgroundColor": "#103E32"
       },
       "package": "com.nutricionapp.chile"
     },
@@ -31,14 +31,21 @@
       "name": "Nutrición IA Chile",
       "shortName": "Nutrición IA",
       "description": "Seguimiento nutricional con IA para Chile",
-      "themeColor": "#10B981",
-      "backgroundColor": "#FFFFFF",
+      "themeColor": "#087F5B",
+      "backgroundColor": "#F6F8F5",
       "display": "standalone",
       "orientation": "portrait",
       "lang": "es-CL"
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permite usar la cámara para escanear los códigos de tus alimentos.",
+          "recordAudioAndroid": false
+        }
+      ],
       [
         "expo-image-picker",
         {

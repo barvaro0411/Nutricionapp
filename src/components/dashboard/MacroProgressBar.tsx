@@ -17,7 +17,7 @@ function MacroCard({ label, consumed, goal, color, lightBg }: MacroCardProps) {
   const isComplete = progressPct >= 100;
 
   return (
-    <View style={styles.macroCard}>
+    <View style={styles.macroCard} accessible accessibilityLabel={`${label}: ${Math.round(consumed)} de ${goal} gramos`}>
       <View style={styles.macroHeader}>
         <View style={styles.headerLeft}>
           <View style={[styles.haloDot, { backgroundColor: lightBg }]}>
@@ -132,6 +132,7 @@ const styles = StyleSheet.create({
   },
   macroCard: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 13,
@@ -141,6 +142,8 @@ const styles = StyleSheet.create({
   },
   macroHeader: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 10,
@@ -179,6 +182,7 @@ const styles = StyleSheet.create({
   },
   numberRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "baseline",
     marginBottom: 8,
   },

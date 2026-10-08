@@ -11,7 +11,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRecipeDetail } from "@/hooks/useRecipes";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
-import { colors } from "@/constants/colors";
+import { colors, layout } from "@/constants/colors";
 import { DetectedFoodItem } from "@/types/meal";
 import { isLiquidFood, formatQuantityDisplay } from "@/utils/liquidUnits";
 
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: 20,
+    ...layout.narrowPage,
     paddingTop: Platform.OS === "ios" ? 48 : 20,
     paddingBottom: 50,
   },

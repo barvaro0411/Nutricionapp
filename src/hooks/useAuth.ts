@@ -120,6 +120,22 @@ export function useAuth() {
     }
   };
 
+  const resendConfirmationEmail = async (email: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: resendError } = await supabase.auth.resend({
+        type: "signup", email: email.trim(), options: { emailRedirectTo: Linking.createURL("/") },
+      });
+      if (resendError) throw resendError;
+      return { success: true };
+    } catch (err) {
+      const message = translateAuthError(err);
+      setError(message);
+      return { success: false, error: message };
+    } finally { setLoading(false); }
+  };
+
   const signOut = async () => {
     setLoading(true);
     try {
@@ -172,7 +188,7 @@ export function useAuth() {
         return { success: false, error: updateError.message };
       }
 
-      setProfile(data);
+      if (useAuthStore.getState().user?.id === user.id) setProfile(data);
       return { success: true, data };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -189,6 +205,7 @@ export function useAuth() {
     error,
     signInWithEmail,
     signUpWithEmail,
+    resendConfirmationEmail,
     signOut,
     resetPassword,
     fetchProfile,

@@ -209,6 +209,9 @@ export interface Database {
           product_name: string;
           brand: string | null;
           serving_size_g: number;
+          unit: "g" | "ml" | null;
+          container_size: number | null;
+          quantity_text: string | null;
           calories_per_100g: number;
           protein_per_100g: number;
           carbs_per_100g: number;
@@ -223,6 +226,9 @@ export interface Database {
           product_name: string;
           brand?: string | null;
           serving_size_g?: number;
+          unit?: "g" | "ml" | null;
+          container_size?: number | null;
+          quantity_text?: string | null;
           calories_per_100g: number;
           protein_per_100g: number;
           carbs_per_100g: number;
@@ -237,6 +243,9 @@ export interface Database {
           product_name?: string;
           brand?: string | null;
           serving_size_g?: number;
+          unit?: "g" | "ml" | null;
+          container_size?: number | null;
+          quantity_text?: string | null;
           calories_per_100g?: number;
           protein_per_100g?: number;
           carbs_per_100g?: number;

@@ -1,7 +1,7 @@
 const ts = require("typescript-eslint");
 const hooks = require("eslint-plugin-react-hooks");
 module.exports = [
-  { ignores: ["node_modules/**", "dist/**", "audit-dist/**", ".expo/**", "supabase/.private/**", "**/*.sql"] },
+  { ignores: ["node_modules/**", "dist/**", "audit-dist/**", "artifacts/**", ".expo/**", ".vercel/**", "supabase/.private/**", "**/*.sql"] },
   ...ts.configs.recommended,
   { files: ["**/*.{ts,tsx}"], plugins: { "react-hooks": hooks }, rules: {
     ...hooks.configs.recommended.rules,

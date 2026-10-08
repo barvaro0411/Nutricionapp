@@ -1,16 +1,23 @@
-import { showAlert } from "@/utils/alerts";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   Switch,
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { FileText, Target, ChevronRight, LogOut } from "lucide-react-native";
+import {
+  FileText,
+  Target,
+  ChevronRight,
+  LogOut,
+  Pencil,
+  CheckCircle2,
+  LockKeyhole,
+} from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getReminderPreferences,
@@ -18,367 +25,475 @@ import {
   MealReminderConfig,
   DEFAULT_CHILEAN_REMINDERS,
 } from "@/services/notificationService";
-import { colors } from "@/constants/colors";
+import { PageHeading, AppButton, FormField } from "@/components/common/AppUI";
+import { showAlert } from "@/utils/alerts";
+import { colors, layout } from "@/constants/colors";
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user, profile, signOut } = useAuth();
-  const [reminders, setReminders] = useState<MealReminderConfig[]>(DEFAULT_CHILEAN_REMINDERS);
-
+  const { user, profile, signOut, updateProfile, loading } = useAuth();
+  const [reminders, setReminders] = useState<MealReminderConfig[]>(
+    DEFAULT_CHILEAN_REMINDERS,
+  );
+  const [busyReminder, setBusyReminder] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
   useEffect(() => {
-    loadReminders();
-  }, []);
-
-  const loadReminders = async () => {
-    const prefs = await getReminderPreferences();
-    setReminders(prefs);
+    let active = true;
+    getReminderPreferences(user?.id).then((prefs) => {
+      if (active) setReminders(prefs);
+    });
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+  const toggle = async (id: string, enabled: boolean) => {
+    if (busyReminder) return;
+    setBusyReminder(id);
+    try {
+      setReminders(await toggleReminder(id, enabled));
+    } catch (error) {
+      showAlert(
+        "Recordatorios",
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar el cambio.",
+      );
+    } finally {
+      setBusyReminder(null);
+    }
   };
-
-  const handleToggleReminder = async (id: string, value: boolean) => {
-    try { const updated = await toggleReminder(id, value); setReminders(updated); }
-    catch (e) { showAlert("Recordatorios", e instanceof Error ? e.message : "No se pudo programar."); }
+  const saveName = async () => {
+    if (!name.trim()) {
+      setEditError("Ingresa tu nombre.");
+      return;
+    }
+    setEditError(null);
+    const result = await updateProfile({ full_name: name.trim() });
+    if (result.success) setEditing(false);
+    else setEditError(result.error || "No se pudo guardar el nombre.");
   };
-
-  const handleSignOut = () => {
-    showAlert("Cerrar Sesión", "¿Estás seguro de que deseas salir?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Salir",
-        style: "destructive",
-        onPress: async () => {
-          try { await signOut(); router.replace("/(auth)/login"); }
-          catch { showAlert("No se pudo cerrar la sesión", "Reintenta para continuar."); }
+  const leave = () =>
+    showAlert(
+      "Cerrar sesión",
+      "Tus registros seguirán guardados en tu cuenta.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Cerrar sesión",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await signOut();
+              router.replace("/(auth)/login");
+            } catch {
+              showAlert(
+                "No se pudo cerrar la sesión",
+                "Reintenta para continuar.",
+              );
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
+  const objectives: Record<string, string> = {
+    lose_weight: "Reducir grasa corporal",
+    maintain: "Mantener mi peso",
+    gain_muscle: "Ganar masa muscular",
   };
-
-  const handleRecalculateGoals = () => {
-    router.push("/(onboarding)/profile-setup");
+  const activity: Record<string, string> = {
+    sedentary: "Sedentaria",
+    light: "Ligera",
+    moderate: "Moderada",
+    active: "Activa",
+    very_active: "Muy activa",
   };
-
-  const objectiveMap: Record<string, string> = {
-    lose_weight: "Bajar grasa corporal",
-    maintain: "Mantener peso actual",
-    gain_muscle: "Aumentar masa muscular",
-  };
-
-  const activityMap: Record<string, string> = {
-    sedentary: "Sedentario",
-    light: "Ligero (1-2 días)",
-    moderate: "Moderado (3-5 días)",
-    active: "Activo (6-7 días)",
-    very_active: "Muy activo",
-  };
-
+  const metrics = [
+    {
+      label: "Peso actual",
+      value: profile?.current_weight_kg
+        ? profile.current_weight_kg + " kg"
+        : "Por completar",
+    },
+    {
+      label: "Estatura",
+      value: profile?.height_cm ? profile.height_cm + " cm" : "Por completar",
+    },
+    {
+      label: "Mi objetivo",
+      value: objectives[profile?.objective || ""] || "Por completar",
+    },
+    {
+      label: "Actividad",
+      value: activity[profile?.activity_level || ""] || "Por completar",
+    },
+  ];
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Tarjeta de Usuario */}
-      <View style={styles.userCard}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {(profile?.full_name || user?.email || "U")[0].toUpperCase()}
-          </Text>
-        </View>
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>{profile?.full_name || "Usuario"}</Text>
-          <Text style={styles.userEmail}>{user?.email}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.sectionHeader}>Beta de pruebas</Text>
-      <Text style={styles.actionSubtitle}>Comidas, metas, IA e informes. Cada cuenta mantiene sus datos separados.</Text>
-      {/* Informes Clínicos para Nutricionistas */}
-      <Text style={styles.sectionHeader}>Herramientas de Salud</Text>
-      <View style={styles.actionsCard}>
-        <TouchableOpacity
-          style={styles.actionRow}
-          onPress={() => router.push("/export")}
-        >
-          <View style={styles.actionIconBadge}>
-            <FileText size={20} color={colors.primary} />
-          </View>
-          <View style={styles.actionTextWrapper}>
-            <Text style={styles.actionTitle}>Exportar Informe para Nutricionista</Text>
-            <Text style={styles.actionSubtitle}>
-              Genera tu resumen semanal o mensual para WhatsApp o planilla Excel
+    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+      <PageHeading
+        eyebrow="A tu medida"
+        title="Tu espacio"
+        description="Administra tu perfil, tus metas y los hábitos que quieres mantener."
+      />
+      <View style={styles.profileCard}>
+        <View style={styles.profileRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {(profile?.full_name || user?.email || "U")
+                .charAt(0)
+                .toUpperCase()}
             </Text>
           </View>
-          <ChevronRight size={20} color={colors.textMuted} />
-        </TouchableOpacity>
+          <View style={styles.identity}>
+            <Text style={styles.name}>{profile?.full_name || "Tu perfil"}</Text>
+            <Text style={styles.email}>{user?.email}</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Editar mi nombre"
+            style={styles.editButton}
+            onPress={() => {
+              setName(profile?.full_name || "");
+              setEditing(true);
+              setEditError(null);
+            }}
+          >
+            <Pencil size={17} color={colors.mint} />
+          </Pressable>
+        </View>
+        {user?.email_confirmed_at && (
+          <View style={styles.verified}>
+            <CheckCircle2 size={13} color={colors.mint} />
+            <Text style={styles.verifiedText}>Correo verificado</Text>
+          </View>
+        )}
       </View>
-
-      {/* Recordatorios de Horarios de Comidas Chilenas */}
-      <Text style={styles.sectionHeader}>Horarios y Recordatorios (Chile)</Text>
-      <View style={styles.actionsCard}>
-        {Platform.OS === "web" && <Text style={[styles.actionSubtitle, { padding: 16 }]}>Los recordatorios están disponibles en la app instalada para iOS o Android.</Text>}
-        {reminders.map((rem, idx) => (
-          <React.Fragment key={rem.id}>
-            <View style={styles.reminderRow}>
-              <View style={styles.actionTextWrapper}>
-                <Text style={styles.actionTitle}>{rem.title}</Text>
-                <Text style={styles.actionSubtitle}>
-                  Programado a las {String(rem.hour).padStart(2, "0")}:
-                  {String(rem.minute).padStart(2, "0")} hrs
-                </Text>
-              </View>
-              <Switch
-                disabled={Platform.OS === "web"}
-                value={rem.enabled}
-                onValueChange={(val) => handleToggleReminder(rem.id, val)}
-                trackColor={{ false: colors.cardBorder, true: colors.primary }}
-                thumbColor="#FFFFFF"
+      {editing && (
+        <View style={styles.editor}>
+          <FormField
+            label="Nombre completo"
+            value={name}
+            onChangeText={setName}
+            maxLength={80}
+            editable={!loading}
+          />
+          {editError && (
+            <Text accessibilityRole="alert" style={styles.error}>
+              {editError}
+            </Text>
+          )}
+          <View style={styles.editorActions}>
+            <View style={styles.editorButton}>
+              <AppButton
+                title="Cancelar"
+                onPress={() => setEditing(false)}
+                secondary
+                disabled={loading}
               />
             </View>
-            {idx < reminders.length - 1 && <View style={styles.divider} />}
-          </React.Fragment>
+            <View style={styles.editorButton}>
+              <AppButton
+                title="Guardar nombre"
+                onPress={() => void saveName()}
+                loading={loading}
+              />
+            </View>
+          </View>
+        </View>
+      )}
+      <Text style={styles.sectionTitle}>Tu punto de partida</Text>
+      <View style={styles.metrics}>
+        {metrics.map((metric) => (
+          <View key={metric.label} style={styles.metric}>
+            <Text style={styles.metricLabel}>{metric.label}</Text>
+            <Text style={styles.metricValue}>{metric.value}</Text>
+          </View>
         ))}
       </View>
-
-      {/* Métricas actuales */}
-      <Text style={styles.sectionHeader}>Mis Métricas Actuales</Text>
-      <View style={styles.metricsCard}>
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Peso actual</Text>
-          <Text style={styles.metricValue}>
-            {profile?.current_weight_kg ? `${profile.current_weight_kg} kg` : "No definido"}
-          </Text>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Estatura</Text>
-          <Text style={styles.metricValue}>
-            {profile?.height_cm ? `${profile.height_cm} cm` : "No definida"}
-          </Text>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Objetivo principal</Text>
-          <Text style={styles.metricValue}>
-            {profile?.objective ? objectiveMap[profile.objective] : "No definido"}
-          </Text>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Nivel de actividad</Text>
-          <Text style={styles.metricValue}>
-            {profile?.activity_level ? activityMap[profile.activity_level] : "No definido"}
-          </Text>
-        </View>
-      </View>
-
-      {/* Preferencias */}
-      <Text style={styles.sectionHeader}>Preferencias</Text>
-      <View style={styles.actionsCard}>
-        <TouchableOpacity style={styles.actionRow} onPress={handleRecalculateGoals}>
-          <View style={[styles.actionIconBadge, { backgroundColor: "#FEF3C7" }]}>
-            <Target size={20} color="#D97706" />
+      <View style={styles.actions}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Actualizar mis metas"
+          onPress={() => router.push("/(onboarding)/profile-setup")}
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+        >
+          <View style={styles.actionIcon}>
+            <Target size={20} color={colors.primary} />
           </View>
-          <View style={styles.actionTextWrapper}>
-            <Text style={styles.actionTitle}>Recalcular Objetivos</Text>
-            <Text style={styles.actionSubtitle}>
-              Actualiza tu peso o cambia tu meta de calorías y macros
+          <View style={styles.actionCopy}>
+            <Text style={styles.actionTitle}>Actualizar mis metas</Text>
+            <Text style={styles.actionDescription}>
+              Revisa tus medidas y tu objetivo nutricional.
             </Text>
           </View>
-          <ChevronRight size={20} color={colors.textMuted} />
-        </TouchableOpacity>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </Pressable>
+        <View style={styles.divider} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Exportar mis registros"
+          onPress={() => router.push("/export")}
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+        >
+          <View style={styles.actionIcon}>
+            <FileText size={20} color={colors.primary} />
+          </View>
+          <View style={styles.actionCopy}>
+            <Text style={styles.actionTitle}>Exportar mis registros</Text>
+            <Text style={styles.actionDescription}>
+              Comparte un resumen con tu nutricionista.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </Pressable>
       </View>
-
-      {/* Cerrar Sesión */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut} activeOpacity={0.8}>
-        <LogOut size={18} color={colors.danger} style={{ marginRight: 8 }} />
-        <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.versionText}>Nutrición IA · Beta</Text>
+      <Text style={styles.sectionTitle}>Un recordatorio a tiempo</Text>
+      <Text style={styles.sectionDescription}>
+        Horarios de comidas e hidratación para tu rutina en Chile.
+      </Text>
+      <View style={styles.reminders}>
+        {Platform.OS === "web" && (
+          <View style={styles.webReminderNotice}>
+            <Text style={styles.noticeText}>
+              Disponibles en la app para iOS y Android. En el navegador puedes
+              registrar tus hábitos en cualquier momento.
+            </Text>
+          </View>
+        )}
+        {reminders.map((rem, index) => (
+          <View
+            key={rem.id}
+            style={[styles.reminder, index > 0 && styles.reminderBorder]}
+          >
+            <View style={styles.reminderTime}>
+              <Text style={styles.timeText}>
+                {String(rem.hour).padStart(2, "0")}:
+                {String(rem.minute).padStart(2, "0")}
+              </Text>
+            </View>
+            <View style={styles.actionCopy}>
+              <Text style={styles.actionTitle}>
+                {rem.mealType === "breakfast"
+                  ? "Desayuno"
+                  : rem.mealType === "lunch"
+                    ? "Almuerzo"
+                    : rem.mealType === "water"
+                      ? "Hidratación"
+                      : "Once / Cena"}
+              </Text>
+              <Text style={styles.actionDescription}>
+                {rem.enabled ? "Activado" : "Desactivado"}
+              </Text>
+            </View>
+            <Switch
+              accessibilityLabel={"Recordatorio de " + rem.mealType}
+              disabled={Platform.OS === "web" || !!busyReminder}
+              value={rem.enabled}
+              onValueChange={(value) => void toggle(rem.id, value)}
+              trackColor={{ false: colors.cardBorder, true: colors.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        ))}
+      </View>
+      <View style={styles.privacy}>
+        <LockKeyhole size={20} color={colors.primary} />
+        <View style={styles.actionCopy}>
+          <Text style={styles.actionTitle}>Tu cuenta, tu progreso</Text>
+          <Text style={styles.actionDescription}>
+            Los registros confirmados se guardan en tu cuenta. Cerrar sesión no
+            los elimina.
+          </Text>
+        </View>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Cerrar sesión"
+        disabled={loading}
+        onPress={leave}
+        style={({ pressed }) => [styles.logout, pressed && styles.pressed]}
+      >
+        <LogOut size={18} color={colors.danger} />
+        <Text style={styles.logoutText}>Cerrar sesión</Text>
+      </Pressable>
+      <Text style={styles.footer}>Nutrición IA · Un día a la vez</Text>
     </ScrollView>
   );
 }
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 110,
-  },
-  userCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.primaryLight,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
-  },
-  avatarText: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: colors.primaryDark,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  userEmail: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  proCard: {
-    backgroundColor: colors.primary,
+  root: { flex: 1, backgroundColor: colors.background },
+  content: { ...layout.narrowPage },
+  profileCard: {
+    backgroundColor: colors.forest,
+    padding: 22,
     borderRadius: 24,
-    padding: 20,
-    flexDirection: "row",
+    marginBottom: 26,
+  },
+  profileRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  avatar: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: colors.mint,
     alignItems: "center",
-    marginBottom: 24,
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 2,
+    justifyContent: "center",
   },
-  proCardLeft: {
-    flex: 1,
+  avatarText: { fontSize: 24, fontWeight: "800", color: colors.forest },
+  identity: { flex: 1, minWidth: 0 },
+  name: { fontSize: 19, fontWeight: "700", color: "#FFFFFF" },
+  email: { fontSize: 12, lineHeight: 18, color: "#CEE1D6", marginTop: 5 },
+  editButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: "#2C5B45",
   },
-  proBadgeRow: {
+  verified: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 6,
+    marginTop: 18,
   },
-  proBadge: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: colors.primaryAccent,
-    letterSpacing: 1,
-  },
-  proTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: -0.3,
-  },
-  proSubtitle: {
-    fontSize: 12,
-    color: "#94A3B8",
-    marginTop: 4,
-    lineHeight: 16,
-  },
-  sectionHeader: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 10,
-    marginLeft: 4,
-  },
-  metricsCard: {
+  verifiedText: { fontSize: 11, color: colors.mint },
+  editor: {
     backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 24,
   },
-  metricRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 10,
+  editorActions: { flexDirection: "row", gap: 10 },
+  editorButton: { flex: 1 },
+  error: { fontSize: 13, color: colors.danger, marginBottom: 16 },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: 12,
   },
-  metricLabel: {
-    fontSize: 14,
+  sectionDescription: {
+    fontSize: 12,
+    lineHeight: 19,
     color: colors.textSecondary,
+    marginBottom: 14,
   },
+  metrics: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 22,
+  },
+  metric: {
+    flexGrow: 1,
+    flexBasis: "44%",
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    padding: 18,
+    borderRadius: 18,
+    minWidth: 0,
+  },
+  metricLabel: { fontSize: 12, color: colors.textSecondary, marginBottom: 8 },
   metricValue: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: colors.text,
+    lineHeight: 24,
+  },
+  actions: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 20,
+    overflow: "hidden",
+    marginBottom: 28,
+  },
+  action: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 18,
+    minHeight: 86,
+  },
+  actionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionCopy: { flex: 1, minWidth: 0 },
+  actionTitle: {
     fontSize: 14,
     fontWeight: "600",
     color: colors.text,
+    lineHeight: 20,
+  },
+  actionDescription: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary,
+    marginTop: 4,
   },
   divider: {
     height: 1,
     backgroundColor: colors.cardBorder,
+    marginHorizontal: 18,
   },
-  actionsCard: {
+  pressed: { opacity: 0.75 },
+  reminders: {
     backgroundColor: colors.card,
-    borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    marginBottom: 24,
+    borderRadius: 20,
     overflow: "hidden",
+    marginBottom: 24,
   },
-  actionRow: {
+  webReminderNotice: { padding: 16, backgroundColor: colors.primaryLight },
+  noticeText: { fontSize: 12, lineHeight: 19, color: colors.primaryDark },
+  reminder: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
     padding: 16,
   },
-  reminderRow: {
+  reminderBorder: { borderTopWidth: 1, borderTopColor: colors.cardBorder },
+  reminderTime: {
+    backgroundColor: colors.surfaceMuted,
+    padding: 10,
+    borderRadius: 10,
+  },
+  timeText: { fontSize: 12, fontWeight: "600", color: colors.text },
+  privacy: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-  },
-  actionIconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 18,
     backgroundColor: colors.primaryLight,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
+    borderRadius: 18,
+    marginBottom: 24,
   },
-  actionTextWrapper: {
-    flex: 1,
-    marginRight: 10,
-  },
-  actionTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  actionSubtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  logoutButton: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    paddingVertical: 16,
+  logout: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    gap: 9,
+    minHeight: 52,
     borderWidth: 1,
-    borderColor: colors.danger,
-    marginTop: 8,
+    borderColor: "#ECCFD2",
+    borderRadius: 14,
+    backgroundColor: colors.card,
   },
-  logoutButtonText: {
-    color: colors.danger,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  versionText: {
+  logoutText: { fontSize: 14, fontWeight: "600", color: colors.danger },
+  footer: {
+    fontSize: 11,
+    color: colors.textSecondary,
     textAlign: "center",
-    fontSize: 12,
-    color: colors.textMuted,
     marginTop: 24,
   },
 });

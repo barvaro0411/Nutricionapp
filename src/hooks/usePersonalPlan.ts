@@ -17,8 +17,8 @@ export function usePersonalPlan() {
   const user = useAuthStore(s => s.user);
   return useQuery({
     queryKey: ["personalPlan", user?.id], enabled: !!user,
-    queryFn: async (): Promise<MasterPlanData | null> => {
-      const { data, error } = await supabase.from("personal_plans").select("plan").eq("user_id", user!.id).maybeSingle();
+    queryFn: async ({ signal }): Promise<MasterPlanData | null> => {
+      const { data, error } = await supabase.from("personal_plans").select("plan").eq("user_id", user!.id).abortSignal(signal).maybeSingle();
       if (error) throw new Error("No se pudo cargar el plan personal.");
       if (!data) return null;
       const parsed = planSchema.safeParse(data.plan);

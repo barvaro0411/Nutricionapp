@@ -3,7 +3,7 @@ import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { compressMealImage } from "@/utils/imageCompressor";
-import { uploadMealPhoto } from "@/services/storageService";
+import { uploadMealPhoto, removeMealPhoto } from "@/services/storageService";
 import { AnalyzeMealResponse, MealType } from "@/types/meal";
 
 import { extractFunctionErrorMessage } from "@/utils/functionErrors";
@@ -13,13 +13,14 @@ export function useMealAnalysis() {
   const [stage, setStage] = useState<"compressing" | "uploading" | "analyzing" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
   const { initializeReview } = useMealReviewStore();
 
   const analyzePhoto = async (
     localUri: string,
     suggestedMealType?: MealType,
-    userNote?: string
+    userNote?: string,
+    options: { prepareReview?: boolean; mode?: "meal" | "nutrition_label" } = {}
   ) => {
     if (!user) {
       setError("Usuario no autenticado");
@@ -28,6 +29,8 @@ export function useMealAnalysis() {
 
     setAnalyzing(true);
     setError(null);
+    let uploadedPath: string | null = null;
+    let keepPhoto = false;
 
     try {
       // 1. Compresión local
@@ -44,6 +47,7 @@ export function useMealAnalysis() {
       if (uploadErr || !imagePath) {
         throw new Error(uploadErr || "No se pudo subir la foto");
       }
+      uploadedPath = imagePath;
 
       // 3. Llamar a Edge Function `analyze-meal`
       setStage("analyzing");
@@ -57,6 +61,7 @@ export function useMealAnalysis() {
             client_time_iso: clientTimeIso,
             user_note: userNote,
             provider: "gemini",
+            mode: options.mode || "meal",
           },
         }
       );
@@ -77,12 +82,15 @@ export function useMealAnalysis() {
       const finalMealType = suggestedMealType || mealData.meal_type_guess || "almuerzo";
 
       // 4. Inicializar estado de revisión
-      initializeReview({
-        imagePath,
-        localImageUri: compressed.uri,
-        mealType: finalMealType,
-        items: mealData.items,
-      });
+      if (options.prepareReview !== false) {
+        initializeReview({
+          imagePath,
+          localImageUri: compressed.uri,
+          mealType: finalMealType,
+          items: mealData.items,
+        });
+        keepPhoto = true;
+      }
 
       return { success: true, data: mealData };
     } catch (err: any) {
@@ -91,6 +99,7 @@ export function useMealAnalysis() {
       setError(msg);
       return { success: false, error: msg };
     } finally {
+      if (uploadedPath && !keepPhoto) await removeMealPhoto(uploadedPath).catch(() => undefined);
       setAnalyzing(false);
       setStage(null);
     }
@@ -98,6 +107,10 @@ export function useMealAnalysis() {
 
   return {
     analyzePhoto,
+    analyzeProductPhoto: (localUri: string, nutritionLabel = false) => analyzePhoto(
+      localUri, "snack", undefined,
+      { prepareReview: false, mode: nutritionLabel ? "nutrition_label" : "meal" }
+    ),
     analyzing,
     stage,
     error,

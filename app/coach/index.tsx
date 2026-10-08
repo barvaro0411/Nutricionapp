@@ -13,12 +13,17 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useCoachChat } from "@/hooks/useCoachChat";
 import { showAlert } from "@/utils/alerts";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Sparkles, ArrowLeft, Send } from "lucide-react-native";
+import { StateCard } from "@/components/common/AppUI";
 import { colors } from "@/constants/colors";
 
 export default function CoachChatScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { initialPrompt } = useLocalSearchParams<{ initialPrompt?: string }>();
-  const { messages, isLoading, sendMessage, isSending } = useCoachChat();
+  const { messages, isLoading, error, refetch, sendMessage, isSending } =
+    useCoachChat();
   const [inputText, setInputText] = useState("");
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -37,8 +42,15 @@ export default function CoachChatScreen() {
     if (!text || isSending) return;
 
     setInputText("");
-    try { await sendMessage(text); }
-    catch (e) { setInputText(text); showAlert("Coach IA", e instanceof Error ? e.message : "No se pudo enviar el mensaje."); }
+    try {
+      await sendMessage(text);
+    } catch (e) {
+      setInputText(text);
+      showAlert(
+        "Coach IA",
+        e instanceof Error ? e.message : "No se pudo enviar el mensaje.",
+      );
+    }
   };
 
   const quickPrompts = [
@@ -54,13 +66,22 @@ export default function CoachChatScreen() {
       style={styles.container}
     >
       {/* Top Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backBtnText}>‹ Volver</Text>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Volver al inicio"
+          style={styles.backBtn}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace("/(tabs)")
+          }
+        >
+          <ArrowLeft size={20} color={colors.primary} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Coach Nutricional IA 🤖</Text>
-          <Text style={styles.headerSubtitle}>Conoce tus comidas y metas de hoy</Text>
+          <Text style={styles.headerTitle}>Tu asistente nutricional</Text>
+          <Text style={styles.headerSubtitle}>
+            Ideas para tu rutina, con ayuda de IA
+          </Text>
         </View>
         <View style={{ width: 50 }} />
       </View>
@@ -72,13 +93,25 @@ export default function CoachChatScreen() {
         contentContainerStyle={styles.messagesContent}
       >
         {/* Mensaje de bienvenida inicial si no hay historial */}
-        {messages.length === 0 && !isLoading && (
+        {error && (
+          <StateCard
+            title="No pudimos cargar la conversación"
+            message="Revisa la conexión y vuelve a intentarlo."
+            onRetry={() => void refetch()}
+          />
+        )}
+        {isLoading && (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: 30 }} />
+        )}
+        {messages.length === 0 && !isLoading && !error && (
           <View style={styles.welcomeCard}>
-            <Text style={styles.welcomeIcon}>🥗</Text>
-            <Text style={styles.welcomeTitle}>¡Hola! Soy tu Coach de Nutrición</Text>
+            <View style={styles.welcomeIconWrap}>
+              <Sparkles size={28} color={colors.primary} />
+            </View>
+            <Text style={styles.welcomeTitle}>Hablemos de tu día.</Text>
             <Text style={styles.welcomeDesc}>
-              Tengo acceso a tus metas del día, las calorías que has consumido y los macronutrientes que te faltan.
-              Pregúntame lo que necesites para optimizar tus comidas.
+              Explora ideas de comidas, aclara tus dudas sobre nutrientes y
+              organiza tu rutina a partir de tus registros y metas.
             </Text>
           </View>
         )}
@@ -88,15 +121,28 @@ export default function CoachChatScreen() {
           return (
             <View
               key={msg.id}
-              style={[styles.messageRow, isUser ? styles.userRow : styles.assistantRow]}
+              style={[
+                styles.messageRow,
+                isUser ? styles.userRow : styles.assistantRow,
+              ]}
             >
               {!isUser && (
                 <View style={styles.botAvatar}>
-                  <Text style={{ fontSize: 16 }}>🤖</Text>
+                  <Sparkles size={16} color={colors.primary} />
                 </View>
               )}
-              <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
-                <Text style={[styles.bubbleText, isUser ? styles.userText : styles.assistantText]}>
+              <View
+                style={[
+                  styles.bubble,
+                  isUser ? styles.userBubble : styles.assistantBubble,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.bubbleText,
+                    isUser ? styles.userText : styles.assistantText,
+                  ]}
+                >
                   {msg.content}
                 </Text>
               </View>
@@ -107,11 +153,19 @@ export default function CoachChatScreen() {
         {isSending && (
           <View style={[styles.messageRow, styles.assistantRow]}>
             <View style={styles.botAvatar}>
-              <Text style={{ fontSize: 16 }}>🤖</Text>
+              <Sparkles size={16} color={colors.primary} />
             </View>
-            <View style={[styles.bubble, styles.assistantBubble, styles.loadingBubble]}>
+            <View
+              style={[
+                styles.bubble,
+                styles.assistantBubble,
+                styles.loadingBubble,
+              ]}
+            >
               <ActivityIndicator color={colors.primary} size="small" />
-              <Text style={styles.typingText}>Revisando tu día y calculando...</Text>
+              <Text style={styles.typingText}>
+                Revisando tu día y calculando...
+              </Text>
             </View>
           </View>
         )}
@@ -120,9 +174,20 @@ export default function CoachChatScreen() {
       {/* Chips de preguntas sugeridas */}
       {messages.length < 3 && (
         <View style={styles.promptsContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.promptsRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.promptsRow}
+          >
             {quickPrompts.map((p) => (
-              <TouchableOpacity key={p} style={styles.promptChip} onPress={() => handleSend(p)}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={p}
+                disabled={isSending || !!error}
+                key={p}
+                style={styles.promptChip}
+                onPress={() => handleSend(p)}
+              >
                 <Text style={styles.promptChipText}>{p}</Text>
               </TouchableOpacity>
             ))}
@@ -134,7 +199,9 @@ export default function CoachChatScreen() {
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.textInput}
-          placeholder="Pregúntale a tu coach nutricional..."
+          accessibilityLabel="Mensaje para el asistente"
+          placeholder="¿Qué te gustaría saber?"
+          editable={!isSending && !error}
           placeholderTextColor={colors.textMuted}
           value={inputText}
           onChangeText={setInputText}
@@ -142,11 +209,17 @@ export default function CoachChatScreen() {
           maxLength={400}
         />
         <TouchableOpacity
-          style={[styles.sendButton, (!inputText.trim() || isSending) && styles.sendButtonDisabled]}
+          accessibilityRole="button"
+          accessibilityLabel="Enviar mensaje"
+          style={[
+            styles.sendButton,
+            (!inputText.trim() || isSending || !!error) &&
+              styles.sendButtonDisabled,
+          ]}
           onPress={() => handleSend()}
-          disabled={!inputText.trim() || isSending}
+          disabled={!inputText.trim() || isSending || !!error}
         >
-          <Text style={styles.sendButtonText}>Enviar</Text>
+          <Send size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -156,6 +229,9 @@ export default function CoachChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: "100%",
+    maxWidth: 980,
+    alignSelf: "center",
     backgroundColor: colors.background,
   },
   header: {
@@ -170,7 +246,10 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.cardBorder,
   },
   backBtn: {
-    paddingVertical: 6,
+    width: 44,
+    height: 44,
+    justifyContent: "center",
+    alignItems: "center",
   },
   backBtnText: {
     fontSize: 16,
@@ -178,6 +257,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   headerCenter: {
+    flex: 1,
+    minWidth: 0,
     alignItems: "center",
   },
   headerTitle: {
@@ -205,6 +286,15 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.cardBorder,
     marginVertical: 20,
+  },
+  welcomeIconWrap: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    backgroundColor: colors.primaryLight,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 18,
   },
   welcomeIcon: {
     fontSize: 44,
@@ -312,6 +402,8 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
+    minWidth: 0,
+    minHeight: 48,
     backgroundColor: colors.background,
     borderWidth: 1.5,
     borderColor: colors.cardBorder,
@@ -323,6 +415,10 @@ const styles = StyleSheet.create({
     maxHeight: 90,
   },
   sendButton: {
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.primary,
     paddingVertical: 10,
     paddingHorizontal: 18,

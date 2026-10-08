@@ -1,9 +1,14 @@
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useQuickLogStore } from "@/stores/useQuickLogStore";
 import { usePersonalPlan } from "@/hooks/usePersonalPlan";
-import { getDateKey, loggedAtForDate, APP_TIME_ZONE } from "@/utils/dates";
+import {
+  getDateKey,
+  dateForMealRoute,
+  loggedAtForDate,
+  APP_TIME_ZONE,
+} from "@/utils/dates";
 import { showAlert } from "@/utils/alerts";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,8 +17,9 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import {
   ChevronLeft,
   ChevronRight,
@@ -43,21 +49,28 @@ import { SmartCoachCard } from "@/components/dashboard/SmartCoachCard";
 import { AppGuideModal } from "@/components/dashboard/AppGuideModal";
 import { OfflineBanner } from "@/components/common/OfflineBanner";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { colors, shadows } from "@/constants/colors";
+import { StateCard } from "@/components/common/AppUI";
+import { colors, shadows, layout } from "@/constants/colors";
 import { MealType } from "@/types/meal";
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ date?: string }>();
+  const wide = useWindowDimensions().width >= 820;
   const { profile } = useAuthStore();
   const { data: personalPlan } = usePersonalPlan();
-  const beginMeal = () => { useMealReviewStore.getState().reset(); useMealReviewStore.getState().setLoggedAt(loggedAtForDate(selectedDate)); };
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const {
-    showTextVoice,
-    showFavorites,
-    closeTextVoice,
-    closeFavorites,
-  } = useQuickLogStore();
+  const beginMeal = () => {
+    useMealReviewStore.getState().reset();
+    useMealReviewStore.getState().setLoggedAt(loggedAtForDate(selectedDate));
+  };
+  const [selectedDate, setSelectedDate] = useState<Date>(() =>
+    dateForMealRoute(params.date),
+  );
+  useEffect(() => {
+    if (params.date) setSelectedDate(dateForMealRoute(params.date));
+  }, [params.date]);
+  const { showTextVoice, showFavorites, closeTextVoice, closeFavorites } =
+    useQuickLogStore();
   const [showTextVoiceModal, setShowTextVoiceModal] = useState(false);
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
@@ -66,17 +79,20 @@ export default function DashboardScreen() {
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>("almuerzo");
 
-  const { data, error, isLoading, isRefetching, refetch } = useDailyNutrition(selectedDate);
-  const { totalMl, targetMl, addWater, isAdding } = useWaterTracker(selectedDate);
+  const { data, error, isLoading, isRefetching, refetch } =
+    useDailyNutrition(selectedDate);
+  const { totalMl, targetMl, addWater, isAdding } =
+    useWaterTracker(selectedDate);
   const { burnedCalories, steps, logActivity } = useActivitySync(selectedDate);
 
-  const isToday =
-    getDateKey(selectedDate) === getDateKey(new Date());
+  const isToday = getDateKey(selectedDate) === getDateKey(new Date());
 
   const changeDay = (delta: number) => {
-    const nextDate = new Date(selectedDate);
-    nextDate.setDate(nextDate.getDate() + delta);
-    setSelectedDate(nextDate);
+    setSelectedDate((current) => {
+      const nextDate = new Date(current);
+      nextDate.setDate(nextDate.getDate() + delta);
+      return getDateKey(nextDate) > getDateKey(new Date()) ? new Date() : nextDate;
+    });
   };
 
   const handleAddMeal = (mealType: MealType) => {
@@ -84,7 +100,7 @@ export default function DashboardScreen() {
     setActiveMealType(mealType);
     router.push({
       pathname: "/(tabs)/record",
-      params: { mealType },
+      params: { mealType, date: getDateKey(selectedDate) },
     });
   };
 
@@ -114,9 +130,13 @@ export default function DashboardScreen() {
         <View style={styles.topHeader}>
           <View style={styles.greetingWrap}>
             <Text style={styles.greetingTitle}>
-              {profile?.full_name ? `¡Hola, ${profile.full_name.split(" ")[0]}!` : "¡Hola!"} 👋
+              {profile?.full_name
+                ? `Hola, ${profile.full_name.split(" ")[0]}`
+                : "Tu espacio de bienestar"}
             </Text>
-            <Text style={styles.greetingSubtitle}>Tu registro nutricional diario</Text>
+            <Text style={styles.greetingSubtitle}>
+              Un día a la vez, a tu ritmo.
+            </Text>
           </View>
           <View style={styles.headerRightActions}>
             <TouchableOpacity
@@ -133,122 +153,42 @@ export default function DashboardScreen() {
 
         {/* Navegador de Fecha */}
         <View style={styles.dateSelector}>
-          <TouchableOpacity style={styles.dateArrow} onPress={() => changeDay(-1)}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Día anterior"
+            style={styles.dateArrow}
+            onPress={() => changeDay(-1)}
+          >
             <ChevronLeft size={18} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.dateCenter}>
-            <Text style={styles.dateTitle}>{isToday ? "Hoy" : formattedDate}</Text>
-            {isToday && <Text style={styles.dateSubtitle}>{formattedDate}</Text>}
+            <Text style={styles.dateTitle}>
+              {isToday ? "Hoy" : formattedDate}
+            </Text>
+            {!isToday && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Volver a hoy"
+                onPress={() => setSelectedDate(new Date())}
+              >
+                <Text style={styles.todayLink}>Volver a hoy</Text>
+              </TouchableOpacity>
+            )}
+            {isToday && (
+              <Text style={styles.dateSubtitle}>{formattedDate}</Text>
+            )}
           </View>
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Día siguiente"
             style={[styles.dateArrow, isToday && styles.dateArrowDisabled]}
             onPress={() => !isToday && changeDay(1)}
             disabled={isToday}
           >
-            <ChevronRight size={18} color={isToday ? colors.textMuted : colors.text} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Banner Destacado: Coach Nutricional IA y Recetas (Fase 3) */}
-        <View style={styles.assistantBannersRow}>
-          <TouchableOpacity
-            style={styles.coachBanner}
-            onPress={() => router.push("/coach")}
-            activeOpacity={0.85}
-          >
-            <View style={styles.bannerIconBadge}>
-              <Sparkles size={18} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.coachBannerTitle}>Coach IA</Text>
-              <Text style={styles.coachBannerDesc}>¿Qué comer hoy?</Text>
-            </View>
-            <ChevronRight size={16} color={colors.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.recipesBanner}
-            onPress={() => router.push("/recipes")}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.bannerIconBadge, { backgroundColor: "#FEF3C7" }]}>
-              <ChefHat size={18} color="#D97706" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.recipesBannerTitle}>Recetas</Text>
-              <Text style={styles.recipesBannerDesc}>Chilenas fitness</Text>
-            </View>
-            <ChevronRight size={16} color={colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Banner Mi Plan Maestro */}
-        {personalPlan && <TouchableOpacity
-          style={styles.masterPlanBanner}
-          onPress={() => setShowMasterPlanModal(true)}
-          activeOpacity={0.85}
-        >
-          <View style={styles.masterPlanBadge}>
-            <Target size={18} color="#FFFFFF" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={styles.masterPlanTitle}>Mi Plan Maestro</Text>
-              <View style={styles.masterPlanPill}>
-                <Text style={styles.masterPlanPillText}>Activo</Text>
-              </View>
-            </View>
-            <Text style={styles.masterPlanSubtitle}>
-              {personalPlan.user.objectiveTitle}
-            </Text>
-          </View>
-          <ChevronRight size={18} color={colors.primary} />
-        </TouchableOpacity>}
-
-        {/* Barra de atajos de registro rápido */}
-        <View style={styles.quickActionsBar}>
-          <TouchableOpacity
-            style={styles.quickActionBtn}
-            onPress={() => { beginMeal(); router.push("/meal/camera"); }}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.quickActionIconWrap, { backgroundColor: colors.primaryLight }]}>
-              <Camera size={18} color={colors.primary} />
-            </View>
-            <Text style={styles.quickActionText}>Foto IA</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickActionBtn}
-            onPress={() => { beginMeal(); setShowTextVoiceModal(true); }}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.quickActionIconWrap, { backgroundColor: "#EEF2FF" }]}>
-              <Mic size={18} color="#6366F1" />
-            </View>
-            <Text style={styles.quickActionText}>Texto/Voz</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickActionBtn}
-            onPress={() => { beginMeal(); router.push("/meal/barcode"); }}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.quickActionIconWrap, { backgroundColor: "#F0F9FF" }]}>
-              <Barcode size={18} color="#0EA5E9" />
-            </View>
-            <Text style={styles.quickActionText}>Código</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickActionBtn}
-            onPress={() => { beginMeal(); setShowFavoritesModal(true); }}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.quickActionIconWrap, { backgroundColor: "#FEF3C7" }]}>
-              <Star size={18} color="#F59E0B" />
-            </View>
-            <Text style={styles.quickActionText}>Frecuentes</Text>
+            <ChevronRight
+              size={18}
+              color={isToday ? colors.textMuted : colors.text}
+            />
           </TouchableOpacity>
         </View>
 
@@ -257,77 +197,263 @@ export default function DashboardScreen() {
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loaderText}>Cargando tu progreso...</Text>
           </View>
-        ) : error ? <Text accessibilityRole="alert" style={styles.loaderText}>{error.message}</Text> : (
+        ) : error ? (
+          <StateCard
+            title="No pudimos cargar tu día"
+            message="Revisa tu conexión e inténtalo de nuevo. Tus registros guardados siguen en tu cuenta."
+            onRetry={() => void refetch()}
+          />
+        ) : (
           <>
-            {/* Calorie Hero Dinámico con Calorías de Ejercicio */}
-            <CalorieHero
-              goal={data?.goal.calories || 2000}
-              consumed={data?.consumed.calories || 0}
-              remaining={data?.remaining.calories || 0}
-              burnedCalories={burnedCalories}
-              onExercisePress={() => setShowActivityModal(true)}
-            />
+            <View style={[styles.summaryLayout, wide && styles.summaryWide]}>
+              <View style={styles.summaryMain}>
+                {/* Calorie Hero Dinámico con Calorías de Ejercicio */}
+                <CalorieHero
+                  goal={data?.goal.calories || 2000}
+                  consumed={data?.consumed.calories || 0}
+                  remaining={data?.remaining.calories || 0}
+                  burnedCalories={burnedCalories}
+                  onExercisePress={() => setShowActivityModal(true)}
+                />
 
-            {/* Widget de Agua */}
-            <WaterCard
-              totalMl={totalMl}
-              targetMl={targetMl}
-              onAddWater={async (ml) => { try { await addWater(ml); } catch { showAlert("Agua", "No se pudo guardar. Revisa la conexión."); } }}
-              loading={isAdding}
-            />
+                {/* Macronutrientes */}
+                <MacroProgressBar
+                  proteinConsumed={data?.consumed.protein || 0}
+                  proteinGoal={data?.goal.protein_g || 140}
+                  carbsConsumed={data?.consumed.carbs || 0}
+                  carbsGoal={data?.goal.carbs_g || 220}
+                  fatConsumed={data?.consumed.fat || 0}
+                  fatGoal={data?.goal.fat_g || 65}
+                />
 
-            {/* Macronutrientes */}
-            <MacroProgressBar
-              proteinConsumed={data?.consumed.protein || 0}
-              proteinGoal={data?.goal.protein_g || 140}
-              carbsConsumed={data?.consumed.carbs || 0}
-              carbsGoal={data?.goal.carbs_g || 220}
-              fatConsumed={data?.consumed.fat || 0}
-              fatGoal={data?.goal.fat_g || 65}
-            />
+                {/* Barra de atajos de registro rápido */}
+                <View style={styles.quickActionsBar}>
+                  <TouchableOpacity
+                    style={styles.quickActionBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Registrar con foto"
+                    onPress={() => {
+                      beginMeal();
+                      router.push("/meal/camera");
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View
+                      style={[
+                        styles.quickActionIconWrap,
+                        { backgroundColor: colors.primaryLight },
+                      ]}
+                    >
+                      <Camera size={18} color={colors.primary} />
+                    </View>
+                    <Text style={styles.quickActionText}>Foto IA</Text>
+                  </TouchableOpacity>
 
-            {/* Smart Coach Proactivo (Fase 3) */}
-            <SmartCoachCard
-              consumedCalories={data?.consumed.calories || 0}
-              goalCalories={data?.goal.calories || 2000}
-              remainingCalories={data?.remaining.calories || 0}
-              consumedProtein={data?.consumed.protein || 0}
-              goalProtein={data?.goal.protein_g || 140}
-              remainingProtein={data?.remaining.protein || 0}
-              waterMl={totalMl}
-              targetWaterMl={targetMl}
-              mealCount={data?.meals.length || 0}
-              onAskCoach={(prompt) => {
-                router.push({
-                  pathname: "/coach",
-                  params: { initialPrompt: prompt },
-                });
-              }}
-            />
+                  <TouchableOpacity
+                    style={styles.quickActionBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Registrar con texto o voz"
+                    onPress={() => {
+                      beginMeal();
+                      setShowTextVoiceModal(true);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View
+                      style={[
+                        styles.quickActionIconWrap,
+                        { backgroundColor: "#EEF2FF" },
+                      ]}
+                    >
+                      <Mic size={18} color="#6366F1" />
+                    </View>
+                    <Text style={styles.quickActionText}>Texto/Voz</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.quickActionBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Registrar con código de barras"
+                    onPress={() => {
+                      beginMeal();
+                      router.push("/meal/barcode");
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View
+                      style={[
+                        styles.quickActionIconWrap,
+                        { backgroundColor: "#F0F9FF" },
+                      ]}
+                    >
+                      <Barcode size={18} color="#0EA5E9" />
+                    </View>
+                    <Text style={styles.quickActionText}>Código</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.quickActionBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Registrar comida frecuente"
+                    onPress={() => {
+                      beginMeal();
+                      setShowFavoritesModal(true);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View
+                      style={[
+                        styles.quickActionIconWrap,
+                        { backgroundColor: "#FEF3C7" },
+                      ]}
+                    >
+                      <Star size={18} color="#F59E0B" />
+                    </View>
+                    <Text style={styles.quickActionText}>Frecuentes</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View
+                style={[styles.summarySide, wide && styles.summarySideWide]}
+              >
+                {/* Widget de Agua */}
+                <WaterCard
+                  totalMl={totalMl}
+                  targetMl={targetMl}
+                  onAddWater={async (ml) => {
+                    try {
+                      await addWater(ml);
+                    } catch {
+                      showAlert(
+                        "Agua",
+                        "No se pudo guardar. Revisa la conexión.",
+                      );
+                    }
+                  }}
+                  loading={isAdding}
+                />
+
+                {isToday && (
+                  <>
+                    {/* Smart Coach Proactivo (Fase 3) */}
+                    <SmartCoachCard
+                      consumedCalories={data?.consumed.calories || 0}
+                      goalCalories={data?.goal.calories || 2000}
+                      remainingCalories={data?.remaining.calories || 0}
+                      consumedProtein={data?.consumed.protein || 0}
+                      goalProtein={data?.goal.protein_g || 140}
+                      remainingProtein={data?.remaining.protein || 0}
+                      waterMl={totalMl}
+                      targetWaterMl={targetMl}
+                      mealCount={data?.meals.length || 0}
+                      onAskCoach={(prompt) => {
+                        router.push({
+                          pathname: "/coach",
+                          params: { initialPrompt: prompt },
+                        });
+                      }}
+                    />
+                  </>
+                )}
+                {/* Banner Destacado: Coach Nutricional IA y Recetas (Fase 3) */}
+                <View style={styles.assistantBannersRow}>
+                  <TouchableOpacity
+                    style={styles.coachBanner}
+                    onPress={() => router.push("/coach")}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.bannerIconBadge}>
+                      <Sparkles size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.coachBannerTitle}>Coach IA</Text>
+                      <Text style={styles.coachBannerDesc}>
+                        ¿Qué comer hoy?
+                      </Text>
+                    </View>
+                    <ChevronRight size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.recipesBanner}
+                    onPress={() => router.push("/recipes")}
+                    activeOpacity={0.85}
+                  >
+                    <View
+                      style={[
+                        styles.bannerIconBadge,
+                        { backgroundColor: "#FEF3C7" },
+                      ]}
+                    >
+                      <ChefHat size={18} color="#D97706" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.recipesBannerTitle}>Recetas</Text>
+                      <Text style={styles.recipesBannerDesc}>
+                        Chilenas fitness
+                      </Text>
+                    </View>
+                    <ChevronRight size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Banner Mi Plan Maestro */}
+                {personalPlan && (
+                  <TouchableOpacity
+                    style={styles.masterPlanBanner}
+                    onPress={() => setShowMasterPlanModal(true)}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.masterPlanBadge}>
+                      <Target size={18} color="#FFFFFF" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <Text style={styles.masterPlanTitle}>
+                          Mi Plan Maestro
+                        </Text>
+                        <View style={styles.masterPlanPill}>
+                          <Text style={styles.masterPlanPillText}>Activo</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.masterPlanSubtitle}>
+                        {personalPlan.user.objectiveTitle}
+                      </Text>
+                    </View>
+                    <ChevronRight size={18} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
 
             {/* Comidas del Día */}
             <Text style={styles.mealsHeaderTitle}>Comidas del Día</Text>
 
-            <MealCard
-              mealType="desayuno"
-              meals={data?.meals || []}
-              onAddPress={handleAddMeal}
-            />
-            <MealCard
-              mealType="almuerzo"
-              meals={data?.meals || []}
-              onAddPress={handleAddMeal}
-            />
-            <MealCard
-              mealType="cena"
-              meals={data?.meals || []}
-              onAddPress={handleAddMeal}
-            />
-            <MealCard
-              mealType="snack"
-              meals={data?.meals || []}
-              onAddPress={handleAddMeal}
-            />
+            <View style={styles.mealGrid}>
+              {(["desayuno", "almuerzo", "cena", "snack"] as MealType[]).map(
+                (type) => (
+                  <View
+                    key={type}
+                    style={[
+                      styles.mealGridItem,
+                      wide && styles.mealGridItemWide,
+                    ]}
+                  >
+                    <MealCard
+                      mealType={type}
+                      meals={data?.meals || []}
+                      onAddPress={handleAddMeal}
+                    />
+                  </View>
+                ),
+              )}
+            </View>
 
             <View style={styles.bottomSpacer} />
           </>
@@ -397,9 +523,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  content: {
-    padding: 16,
-    paddingBottom: 110,
+  content: { ...layout.page },
+  summaryLayout: { gap: 0 },
+  summaryWide: { flexDirection: "row", gap: 24, alignItems: "flex-start" },
+  summaryMain: { flex: 1, minWidth: 0, width: "100%" },
+  summarySide: { width: "100%" },
+  summarySideWide: { width: 300 },
+  mealGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  mealGridItem: { width: "100%", minWidth: 0 },
+  mealGridItemWide: { width: "48%" },
+  todayLink: {
+    fontSize: 11,
+    color: colors.primary,
+    fontWeight: "600",
+    paddingVertical: 4,
   },
   topHeader: {
     flexDirection: "row",
@@ -414,8 +551,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   helpGuideBtn: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: 17,
     backgroundColor: colors.primaryLight,
     alignItems: "center",
@@ -428,8 +565,8 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   greetingTitle: {
-    fontSize: 21,
-    fontWeight: "900",
+    fontSize: 28,
+    fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.5,
   },
@@ -453,8 +590,8 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   dateArrow: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: 16,
     backgroundColor: colors.surfaceMuted,
     justifyContent: "center",
@@ -473,9 +610,13 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   dateCenter: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 8,
     alignItems: "center",
   },
   dateTitle: {
+    textAlign: "center",
     fontSize: 14.5,
     fontWeight: "800",
     color: colors.text,

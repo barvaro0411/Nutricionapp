@@ -7,12 +7,16 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
+import { BrowserCodeReader } from "@zxing/library/esm/browser/BrowserCodeReader";
+import MultiFormatOneDReader from "@zxing/library/esm/core/oned/MultiFormatOneDReader";
+import BarcodeFormat from "@zxing/library/esm/core/BarcodeFormat";
+import DecodeHintType from "@zxing/library/esm/core/DecodeHintType";
 import {
-  BrowserMultiFormatReader,
-  BarcodeFormat,
-  DecodeHintType,
-} from "@zxing/library";
-import { Flashlight, FlashlightOff, AlertCircle, RotateCcw } from "lucide-react-native";
+  Flashlight,
+  FlashlightOff,
+  AlertCircle,
+  RotateCcw,
+} from "lucide-react-native";
 import { colors } from "@/constants/colors";
 
 interface BarcodeScannerViewProps {
@@ -25,8 +29,17 @@ export function BarcodeScannerView({
   isPaused,
 }: BarcodeScannerViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const readerRef = useRef<BrowserCodeReader | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const onBarcodeRef = useRef(onBarcodeScanned);
+  const pausedRef = useRef(isPaused);
+  const scanVersion = useRef(0);
+  useEffect(() => {
+    onBarcodeRef.current = onBarcodeScanned;
+  }, [onBarcodeScanned]);
+  useEffect(() => {
+    pausedRef.current = isPaused;
+  }, [isPaused]);
 
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -34,10 +47,12 @@ export function BarcodeScannerView({
   const [torchOn, setTorchOn] = useState(false);
 
   const stopScanning = useCallback(() => {
+    scanVersion.current++;
     if (readerRef.current) {
       try {
         readerRef.current.reset();
       } catch {}
+      readerRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -47,12 +62,14 @@ export function BarcodeScannerView({
 
   const startScanning = useCallback(async () => {
     if (Platform.OS !== "web") return;
+    stopScanning();
+    const version = scanVersion.current;
     setErrorMsg(null);
     setLoading(true);
+    setTorchOn(false);
+    setTorchAvailable(false);
 
     try {
-      stopScanning();
-
       // Configurar formatos de códigos de barras (EAN-13 chileno, UPC, Code 128, etc.)
       const hints = new Map();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -63,10 +80,13 @@ export function BarcodeScannerView({
         BarcodeFormat.CODE_128,
         BarcodeFormat.CODE_39,
         BarcodeFormat.ITF,
-        BarcodeFormat.QR_CODE,
       ]);
 
-      const reader = new BrowserMultiFormatReader(hints, 250);
+      const reader = new BrowserCodeReader(
+        new MultiFormatOneDReader(hints),
+        250,
+        hints,
+      );
       readerRef.current = reader;
 
       if (videoRef.current) {
@@ -82,16 +102,24 @@ export function BarcodeScannerView({
           },
           videoRef.current,
           (result, _err) => {
-            if (result && !isPaused) {
+            if (result && !pausedRef.current && readerRef.current === reader) {
               const code = result.getText();
-              if (code && code.trim().length >= 4) {
-                onBarcodeScanned(code.trim());
+              if (/^[0-9]{8,14}$/.test(code.trim())) {
+                pausedRef.current = true;
+                onBarcodeRef.current(code.trim());
               }
             }
-          }
+          },
         );
+        if (readerRef.current !== reader) {
+          reader.reset();
+          return;
+        }
+        streamRef.current = videoRef.current?.srcObject as MediaStream | null;
 
-        const track = (videoRef.current?.srcObject as MediaStream)?.getVideoTracks()[0];
+        const track = (
+          videoRef.current?.srcObject as MediaStream
+        )?.getVideoTracks()[0];
         if (track && typeof (track as any).getCapabilities === "function") {
           const caps = (track as any).getCapabilities();
           if (caps && "torch" in caps) {
@@ -101,15 +129,21 @@ export function BarcodeScannerView({
       }
       setLoading(false);
     } catch (err: any) {
+      if (version !== scanVersion.current) return;
       console.warn("Error accediendo a la cámara:", err);
       setLoading(false);
-      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
-        setErrorMsg("Permiso de cámara denegado. Permite el acceso para escanear.");
+      if (
+        err?.name === "NotAllowedError" ||
+        err?.name === "PermissionDeniedError"
+      ) {
+        setErrorMsg(
+          "Permiso de cámara denegado. Permite el acceso para escanear.",
+        );
       } else {
         setErrorMsg("No se pudo iniciar la cámara en este navegador.");
       }
     }
-  }, [isPaused, onBarcodeScanned, stopScanning]);
+  }, [stopScanning]);
 
   useEffect(() => {
     if (!isPaused) {

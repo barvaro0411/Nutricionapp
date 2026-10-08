@@ -76,7 +76,7 @@ export function ScanningOverlay({ stage }: ScanningOverlayProps) {
       pulseLoop.stop();
       clearInterval(stepInterval);
     };
-  }, []);
+  }, [progressAnim, pulseAnim, scanLineAnim, stepMessages.length]);
 
   const getStageTitle = () => {
     if (stage === "compressing") return "⚡ Optimizando foto...";

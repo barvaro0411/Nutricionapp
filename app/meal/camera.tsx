@@ -14,7 +14,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Camera, Image as ImageIcon, RotateCcw, ArrowLeft, Sparkles, AlertCircle } from "lucide-react-native";
 import { useMealAnalysis } from "@/hooks/useMealAnalysis";
 import { ScanningOverlay } from "@/components/meal/ScanningOverlay";
-import { colors } from "@/constants/colors";
+import { colors, layout } from "@/constants/colors";
 import { MealType } from "@/types/meal";
 import { showAlert } from "@/utils/alerts";
 
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: 20,
+    ...layout.narrowPage,
     paddingTop: Platform.OS === "ios" ? 54 : 36,
     paddingBottom: 40,
   },

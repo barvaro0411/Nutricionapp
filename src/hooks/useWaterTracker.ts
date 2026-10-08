@@ -5,7 +5,7 @@ import { usePersonalPlan } from "@/hooks/usePersonalPlan";
 import { useAuthStore } from "@/stores/useAuthStore";
 
 export function useWaterTracker(selectedDate: Date = new Date()) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
 
   const { data: plan } = usePersonalPlan();
@@ -14,7 +14,7 @@ export function useWaterTracker(selectedDate: Date = new Date()) {
   const waterQuery = useQuery({
     queryKey: ["waterLogs", user?.id, dateKey, plan?.dailyGoals.waterMl],
     enabled: !!user?.id,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user) return { totalMl: 0, targetMl: 2000, logs: [] };
 
       const { data, error } = await supabase
@@ -23,7 +23,8 @@ export function useWaterTracker(selectedDate: Date = new Date()) {
         .eq("user_id", user.id)
         .gte("logged_at", start)
         .lt("logged_at", end)
-        .order("logged_at", { ascending: false });
+        .order("logged_at", { ascending: false })
+        .abortSignal(signal);
 
       if (error) throw new Error("No se pudo cargar el agua registrada.");
       const totalMl = (data || []).reduce((acc, log) => acc + log.amount_ml, 0);

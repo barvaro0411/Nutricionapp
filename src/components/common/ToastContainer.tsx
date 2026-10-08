@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -49,6 +49,16 @@ export function ToastContainer() {
   const { currentToast, hideToast } = useToastStore();
   const translateY = useRef(new Animated.Value(-80)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const toastId = currentToast?.id;
+
+  const handleDismiss = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(translateY, { toValue: -80, duration: 200, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(({ finished }) => {
+      if (finished && useToastStore.getState().currentToast?.id === toastId) hideToast();
+    });
+  }, [translateY, opacity, hideToast, toastId]);
 
   useEffect(() => {
     if (currentToast) {
@@ -70,29 +80,12 @@ export function ToastContainer() {
         handleDismiss();
       }, currentToast.duration || 3000);
 
-      return () => clearTimeout(timer);
+      return () => { clearTimeout(timer); translateY.stopAnimation(); opacity.stopAnimation(); };
     } else {
       translateY.setValue(-80);
       opacity.setValue(0);
     }
-  }, [currentToast?.id]);
-
-  const handleDismiss = () => {
-    Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: -80,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      hideToast();
-    });
-  };
+  }, [currentToast, handleDismiss, opacity, translateY]);
 
   if (!currentToast) return null;
 

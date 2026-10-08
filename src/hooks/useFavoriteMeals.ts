@@ -29,7 +29,7 @@ export interface FavoriteMealWithItems {
 }
 
 export function useFavoriteMeals() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
 
   // 1. Obtener comidas favoritas
@@ -174,6 +174,7 @@ export function useFavoriteMeals() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
       queryClient.invalidateQueries({ queryKey: ["weeklyStats"] });
+      queryClient.invalidateQueries({ queryKey: ["userStreak"] });
       queryClient.invalidateQueries({ queryKey: ["favoriteMeals"] });
     },
   });

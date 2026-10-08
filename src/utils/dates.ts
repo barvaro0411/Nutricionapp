@@ -52,3 +52,13 @@ export function loggedAtForDate(date: Date): string {
   const { start, end } = getDayRange(date);
   return new Date((Date.parse(start) + Date.parse(end)) / 2).toISOString();
 }
+
+export function dateForMealRoute(dateKey?: string): Date {
+  if (!dateKey) return new Date();
+  try {
+    const { start, end } = getDayRange(dateKey);
+    return new Date((Date.parse(start) + Date.parse(end)) / 2);
+  } catch {
+    return new Date();
+  }
+}

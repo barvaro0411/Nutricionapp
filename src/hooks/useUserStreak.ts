@@ -19,12 +19,12 @@ export interface UserStreakData {
 }
 
 export function useUserStreak() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
 
   return useQuery<UserStreakData>({
     queryKey: ["userStreak", user?.id],
     enabled: !!user?.id,
-    queryFn: async (): Promise<UserStreakData> => {
+    queryFn: async ({ signal }): Promise<UserStreakData> => {
       if (!user) {
         throw new Error("No hay sesión de usuario activa");
       }
@@ -40,7 +40,8 @@ export function useUserStreak() {
         .eq("user_id", user.id)
         .gte("log_date", getDateKey(past60Days))
         .lte("log_date", getDateKey(today))
-        .order("log_date", { ascending: false });
+        .order("log_date", { ascending: false })
+        .abortSignal(signal);
 
       if (error) {
         console.warn("Error al cargar datos de racha:", error);

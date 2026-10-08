@@ -11,14 +11,14 @@ export interface CoachMessage {
 }
 
 export function useCoachChat() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
 
   // 1. Obtener historial de mensajes
   const messagesQuery = useQuery({
     queryKey: ["coachMessages", user?.id],
     enabled: !!user?.id,
-    queryFn: async (): Promise<CoachMessage[]> => {
+    queryFn: async ({ signal }): Promise<CoachMessage[]> => {
       if (!user) return [];
 
       const { data, error } = await supabase
@@ -26,7 +26,8 @@ export function useCoachChat() {
         .select("id, role, content, created_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(50)
+        .abortSignal(signal);
 
       if (error) {
         console.error("Error al cargar mensajes del coach:", error);
@@ -78,6 +79,8 @@ export function useCoachChat() {
   return {
     messages: messagesQuery.data || [],
     isLoading: messagesQuery.isLoading,
+    error: messagesQuery.error,
+    refetch: messagesQuery.refetch,
     sendMessage: sendMessageMutation.mutateAsync,
     isSending: sendMessageMutation.isPending,
   };

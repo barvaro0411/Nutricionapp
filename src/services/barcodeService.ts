@@ -42,7 +42,9 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeProduct | n
         productName: data.product_name,
         brand: data.brand || undefined,
         servingSizeG: Number(data.serving_size_g) || (isLiquid ? 250 : 100),
-        unit: isLiquid ? "ml" : "g",
+        unit: data.unit || (isLiquid ? "ml" : "g"),
+        containerSize: data.container_size ? Number(data.container_size) : undefined,
+        quantityText: data.quantity_text || undefined,
         caloriesPer100g: Number(data.calories_per_100g),
         proteinPer100g: Number(data.protein_per_100g),
         carbsPer100g: Number(data.carbs_per_100g),
@@ -94,7 +96,7 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeProduct | n
           servingSizeG: servingSize,
           unit,
           containerSize,
-          quantityText: quantityRaw || undefined,
+          quantityText: quantityRaw.slice(0, 300) || undefined,
           caloriesPer100g: Math.round(cals * 10) / 10,
           proteinPer100g: Math.round(prot * 10) / 10,
           carbsPer100g: Math.round(carbs * 10) / 10,
@@ -104,17 +106,21 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeProduct | n
 
         // 3. Auto-cache en Supabase para acelerar futuras búsquedas chilenas
         try {
-          await supabase.from("barcode_products").insert({
+          const { error: cacheError } = await supabase.from("barcode_products").insert({
             barcode: cleanBarcode,
             product_name: productName,
             brand: brand || null,
-            serving_size_g: 100,
+            serving_size_g: productResult.servingSizeG,
+            unit: productResult.unit,
+            container_size: productResult.containerSize || null,
+            quantity_text: productResult.quantityText || null,
             calories_per_100g: productResult.caloriesPer100g,
             protein_per_100g: productResult.proteinPer100g,
             carbs_per_100g: productResult.carbsPer100g,
             fat_per_100g: productResult.fatPer100g,
             country: null,
           });
+          if (cacheError && cacheError.code !== "23505") console.warn("No se pudo guardar el producto en la caché.");
         } catch (cacheErr) {
           console.warn("No se pudo cachear en barcode_products:", cacheErr);
         }
@@ -139,6 +145,9 @@ export async function saveCustomBarcodeProduct(
     productName: string;
     brand?: string;
     servingSizeG?: number;
+    unit?: FoodUnit;
+    containerSize?: number;
+    quantityText?: string;
     caloriesPer100g: number;
     proteinPer100g: number;
     carbsPer100g: number;
@@ -146,6 +155,8 @@ export async function saveCustomBarcodeProduct(
   }
 ) {
   if (!/^[0-9]{8,14}$/.test(product.barcode) || !product.productName.trim()) throw new Error("Producto inválido.");
+  if (product.servingSizeG !== undefined && (!Number.isFinite(product.servingSizeG) || product.servingSizeG <= 0 || product.servingSizeG > 20000)) throw new Error("Porción inválida.");
+  if (product.containerSize !== undefined && (!Number.isFinite(product.containerSize) || product.containerSize <= 0 || product.containerSize > 20000)) throw new Error("Tamaño de envase inválido.");
   if (![product.caloriesPer100g, product.proteinPer100g, product.carbsPer100g, product.fatPer100g].every(v => Number.isFinite(v) && v >= 0) || product.caloriesPer100g > 1000 || [product.proteinPer100g, product.carbsPer100g, product.fatPer100g].some(v => v > 100)) throw new Error("Revisa la información nutricional por 100 g.");
   const { data, error } = await supabase
     .from("barcode_products")
@@ -155,6 +166,9 @@ export async function saveCustomBarcodeProduct(
         product_name: product.productName,
         brand: product.brand || null,
         serving_size_g: product.servingSizeG || 100,
+        unit: product.unit || (isLiquidFood(product.productName) ? "ml" : "g"),
+        container_size: product.containerSize || null,
+        quantity_text: product.quantityText?.slice(0, 300) || null,
         calories_per_100g: product.caloriesPer100g,
         protein_per_100g: product.proteinPer100g,
         carbs_per_100g: product.carbsPer100g,

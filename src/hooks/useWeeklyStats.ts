@@ -25,12 +25,12 @@ export interface WeeklyStats {
 }
 
 export function useWeeklyStats() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
 
   return useQuery({
     queryKey: ["weeklyStats", user?.id],
     enabled: !!user?.id,
-    queryFn: async (): Promise<WeeklyStats> => {
+    queryFn: async ({ signal }): Promise<WeeklyStats> => {
       if (!user) throw new Error("No hay usuario autenticado");
 
       // Calcular rango de los últimos 7 días
@@ -45,7 +45,8 @@ export function useWeeklyStats() {
         .eq("user_id", user.id)
         .gte("log_date", getDateKey(sevenDaysAgo))
         .lte("log_date", getDateKey(today))
-        .order("log_date", { ascending: true });
+        .order("log_date", { ascending: true })
+        .abortSignal(signal);
 
       if (error) {
         throw new Error("No se pudieron cargar las estadísticas.");

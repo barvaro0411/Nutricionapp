@@ -4,6 +4,7 @@ node_modules/
 .vercel/
 dist/
 audit-dist/
+artifacts/
 auditoria/
 supabase/
 .env
@@ -11,4 +12,3 @@ supabase/
 *.pem
 *.log
 *.png.log
-({placeholder

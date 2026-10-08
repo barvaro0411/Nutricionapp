@@ -43,13 +43,14 @@ import {
   getStandardPortions,
   formatQuantityDisplay,
 } from "@/utils/liquidUnits";
-import { colors, shadows } from "@/constants/colors";
+import { colors, shadows, layout } from "@/constants/colors";
+import { nutritionPer100 } from "@/utils/productNutrition";
 
 export default function BarcodeScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { addItem } = useMealReviewStore();
-  const { analyzePhoto } = useMealAnalysis();
+  const { analyzeProductPhoto } = useMealAnalysis();
 
   const [activeTab, setActiveTab] = useState<"camera" | "manual">("camera");
   const [scanned, setScanned] = useState(false);
@@ -63,6 +64,7 @@ export default function BarcodeScreen() {
 
   // Formulario si no se encuentra
   const [customName, setCustomName] = useState("");
+  const [customUnit, setCustomUnit] = useState<FoodUnit>("g");
   const [customBrand, setCustomBrand] = useState("");
   const [customCals, setCustomCals] = useState("150");
   const [customProt, setCustomProt] = useState("5");
@@ -143,11 +145,7 @@ export default function BarcodeScreen() {
           await handleSearch(codeFound);
         } else {
           // Si no se decodificó ópticamente, usar IA para reconocer el alimento directamente
-          const analysis = await analyzePhoto(
-            result.assets[0].uri,
-            "snack",
-            "Identifica este producto de supermercado chileno y sus macronutrientes por cada 100g."
-          );
+          const analysis = await analyzeProductPhoto(result.assets[0].uri);
 
           if (analysis.success && analysis.data?.items?.[0]) {
             const item = analysis.data.items[0];
@@ -157,11 +155,8 @@ export default function BarcodeScreen() {
             setProduct({
               barcode: "FOTO-IA",
               productName: item.food,
-              servingSizeG: 100,
-              caloriesPer100g: item.calories,
-              proteinPer100g: item.protein,
-              carbsPer100g: item.carbs,
-              fatPer100g: item.fat,
+              servingSizeG: initialPortion,
+              ...nutritionPer100(item),
               source: "local",
               unit,
               containerSize: isLiquid ? initialPortion : undefined,
@@ -191,21 +186,15 @@ export default function BarcodeScreen() {
 
       if (!result.canceled && result.assets[0]) {
         setScanningLabel(true);
-        const analysis = await analyzePhoto(
-          result.assets[0].uri,
-          "snack",
-          "Esta foto es de una etiqueta nutricional de un producto chileno. Lee la información por cada 100g."
-        );
+        const analysis = await analyzeProductPhoto(result.assets[0].uri, true);
 
         if (analysis.success && analysis.data?.items?.[0]) {
           const item = analysis.data.items[0];
+          const nutrition = nutritionPer100(item);
           if (product && user) {
             const updatedProduct: BarcodeProduct = {
               ...product,
-              caloriesPer100g: Math.round(item.calories),
-              proteinPer100g: Math.round(item.protein * 10) / 10,
-              carbsPer100g: Math.round(item.carbs * 10) / 10,
-              fatPer100g: Math.round(item.fat * 10) / 10,
+              ...nutrition,
               source: "custom",
             };
             setProduct(updatedProduct);
@@ -215,6 +204,9 @@ export default function BarcodeScreen() {
                 productName: product.productName,
                 brand: product.brand,
                 servingSizeG: product.servingSizeG,
+                unit: product.unit,
+                containerSize: product.containerSize,
+                quantityText: product.quantityText,
                 caloriesPer100g: updatedProduct.caloriesPer100g,
                 proteinPer100g: updatedProduct.proteinPer100g,
                 carbsPer100g: updatedProduct.carbsPer100g,
@@ -222,7 +214,7 @@ export default function BarcodeScreen() {
               });
               showAlert(
                 "¡Tabla Nutricional Actualizada!",
-                "La IA leyó la tabla del envase y guardó estos valores exactos para este código de barras."
+                "Guardamos los valores de la etiqueta. Revísalos antes de confirmar la porción."
               );
             } catch {
               showAlert(
@@ -232,15 +224,18 @@ export default function BarcodeScreen() {
             }
           } else {
             setCustomName(item.food);
-            setCustomCals(String(Math.round(item.calories)));
-            setCustomProt(String(Math.round(item.protein * 10) / 10));
-            setCustomCarbs(String(Math.round(item.carbs * 10) / 10));
-            setCustomFat(String(Math.round(item.fat * 10) / 10));
+            setCustomUnit(item.unit === "ml" || isLiquidFood(item.food) ? "ml" : "g");
+            setCustomCals(String(nutrition.caloriesPer100g));
+            setCustomProt(String(nutrition.proteinPer100g));
+            setCustomCarbs(String(nutrition.carbsPer100g));
+            setCustomFat(String(nutrition.fatPer100g));
             showAlert(
               "¡Etiqueta Leída con IA!",
               "Completamos los datos nutricionales según la foto. Confirma los valores."
             );
           }
+        } else {
+          showAlert("Etiqueta", analysis.error || "No se pudo leer la etiqueta. Ingresa los valores manualmente.");
         }
       }
     } catch (err: any) {
@@ -284,14 +279,14 @@ export default function BarcodeScreen() {
 
     try {
       setLoading(true);
-      const isLiquid = isLiquidFood(customName);
-      const unit: FoodUnit = isLiquid ? "ml" : "g";
+      const unit = customUnit;
 
       await saveCustomBarcodeProduct(user.id, {
         barcode: barcodeInput.trim() || "000000000000",
         productName: customName.trim(),
         brand: customBrand.trim() || undefined,
         servingSizeG: 100,
+        unit,
         caloriesPer100g: parseDecimal(customCals),
         proteinPer100g: parseDecimal(customProt),
         carbsPer100g: parseDecimal(customCarbs),
@@ -688,7 +683,7 @@ export default function BarcodeScreen() {
             placeholder="Nombre del alimento (ej: Galletas de avena)"
             placeholderTextColor={colors.textMuted}
             value={customName}
-            onChangeText={setCustomName}
+            onChangeText={(name) => { setCustomName(name); if (isLiquidFood(name)) setCustomUnit("ml"); }}
           />
           <TextInput
             style={styles.customInput}
@@ -698,7 +693,15 @@ export default function BarcodeScreen() {
             onChangeText={setCustomBrand}
           />
 
-          <Text style={styles.customMacroHeader}>Información por cada 100g (etiqueta):</Text>
+          <View style={styles.unitToggle}>
+            {(["g", "ml"] as FoodUnit[]).map(unit => <TouchableOpacity key={unit}
+              style={[styles.unitToggleBtn, customUnit === unit && styles.unitToggleBtnActive]}
+              accessibilityRole="button" accessibilityLabel={`Etiqueta por 100 ${unit}`}
+              accessibilityState={{ selected: customUnit === unit }} onPress={() => setCustomUnit(unit)}>
+              <Text style={[styles.unitToggleText, customUnit === unit && styles.unitToggleTextActive]}>{unit}</Text>
+            </TouchableOpacity>)}
+          </View>
+          <Text style={styles.customMacroHeader}>Información por cada 100 {customUnit} (etiqueta):</Text>
           <View style={styles.macroInputsRow}>
             <View style={styles.macroInputCol}>
               <Text style={styles.macroInputLbl}>Calorías</Text>
@@ -758,7 +761,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: 16,
+    ...layout.narrowPage,
     paddingBottom: 40,
   },
   topNav: {
@@ -1178,6 +1181,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   customInput: {
+    width: "100%",
+    minWidth: 0,
     backgroundColor: colors.card,
     height: 42,
     borderRadius: 10,
@@ -1201,6 +1206,7 @@ const styles = StyleSheet.create({
   },
   macroInputCol: {
     flex: 1,
+    minWidth: 0,
   },
   macroInputLbl: {
     fontSize: 11,

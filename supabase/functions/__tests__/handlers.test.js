@@ -23,6 +23,25 @@ test("photo rejects another user's path before charging AI quota", async () => {
   expect((await handleRequest(request({ image_path: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/photo.jpg" }))).status).toBe(403);
   expect(client.rpc).not.toHaveBeenCalled(); expect(fetchMock).not.toHaveBeenCalled();
 });
+test("nutrition label mode uses a dedicated contract with matching portion and nutrients", async () => {
+  client.storage.from.mockReturnValue({ download: jest.fn().mockResolvedValue({ data: new Blob(["photo"], { type: "image/jpeg" }), error: null }) });
+  const output = { meal_type_guess: "snack", items: [{ food: "Yogur", grams: 125, unit: "ml", calories: 100, protein: 5, carbs: 15, fat: 2, confidence: 0.9 }] };
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(output) }] } }] })));
+  const { handleRequest } = require("../analyze-meal/index.ts");
+  const res = await handleRequest(request({ image_path: owner + "/label.jpg", mode: "nutrition_label" }));
+  expect(res.status).toBe(200);
+  const providerBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+  expect(providerBody.contents[0].parts[0].text).toContain("Lee la etiqueta nutricional");
+  expect((await res.json()).data.items[0].grams).toBe(125);
+});
+test("nutrition labels with an unknown reference portion are rejected", async () => {
+  client.storage.from.mockReturnValue({ download: jest.fn().mockResolvedValue({ data: new Blob(["photo"], { type: "image/jpeg" }), error: null }) });
+  const output = { meal_type_guess: "snack", items: [{ food: "Yogur", grams: 0, calories: 100, protein: 5, carbs: 15, fat: 2 }] };
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(output) }] } }] })));
+  const { handleRequest } = require("../analyze-meal/index.ts");
+  const res = await handleRequest(request({ image_path: owner + "/label.jpg", mode: "nutrition_label" }));
+  expect(res.status).toBe(422);
+});
 test("text handler processes real provider JSON and computes totals", async () => {
   const output = { items: [{ food: "Manzana", grams: 100, calories: 52, protein: 0.3, carbs: 14, fat: 0.2, confidence: 0.9 }], meal_type_guess: "snack", notes: null };
   fetchMock.mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(output) }] } }] })));

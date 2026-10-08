@@ -19,7 +19,7 @@ import { useFavoriteMeals } from "@/hooks/useFavoriteMeals";
 import { saveMealToDatabase } from "@/services/mealService";
 import { VariantModal } from "@/components/meal/VariantModal";
 import { findFamilyForFood } from "@/constants/chileanPresets";
-import { colors, shadows } from "@/constants/colors";
+import { colors, shadows, layout } from "@/constants/colors";
 import { FoodUnit, MealType, DetectedFoodItemSchema } from "@/types/meal";
 import { parseDecimal } from "@/utils/dates";
 import {
@@ -364,7 +364,7 @@ export default function MealReviewScreen() {
           <View style={styles.portionGuideCard}>
             <Text style={styles.portionGuideTitle}>💡 Calibra tus porciones con facilidad</Text>
             <Text style={styles.portionGuideSubtitle}>
-              La IA sugiere el peso visual, pero ajustarlo asegura tus calorías exactas:
+              La IA estima la porción. Ajusta la cantidad consumida para mejorar la estimación:
             </Text>
             <View style={styles.portionPillsRow}>
               <View style={styles.portionPill}>
@@ -466,6 +466,8 @@ export default function MealReviewScreen() {
                 <TouchableOpacity
                   style={styles.stepBtn}
                   onPress={() => adjustItemGramsDelta(index, isMl ? -50 : -10)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Disminuir porción de ${item.food}`}
                 >
                   <Text style={styles.stepBtnText}>{isMl ? "-50ml" : "-10g"}</Text>
                 </TouchableOpacity>
@@ -474,6 +476,7 @@ export default function MealReviewScreen() {
                   <TextInput
                     style={styles.gramsInput}
                     keyboardType="default"
+                    accessibilityLabel={`Cantidad de ${item.food}`}
                     value={
                       inputValues[index] !== undefined
                         ? inputValues[index]
@@ -506,6 +509,8 @@ export default function MealReviewScreen() {
                 <TouchableOpacity
                   style={styles.stepBtn}
                   onPress={() => adjustItemGramsDelta(index, isMl ? 50 : 10)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Aumentar porción de ${item.food}`}
                 >
                   <Text style={styles.stepBtnText}>{isMl ? "+50ml" : "+10g"}</Text>
                 </TouchableOpacity>
@@ -639,7 +644,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    padding: 16,
+    ...layout.narrowPage,
     paddingBottom: 110,
   },
   topSummaryCard: {
@@ -778,6 +783,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   manualInput: {
+    width: "100%",
+    minWidth: 0,
     backgroundColor: colors.background,
     borderRadius: 10,
     borderWidth: 1,
@@ -794,6 +801,7 @@ const styles = StyleSheet.create({
   },
   manualCol: {
     flex: 1,
+    minWidth: 0,
   },
   manualColLabel: {
     fontSize: 11,
@@ -903,6 +911,7 @@ const styles = StyleSheet.create({
     borderColor: "#F1F5F9",
   },
   stepBtn: {
+    flexShrink: 0,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: colors.cardBorder,
@@ -917,15 +926,21 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   gramsDisplay: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
   },
   gramsInput: {
     fontSize: 22,
     fontWeight: "900",
     color: colors.text,
     textAlign: "right",
-    minWidth: 50,
+    width: 70,
+    flexShrink: 1,
+    minWidth: 0,
+    padding: 0,
   },
   gramsUnit: {
     fontSize: 16,

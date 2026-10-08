@@ -1,8 +1,8 @@
 import React from "react";
 import { Tabs } from "expo-router";
-import { View, StyleSheet, Platform } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LayoutDashboard, CalendarDays, Plus, Sparkles, Settings } from "lucide-react-native";
+import { LayoutDashboard, CalendarDays, Plus, Sparkles, UserRound, Leaf } from "lucide-react-native";
 import { colors } from "@/constants/colors";
 
 export default function TabLayout() {
@@ -17,10 +17,11 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
+        headerTitle: () => <View style={styles.brand}><View style={styles.brandIcon}><Leaf size={18} color={colors.primary}/></View><Text style={styles.brandText}>Nutrición IA</Text></View>,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "700",
+          fontSize: 11,
+          fontWeight: "600",
           marginTop: 2,
           marginBottom: 2,
         },
@@ -30,7 +31,7 @@ export default function TabLayout() {
           alignItems: "center",
         },
         tabBarStyle: {
-          backgroundColor: "#FFFFFF",
+          backgroundColor: colors.card,
           borderTopColor: colors.cardBorder,
           borderTopWidth: 1,
           height: barHeight,
@@ -43,10 +44,10 @@ export default function TabLayout() {
           elevation: 10,
         },
         headerStyle: {
-          backgroundColor: "#FFFFFF",
+          backgroundColor: colors.background,
           elevation: 0,
           shadowOpacity: 0,
-          borderBottomWidth: 1,
+          borderBottomWidth: 0,
           borderBottomColor: colors.cardBorder,
         },
         headerTitleStyle: {
@@ -61,8 +62,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Hoy",
-          headerTitle: "Nutrición Hoy",
+          title: "Inicio",
+          tabBarAccessibilityLabel: "Ir al inicio",
           tabBarIcon: ({ color, focused }) => (
             <LayoutDashboard
               size={21}
@@ -77,8 +78,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: "Historial",
-          headerTitle: "Progreso Semanal",
+          title: "Progreso",
+          tabBarAccessibilityLabel: "Ver progreso",
           tabBarIcon: ({ color, focused }) => (
             <CalendarDays
               size={21}
@@ -94,7 +95,7 @@ export default function TabLayout() {
         name="record"
         options={{
           title: "Registrar",
-          headerTitle: "Registrar Comida",
+          tabBarAccessibilityLabel: "Registrar comida",
           tabBarIcon: ({ focused }) => (
             <View style={[styles.centerButton, focused && styles.centerButtonActive]}>
               <Plus size={24} color="#FFFFFF" strokeWidth={3} />
@@ -107,7 +108,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="coach"
         options={{
-          title: "Coach IA",
+          title: "Asistente",
+          tabBarAccessibilityLabel: "Abrir asistente",
           headerShown: false, // CoachChatScreen ya maneja su propia cabecera completa
           tabBarIcon: ({ color, focused }) => (
             <Sparkles
@@ -123,10 +125,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Ajustes",
-          headerTitle: "Mi Perfil y Metas",
+          title: "Perfil",
+          tabBarAccessibilityLabel: "Abrir perfil",
           tabBarIcon: ({ color, focused }) => (
-            <Settings
+            <UserRound
               size={21}
               color={color}
               strokeWidth={focused ? 2.5 : 1.8}
@@ -139,6 +141,9 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
+  brand: { flexDirection: "row", alignItems: "center", gap: 8 },
+  brandIcon: { width: 30, height: 30, borderRadius: 10, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center" },
+  brandText: { fontSize: 17, fontWeight: "800", letterSpacing: -0.5, color: colors.text },
   centerButton: {
     width: 46,
     height: 46,
@@ -151,7 +156,7 @@ const styles = StyleSheet.create({
     borderColor: "#FFFFFF",
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.12,
     shadowRadius: 8,
     elevation: 8,
   },

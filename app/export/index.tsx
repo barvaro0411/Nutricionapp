@@ -18,7 +18,7 @@ import {
   generateNutritionistReport,
   NutritionistReportData,
 } from "@/services/nutritionistReportService";
-import { colors } from "@/constants/colors";
+import { colors, layout } from "@/constants/colors";
 
 export default function ExportReportScreen() {
   const router = useRouter();
@@ -93,7 +93,7 @@ export default function ExportReportScreen() {
           onPress={() => setDaysBack(7)}
         >
           <Text style={[styles.rangeBtnText, daysBack === 7 && styles.rangeBtnTextActive]}>
-            Últimos 7 días (Semanal)
+            7 días
           </Text>
         </TouchableOpacity>
 
@@ -102,7 +102,7 @@ export default function ExportReportScreen() {
           onPress={() => setDaysBack(30)}
         >
           <Text style={[styles.rangeBtnText, daysBack === 30 && styles.rangeBtnTextActive]}>
-            Últimos 30 días (Mensual)
+            30 días
           </Text>
         </TouchableOpacity>
       </View>
@@ -146,7 +146,7 @@ export default function ExportReportScreen() {
 
             <View style={styles.waterRow}>
               <Text style={styles.waterText}>
-                💧 Consumo promedio de agua: *{report.avgWaterMl} ml / día*
+                Consumo promedio de agua: {report.avgWaterMl} ml / día
               </Text>
             </View>
           </View>
@@ -154,11 +154,11 @@ export default function ExportReportScreen() {
           {/* Botones de Acción */}
           <View style={styles.actionsContainer}>
             <TouchableOpacity style={styles.shareBtn} onPress={handleShareWhatsApp}>
-              <Text style={styles.shareBtnText}>📲 Enviar por WhatsApp / Compartir</Text>
+              <Text style={styles.shareBtnText}>Compartir mi informe</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.csvBtn} onPress={handleExportCSV}>
-              <Text style={styles.csvBtnText}>📊 Descargar en formato CSV (Excel)</Text>
+              <Text style={styles.csvBtnText}>Descargar CSV para Excel</Text>
             </TouchableOpacity>
           </View>
 
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: 16,
+    ...layout.narrowPage,
     paddingTop: Platform.OS === "ios" ? 48 : 20,
     paddingBottom: 48,
   },
@@ -258,6 +258,8 @@ const styles = StyleSheet.create({
   },
   gridAverages: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
     justifyContent: "space-between",
     paddingVertical: 14,
     borderTopWidth: 1,

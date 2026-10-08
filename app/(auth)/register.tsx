@@ -1,346 +1,218 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from "react-native";
+import { Text, View, Pressable, StyleSheet } from "react-native";
 import { Link, useRouter } from "expo-router";
-import { MailCheck } from "lucide-react-native";
+import { MailCheck, ArrowRight } from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
 import { colors } from "@/constants/colors";
+import { AuthShell } from "@/components/common/AuthShell";
+import { AppButton, FormField } from "@/components/common/AppUI";
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { signUpWithEmail, loading } = useAuth();
-
+  const { signUpWithEmail, resendConfirmationEmail, loading } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [needsConfirmation, setNeedsConfirmation] = useState(false);
-  const [userAlreadyExists, setUserAlreadyExists] = useState(false);
-
-  const handleRegister = async () => {
+  const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [resent, setResent] = useState(false);
+  const register = async () => {
+    if (loading) return;
     if (!fullName.trim()) {
-      setErrorMessage("Por favor ingresa tu nombre completo.");
+      setError("Ingresa tu nombre para personalizar tu cuenta.");
       return;
     }
-    if (!email.trim() || !email.includes("@")) {
-      setErrorMessage("Por favor ingresa un correo electrónico válido.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Ingresa un correo electrónico válido.");
       return;
     }
-    if (password.length < 6) {
-      setErrorMessage("La contraseña debe tener al menos 6 caracteres.");
+    if (password.length < 8) {
+      setError("Usa una contraseña de al menos 8 caracteres.");
       return;
     }
-
-    setErrorMessage(null);
-    setUserAlreadyExists(false);
-    const result = await signUpWithEmail(email.trim(), password, fullName.trim());
+    setError(null);
+    const result = await signUpWithEmail(
+      email.trim(),
+      password,
+      fullName.trim(),
+    );
     if (!result.success) {
-      if ((result as any).code === "user_already_exists") {
-        setUserAlreadyExists(true);
-      }
-      setErrorMessage(result.error || "No se pudo crear la cuenta.");
+      setError(result.error || "No se pudo crear la cuenta.");
       return;
     }
-
-    if ((result as any).needsEmailConfirmation) {
-      setNeedsConfirmation(true);
+    if (result.needsEmailConfirmation) {
+      setConfirming(true);
+      setPassword("");
     }
   };
-
+  const resend = async () => {
+    setError(null);
+    const result = await resendConfirmationEmail(email.trim());
+    if (result.success) setResent(true);
+    else setError(result.error || "No se pudo reenviar el correo.");
+  };
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+    <AuthShell
+      title={confirming ? "Revisa tu correo" : "Empieza con un pequeño paso"}
+      subtitle={
+        confirming
+          ? "Confirma tu dirección para activar la cuenta."
+          : "Crea tu cuenta y encuentra una rutina que funcione para ti."
+      }
+      footer={
+        <>
+          <Text style={styles.muted}>¿Ya tienes una cuenta?</Text>
+          <Link href="/(auth)/login" asChild>
+            <Pressable accessibilityRole="link" style={styles.linkButton}>
+              <Text style={styles.link}>Iniciar sesión</Text>
+              <ArrowRight size={16} color={colors.primary} />
+            </Pressable>
+          </Link>
+        </>
+      }
     >
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Crea tu cuenta</Text>
-          <Text style={styles.subtitle}>Empieza a seguir tus comidas con IA hoy mismo</Text>
-        </View>
-
-        {/* Card */}
-        <View style={styles.card}>
-          {needsConfirmation ? (
-            <View style={styles.confirmationContent}>
-              <View style={styles.confirmationIconBadge}>
-                <MailCheck size={32} color={colors.primary} strokeWidth={2.2} />
-              </View>
-              <Text style={styles.confirmationTitle}>¡Revisa tu correo!</Text>
-              <Text style={styles.confirmationText}>
-                Hemos enviado un correo de confirmación a:
-              </Text>
-              <Text style={styles.confirmationEmail}>{email.trim()}</Text>
-              <Text style={styles.confirmationHint}>
-                Abre el correo y haz clic en el enlace para activar tu cuenta antes de iniciar sesión.
-                (Revisa también la carpeta de Spam o Correo no deseado).
-              </Text>
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => router.replace("/(auth)/login")}
-              >
-                <Text style={styles.primaryButtonText}>Ir a Iniciar Sesión</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                onPress={() => setNeedsConfirmation(false)}
-              >
-                <Text style={styles.secondaryButtonText}>Volver</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              {errorMessage && (
-                <View style={styles.errorBox}>
-                  <Text style={styles.errorText}>{errorMessage}</Text>
-                  {userAlreadyExists && (
-                    <TouchableOpacity
-                      style={styles.errorActionBtn}
-                      onPress={() => router.push("/(auth)/login")}
-                    >
-                      <Text style={styles.errorActionText}>Ir a Iniciar Sesión →</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Nombre Completo</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ej: Sofía Contreras"
-                  placeholderTextColor={colors.textMuted}
-                  value={fullName}
-                  onChangeText={setFullName}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Correo Electrónico</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="ejemplo@correo.cl"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={email}
-                  onChangeText={setEmail}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Contraseña</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Mínimo 6 caracteres"
-                  placeholderTextColor={colors.textMuted}
-                  secureTextEntry
-                  value={password}
-                  onChangeText={setPassword}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.primaryButton, loading && styles.buttonDisabled]}
-                onPress={handleRegister}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.primaryButtonText}>Registrarme</Text>
-                )}
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-
-        {/* Footer */}
-        {!needsConfirmation && (
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>¿Ya tienes cuenta? </Text>
-            <Link href="/(auth)/login" asChild>
-              <TouchableOpacity>
-                <Text style={styles.loginLink}>Iniciar sesión</Text>
-              </TouchableOpacity>
-            </Link>
+      {error && (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {error}
+        </Text>
+      )}
+      {confirming ? (
+        <View style={styles.confirmation}>
+          <View style={styles.mailIcon}>
+            <MailCheck size={30} color={colors.primary} />
           </View>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <Text style={styles.email}>{email.trim()}</Text>
+          <Text style={styles.confirmationText}>
+            Abre el enlace del correo de confirmación. Si no lo ves, revisa
+            también la carpeta de spam.
+          </Text>
+          <AppButton
+            title="Ir a iniciar sesión"
+            onPress={() => router.replace("/(auth)/login")}
+          />
+          <AppButton
+            title={resent ? "Correo reenviado" : "Reenviar confirmación"}
+            onPress={() => void resend()}
+            secondary
+            loading={loading}
+            disabled={resent}
+          />
+          {resent && (
+            <Text accessibilityRole="alert" style={styles.muted}>
+              El correo está en camino. Puede tardar unos minutos.
+            </Text>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            style={styles.linkButton}
+            onPress={() => {
+              setConfirming(false);
+              setResent(false);
+              setError(null);
+            }}
+          >
+            <Text style={styles.link}>Corregir mi correo</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <>
+          <FormField
+            label="Nombre completo"
+            placeholder="Ej: Sofía Contreras"
+            value={fullName}
+            onChangeText={setFullName}
+            maxLength={80}
+            autoComplete="name"
+            textContentType="name"
+            editable={!loading}
+          />
+          <FormField
+            label="Correo electrónico"
+            placeholder="ejemplo@correo.cl"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
+            editable={!loading}
+          />
+          <FormField
+            label="Contraseña"
+            placeholder="Al menos 8 caracteres"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoComplete="new-password"
+            textContentType="newPassword"
+            hint="Elige una contraseña larga y diferente a la de otras cuentas."
+            editable={!loading}
+            returnKeyType="go"
+            onSubmitEditing={() => void register()}
+          />
+          <AppButton
+            title="Crear mi cuenta"
+            onPress={() => void register()}
+            loading={loading}
+            icon={<ArrowRight size={18} color="#FFFFFF" />}
+          />
+          <Text style={styles.bottomNote}>
+            Confirmarás tu correo antes de completar tu perfil y tus metas.
+          </Text>
+        </>
+      )}
+    </AuthShell>
   );
 }
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollContent: {
-    width: "100%", maxWidth: 520, alignSelf: "center",
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 24,
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: colors.text,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 15,
+  muted: {
+    fontSize: 13,
     color: colors.textSecondary,
-    marginTop: 6,
     textAlign: "center",
+    lineHeight: 20,
   },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
+  linkButton: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
-  errorBox: {
-    backgroundColor: colors.dangerLight,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorText: {
+  link: { color: colors.primary, fontWeight: "700", fontSize: 13 },
+  error: {
     color: colors.danger,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  inputGroup: {
+    backgroundColor: colors.dangerLight,
+    fontSize: 13,
+    lineHeight: 19,
+    padding: 14,
+    borderRadius: 12,
     marginBottom: 18,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.text,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: colors.text,
-  },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 28,
-  },
-  footerText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  loginLink: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: "700",
-  },
-  errorActionBtn: {
-    marginTop: 8,
-    alignSelf: "flex-start",
-  },
-  errorActionText: {
-    color: colors.primary,
-    fontWeight: "700",
-    fontSize: 14,
-  },
-  confirmationContent: {
-    alignItems: "center",
-    paddingVertical: 12,
-  },
-  confirmationIconBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  confirmation: { gap: 16 },
+  mailIcon: {
+    alignSelf: "center",
+    padding: 18,
     backgroundColor: colors.primaryLight,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
+    borderRadius: 22,
   },
-  confirmationEmoji: {
-    fontSize: 32,
-  },
-  confirmationTitle: {
-    fontSize: 22,
-    fontWeight: "800",
+  email: {
+    fontSize: 16,
+    fontWeight: "700",
     color: colors.text,
-    marginBottom: 12,
     textAlign: "center",
   },
   confirmationText: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: "center",
-  },
-  confirmationEmail: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.primary,
-    marginTop: 4,
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  confirmationHint: {
-    fontSize: 13,
-    color: colors.textMuted,
-    textAlign: "center",
-    lineHeight: 18,
-    marginBottom: 24,
-    paddingHorizontal: 8,
-  },
-  secondaryButton: {
-    marginTop: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-    width: "100%",
-  },
-  secondaryButtonText: {
-    color: colors.textSecondary,
     fontSize: 14,
-    fontWeight: "600",
+    lineHeight: 22,
+    color: colors.textSecondary,
+    textAlign: "center",
+  },
+  bottomNote: {
+    marginTop: 16,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary,
+    textAlign: "center",
   },
 });

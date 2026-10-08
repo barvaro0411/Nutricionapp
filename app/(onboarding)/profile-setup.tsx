@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { colors } from "@/constants/colors";
+import { colors, layout } from "@/constants/colors";
 import { Gender, ActivityLevel, Objective } from "@/types/profile";
 import { parseDecimal } from "@/utils/dates";
 import { calculateNutritionGoals } from "@/utils/nutritionCalculator";
@@ -83,7 +83,7 @@ export default function ProfileSetupScreen() {
         <Text style={styles.stepIndicator}>Paso 1 de 2</Text>
         <Text style={styles.title}>Cuéntanos sobre ti</Text>
         <Text style={styles.subtitle}>
-          Calcularemos tus requerimientos de energía y macronutrientes basados en ciencia.
+          Usaremos tus datos para estimar una meta inicial. Podrás ajustarla cuando lo necesites.
         </Text>
       </View>
 
@@ -103,7 +103,7 @@ export default function ProfileSetupScreen() {
               { key: "female", label: "Mujer" },
             ] as const
           ).map((item) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={item.key}
               style={[styles.pillOption, gender === item.key && styles.pillOptionActive]}
               onPress={() => setGender(item.key)}
@@ -123,6 +123,7 @@ export default function ProfileSetupScreen() {
           <TextInput
             style={styles.numericInput}
             keyboardType="numeric"
+            accessibilityLabel="Edad"
             value={age}
             onChangeText={setAge}
             placeholder="28"
@@ -135,6 +136,7 @@ export default function ProfileSetupScreen() {
           <TextInput
             style={styles.numericInput}
             keyboardType="numeric"
+            accessibilityLabel="Estatura en centímetros"
             value={heightCm}
             onChangeText={setHeightCm}
             placeholder="175"
@@ -147,6 +149,7 @@ export default function ProfileSetupScreen() {
           <TextInput
             style={styles.numericInput}
             keyboardType="decimal-pad"
+            accessibilityLabel="Peso en kilogramos"
             value={weightKg}
             onChangeText={setWeightKg}
             placeholder="75"
@@ -166,7 +169,7 @@ export default function ProfileSetupScreen() {
             { key: "active", title: "Activo", desc: "6-7 sesiones o trabajo físico activo" },
           ] as const
         ).map((item) => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={item.key}
             style={[styles.cardOption, activityLevel === item.key && styles.cardOptionActive]}
             onPress={() => setActivityLevel(item.key)}
@@ -192,7 +195,7 @@ export default function ProfileSetupScreen() {
             { key: "gain_muscle", title: "Aumentar masa muscular", desc: "Superávit calórico controlado" },
           ] as const
         ).map((item) => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={item.key}
             style={[styles.cardOption, objective === item.key && styles.cardOptionActive]}
             onPress={() => setObjective(item.key)}
@@ -208,7 +211,7 @@ export default function ProfileSetupScreen() {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.continueButton} onPress={handleCalculateGoals}>
+      <TouchableOpacity accessibilityRole="button" style={styles.continueButton} onPress={handleCalculateGoals}>
         <Text style={styles.continueButtonText}>Calcular mis Objetivos</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -221,7 +224,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: 24,
+    ...layout.narrowPage,
     paddingBottom: 48,
   },
   header: {
@@ -237,6 +240,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   title: {
+    letterSpacing: -0.8,
     fontSize: 26,
     fontWeight: "800",
     color: colors.text,
@@ -300,8 +304,11 @@ const styles = StyleSheet.create({
   },
   measureCol: {
     flex: 1,
+    minWidth: 0,
   },
   numericInput: {
+    width: "100%",
+    minWidth: 0,
     backgroundColor: colors.card,
     borderWidth: 1.5,
     borderColor: colors.cardBorder,

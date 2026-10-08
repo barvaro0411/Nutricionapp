@@ -1,7 +1,7 @@
 {
   "short_name": "Nutrición IA",
   "name": "Nutrición IA Chile",
-  "description": "Seguimiento nutricional con IA para Chile (Fotos, Macros y Nutricionistas)",
+  "description": "Registra comidas, sigue tus nutrientes y construye hábitos con ayuda de IA.",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -17,8 +17,8 @@
     }
   ],
   "start_url": "/",
-  "background_color": "#F8FAFC",
-  "theme_color": "#10B981",
+  "background_color": "#F6F8F5",
+  "theme_color": "#087F5B",
   "display": "standalone",
   "orientation": "portrait",
   "lang": "es-CL"

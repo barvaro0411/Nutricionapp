@@ -9,6 +9,7 @@ export const AnalyzeMealRequestSchema = z.object({
   client_time_iso: z.string().datetime().optional(),
   user_note: z.string().max(200).optional(),
   provider: z.enum(["gemini", "openai"]).optional().default("gemini"),
+  mode: z.enum(["meal", "nutrition_label"]).default("meal"),
 });
 export type AnalyzeMealRequest = z.infer<typeof AnalyzeMealRequestSchema>;
 

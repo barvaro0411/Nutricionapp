@@ -1,5 +1,6 @@
 import { AnalyzeMealRequestSchema } from "./types.ts";
 import { CHILEAN_MEAL_VISION_PROMPT } from "./prompts/mealVisionPrompt.ts";
+import { NUTRITION_LABEL_PROMPT } from "./prompts/nutritionLabelPrompt.ts";
 import { GeminiVisionProvider } from "./providers/gemini.ts";
 import { OpenAIVisionProvider } from "./providers/openai.ts";
 import { ApiError, authenticate, errorResponse, json, methodResponse, readBody, reserveAiRequest } from "../_shared/http.ts";
@@ -15,7 +16,8 @@ export async function handleRequest(req: Request) {
     const { client, user } = await authenticate(req);
     const parsed = AnalyzeMealRequestSchema.safeParse(await readBody(req, 4096));
     if (!parsed.success) throw new ApiError(400, "INVALID_REQUEST", "Los datos de la foto no son válidos.");
-    const { image_path, client_time_iso, user_note, provider } = parsed.data;
+    const { image_path, client_time_iso, user_note, provider, mode } = parsed.data;
+    const systemPrompt = mode === "nutrition_label" ? NUTRITION_LABEL_PROMPT : CHILEAN_MEAL_VISION_PROMPT;
     if (!image_path.startsWith(user.id + "/") || image_path.includes("..") || image_path.includes("%")) {
       throw new ApiError(403, "FORBIDDEN", "La imagen no pertenece a tu cuenta.");
     }
@@ -37,11 +39,14 @@ export async function handleRequest(req: Request) {
     let analysis;
     let failure: unknown;
     for (const selected of providers) {
-      try { analysis = await selected.analyzeImage(image, photo.type, CHILEAN_MEAL_VISION_PROMPT, client_time_iso, user_note); break; }
+      try { analysis = await selected.analyzeImage(image, photo.type, systemPrompt, client_time_iso, user_note); break; }
       catch (error) { failure = error; }
     }
     if (!analysis) throw failure || new ApiError(503, "CONFIGURATION_ERROR", "No hay un proveedor de IA configurado.");
     if (!analysis.data.items.length) throw new ApiError(422, "NO_FOOD_DETECTED", "No se detectaron alimentos. Prueba con otra foto.");
+    if (mode === "nutrition_label" && (analysis.data.items.length !== 1 || analysis.data.items[0].grams <= 0)) {
+      throw new ApiError(422, "INVALID_LABEL", "No se pudo leer la porción de la etiqueta. Ingresa los valores manualmente.");
+    }
     const normalizedItems = analysis.data.items.map((item) => ({
       ...item,
       unit: resolveItemUnit(item),

@@ -4,239 +4,311 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   ActivityIndicator,
-  Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ArrowLeft, ArrowUpRight, ChefHat, Clock3 } from "lucide-react-native";
 import { useRecipes } from "@/hooks/useRecipes";
-import { colors } from "@/constants/colors";
+import {
+  PageHeading,
+  FormField,
+  StateCard,
+  AppButton,
+} from "@/components/common/AppUI";
+import { colors, layout } from "@/constants/colors";
 import { MealType } from "@/types/meal";
-import { Recipe } from "@/services/recipeService";
 
+const normalize = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+const labels: Record<MealType, string> = {
+  desayuno: "Desayuno",
+  almuerzo: "Almuerzo",
+  cena: "Once / Cena",
+  snack: "Colación",
+};
 export default function RecipesCatalogScreen() {
   const router = useRouter();
-  const [selectedType, setSelectedType] = useState<MealType | undefined>(undefined);
-
-  const { data: recipes, isLoading } = useRecipes(selectedType);
-
+  const insets = useSafeAreaInsets();
+  const wide = useWindowDimensions().width >= 760;
+  const [selectedType, setSelectedType] = useState<MealType | undefined>();
+  const [search, setSearch] = useState("");
+  const { data: recipes, isLoading, error, refetch } = useRecipes(selectedType);
+  const filtered = (recipes || []).filter((recipe) =>
+    normalize(recipe.title + " " + recipe.description).includes(
+      normalize(search.trim()),
+    ),
+  );
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backBtnText}>‹ Volver</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Recetas Saludables Chilenas</Text>
-        <View style={{ width: 50 }} />
-      </View>
-
-      <Text style={styles.subtitle}>
-        Comida tradicional chilena adaptada con alto contenido proteico y balance calórico óptimo.
-      </Text>
-
-      {/* Filtros */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity
-          style={[styles.filterChip, !selectedType && styles.filterChipActive]}
-          onPress={() => setSelectedType(undefined)}
-        >
-          <Text style={[styles.filterChipText, !selectedType && styles.filterChipTextActive]}>
-            Todas
-          </Text>
-        </TouchableOpacity>
-        {(["desayuno", "almuerzo", "cena"] as MealType[]).map((type) => (
-          <TouchableOpacity
-            key={type}
-            style={[styles.filterChip, selectedType === type && styles.filterChipActive]}
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: Math.max(insets.top, 16) },
+      ]}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Volver a mi día"
+        onPress={() =>
+          router.canGoBack() ? router.back() : router.replace("/(tabs)")
+        }
+        style={styles.back}
+      >
+        <ArrowLeft size={18} color={colors.primary} />
+        <Text style={styles.backText}>Volver</Text>
+      </Pressable>
+      <PageHeading
+        eyebrow="Un poco de inspiración"
+        title="Ideas para tu próxima comida"
+        description="Recetas para variar tu rutina, disfrutar lo que comes y conocer sus nutrientes."
+      />
+      <FormField
+        label="Buscar recetas"
+        placeholder="Ej: pollo, avena, porotos…"
+        value={search}
+        onChangeText={setSearch}
+        autoCorrect={false}
+        returnKeyType="search"
+      />
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filters}
+      >
+        {[
+          undefined,
+          ...(["desayuno", "almuerzo", "cena", "snack"] as MealType[]),
+        ].map((type) => (
+          <Pressable
+            key={type || "all"}
+            accessibilityRole="button"
+            accessibilityLabel={
+              "Filtrar " + (type ? labels[type] : "todas las recetas")
+            }
+            accessibilityState={{ selected: selectedType === type }}
             onPress={() => setSelectedType(type)}
+            style={[styles.chip, selectedType === type && styles.activeChip]}
           >
             <Text
               style={[
-                styles.filterChipText,
-                selectedType === type && styles.filterChipTextActive,
+                styles.chipText,
+                selectedType === type && styles.activeText,
               ]}
             >
-              {type === "cena" ? "Once/Cena" : type.charAt(0).toUpperCase() + type.slice(1)}
+              {type ? labels[type] : "Todas"}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         ))}
-      </View>
-
-      {/* Lista de Recetas */}
+      </ScrollView>
       {isLoading ? (
-        <ActivityIndicator color={colors.primary} size="large" style={{ marginVertical: 40 }} />
+        <ActivityIndicator
+          color={colors.primary}
+          size="large"
+          style={styles.loading}
+        />
+      ) : error ? (
+        <StateCard
+          title="No pudimos cargar las recetas"
+          message="Revisa la conexión y vuelve a intentarlo."
+          onRetry={() => void refetch()}
+        />
+      ) : filtered.length === 0 ? (
+        <>
+          <StateCard
+            title={
+              search || selectedType
+                ? "No encontramos esa combinación"
+                : "Estamos preparando nuevas ideas"
+            }
+            message={
+              search || selectedType
+                ? "Prueba otro ingrediente o cambia el filtro de comida."
+                : "Las recetas aparecerán aquí cuando estén disponibles."
+            }
+          />
+          {(search || selectedType) && (
+            <AppButton
+              title="Limpiar filtros"
+              onPress={() => {
+                setSearch("");
+                setSelectedType(undefined);
+              }}
+              secondary
+            />
+          )}
+        </>
       ) : (
-        <View style={styles.recipesList}>
-          {(recipes || []).map((recipe: Recipe) => (
-            <TouchableOpacity
-              key={recipe.id}
-              style={styles.recipeCard}
-              onPress={() => router.push(`/recipes/${recipe.id}`)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.cardTopRow}>
-                <View style={styles.mealBadge}>
-                  <Text style={styles.mealBadgeText}>{recipe.mealType.toUpperCase()}</Text>
+        <>
+          <Text style={styles.results}>
+            {filtered.length}{" "}
+            {filtered.length === 1
+              ? "receta para inspirarte"
+              : "recetas para inspirarte"}
+          </Text>
+          <View style={styles.grid}>
+            {filtered.map((recipe) => (
+              <Pressable
+                key={recipe.id}
+                accessibilityRole="button"
+                accessibilityLabel={"Ver receta de " + recipe.title}
+                onPress={() =>
+                  router.push({
+                    pathname: "/recipes/[id]",
+                    params: { id: recipe.id },
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.card,
+                  wide && styles.wideCard,
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={styles.icon}>
+                    <ChefHat size={25} color={colors.primary} />
+                  </View>
+                  <View style={styles.time}>
+                    <Clock3 size={13} color={colors.textSecondary} />
+                    <Text style={styles.timeText}>
+                      {recipe.prepTimeMinutes} min
+                    </Text>
+                  </View>
                 </View>
-                <Text style={styles.prepTime}>⏱️ {recipe.prepTimeMinutes} min</Text>
-              </View>
-
-              <Text style={styles.recipeTitle}>{recipe.title}</Text>
-              <Text style={styles.recipeDesc} numberOfLines={2}>
-                {recipe.description}
-              </Text>
-
-              <View style={styles.cardFooter}>
-                <View style={styles.calPill}>
-                  <Text style={styles.calPillText}>{Math.round(recipe.caloriesPerServing)} kcal</Text>
-                </View>
-                <Text style={styles.macroSummary}>
-                  {Math.round(recipe.proteinPerServing)}g P • {Math.round(recipe.carbsPerServing)}g C • {Math.round(recipe.fatPerServing)}g G
+                <Text style={styles.category}>{labels[recipe.mealType]}</Text>
+                <Text style={styles.recipeTitle}>{recipe.title}</Text>
+                <Text style={styles.recipeDescription} numberOfLines={2}>
+                  {recipe.description}
                 </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+                <View style={styles.nutrients}>
+                  <Text style={styles.calories}>
+                    {Math.round(recipe.caloriesPerServing)}{" "}
+                    <Text style={styles.calorieUnit}>kcal / porción</Text>
+                  </Text>
+                  <Text style={styles.protein}>
+                    {Math.round(recipe.proteinPerServing)} g proteína
+                  </Text>
+                </View>
+                <View style={styles.cardFooter}>
+                  <Text style={styles.details}>
+                    Ver ingredientes y preparación
+                  </Text>
+                  <ArrowUpRight size={17} color={colors.primary} />
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        </>
       )}
     </ScrollView>
   );
 }
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: 16,
-    paddingTop: Platform.OS === "ios" ? 48 : 20,
-    paddingBottom: 40,
-  },
-  header: {
+  root: { flex: 1, backgroundColor: colors.background },
+  content: { ...layout.page },
+  back: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
-  },
-  backBtn: {
-    paddingVertical: 6,
-  },
-  backBtnText: {
-    fontSize: 16,
-    color: colors.primary,
-    fontWeight: "700",
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: colors.text,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 16,
-    lineHeight: 18,
-  },
-  filterRow: {
-    flexDirection: "row",
     gap: 8,
+    minHeight: 44,
+    alignSelf: "flex-start",
+    marginBottom: 16,
+  },
+  backText: { fontSize: 13, fontWeight: "600", color: colors.primary },
+  filters: { gap: 8, paddingBottom: 12, marginBottom: 10 },
+  chip: {
+    minHeight: 44,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 13,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  activeChip: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontSize: 12, fontWeight: "600", color: colors.textSecondary },
+  activeText: { color: "#FFFFFF" },
+  loading: { marginVertical: 60 },
+  results: { fontSize: 12, color: colors.textSecondary, marginBottom: 16 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
+  card: {
+    width: "100%",
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 22,
+    padding: 22,
+  },
+  wideCard: { flexGrow: 1, flexBasis: "45%", maxWidth: "49%" },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 18,
   },
-  filterChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  filterChipActive: {
+  icon: {
+    width: 52,
+    height: 52,
     backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
-  },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  filterChipTextActive: {
-    color: colors.primaryDark,
-    fontWeight: "700",
-  },
-  recipesList: {
-    gap: 14,
-  },
-  recipeCard: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  cardTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    borderRadius: 17,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  time: { flexDirection: "row", alignItems: "center", gap: 5 },
+  timeText: { fontSize: 11, color: colors.textSecondary },
+  category: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    color: colors.primary,
     marginBottom: 8,
   },
-  mealBadge: {
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  mealBadgeText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: colors.primaryDark,
-  },
-  prepTime: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontWeight: "500",
-  },
   recipeTitle: {
-    fontSize: 17,
-    fontWeight: "800",
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 26,
+    letterSpacing: -0.5,
     color: colors.text,
-    marginBottom: 6,
+    marginBottom: 8,
   },
-  recipeDesc: {
+  recipeDescription: {
     fontSize: 13,
+    lineHeight: 20,
     color: colors.textSecondary,
-    lineHeight: 18,
-    marginBottom: 14,
+    marginBottom: 20,
+  },
+  nutrients: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+    marginBottom: 18,
+  },
+  calories: { fontSize: 18, fontWeight: "700", color: colors.text },
+  calorieUnit: { fontSize: 11, fontWeight: "400", color: colors.textSecondary },
+  protein: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.protein,
+    backgroundColor: colors.proteinLight,
+    padding: 7,
+    borderRadius: 9,
   },
   cardFooter: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 10,
+    justifyContent: "space-between",
+    gap: 8,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: colors.cardBorder,
   },
-  calPill: {
-    backgroundColor: colors.background,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  calPillText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: colors.text,
-  },
-  macroSummary: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
+  details: { flex: 1, fontSize: 12, fontWeight: "600", color: colors.primary },
 });

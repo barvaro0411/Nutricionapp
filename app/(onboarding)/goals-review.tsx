@@ -14,7 +14,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { GoalsSchema, OnboardingProfileSchema } from "@/types/profile";
 import { parseDecimal } from "@/utils/dates";
-import { colors } from "@/constants/colors";
+import { colors, layout } from "@/constants/colors";
 
 export default function GoalsReviewScreen() {
   const router = useRouter();
@@ -116,7 +116,7 @@ export default function GoalsReviewScreen() {
       <View style={styles.calorieCard}>
         <Text style={styles.calorieCardLabel}>Calorías diarias recomendadas</Text>
         <View style={styles.counterRow}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.adjustBtn}
             onPress={() => adjustValue(setCalories, calories, -50, 800)}
           >
@@ -126,12 +126,13 @@ export default function GoalsReviewScreen() {
             <TextInput
               style={styles.mainValueText}
               keyboardType="numeric"
+              accessibilityLabel="Meta de calorías"
               value={calories}
               onChangeText={setCalories}
             />
             <Text style={styles.mainValueUnit}>kcal / día</Text>
           </View>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.adjustBtn}
             onPress={() => adjustValue(setCalories, calories, 50, 800)}
           >
@@ -161,7 +162,7 @@ export default function GoalsReviewScreen() {
             <Text style={styles.macroName}>Proteína</Text>
           </View>
           <View style={styles.inlineControls}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setProteinG, proteinG, -5, 10)}
             >
@@ -170,11 +171,12 @@ export default function GoalsReviewScreen() {
             <TextInput
               style={styles.macroInput}
               keyboardType="numeric"
+              accessibilityLabel="Meta de proteínas"
               value={proteinG}
               onChangeText={setProteinG}
             />
             <Text style={styles.macroUnit}>g</Text>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setProteinG, proteinG, 5, 10)}
             >
@@ -190,7 +192,7 @@ export default function GoalsReviewScreen() {
             <Text style={styles.macroName}>Carbohidratos</Text>
           </View>
           <View style={styles.inlineControls}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setCarbsG, carbsG, -5, 10)}
             >
@@ -199,11 +201,12 @@ export default function GoalsReviewScreen() {
             <TextInput
               style={styles.macroInput}
               keyboardType="numeric"
+              accessibilityLabel="Meta de carbohidratos"
               value={carbsG}
               onChangeText={setCarbsG}
             />
             <Text style={styles.macroUnit}>g</Text>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setCarbsG, carbsG, 5, 10)}
             >
@@ -219,7 +222,7 @@ export default function GoalsReviewScreen() {
             <Text style={styles.macroName}>Grasas</Text>
           </View>
           <View style={styles.inlineControls}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setFatG, fatG, -5, 5)}
             >
@@ -228,11 +231,12 @@ export default function GoalsReviewScreen() {
             <TextInput
               style={styles.macroInput}
               keyboardType="numeric"
+              accessibilityLabel="Meta de grasas"
               value={fatG}
               onChangeText={setFatG}
             />
             <Text style={styles.macroUnit}>g</Text>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setFatG, fatG, 5, 5)}
             >
@@ -242,7 +246,7 @@ export default function GoalsReviewScreen() {
         </View>
       </View>
 
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={[styles.saveButton, saving && styles.buttonDisabled]}
         onPress={handleSaveAndContinue}
         disabled={saving}
@@ -263,7 +267,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: 24,
+    ...layout.narrowPage,
     paddingBottom: 48,
   },
   header: {
@@ -332,9 +336,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   mainValueContainer: {
+    flex: 1,
+    minWidth: 0,
     alignItems: "center",
   },
   mainValueText: {
+    width: 100,
+    minWidth: 0,
     fontSize: 34,
     fontWeight: "800",
     color: colors.text,
@@ -357,6 +365,8 @@ const styles = StyleSheet.create({
   },
   ratioLabelsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
     justifyContent: "space-between",
     marginBottom: 24,
   },
@@ -374,6 +384,8 @@ const styles = StyleSheet.create({
   },
   macroRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 12,
