@@ -57,3 +57,17 @@ La evidencia privada está en `supabase/.private/latest-backup-verification.json
 No hay una copia externa automática configurada ni puntos de recuperación del proveedor disponibles. La clave de la copia local está protegida mediante Windows DPAPI para el usuario actual: para recuperar en otro equipo hay que conservar el perfil Windows o exportar de forma segura la clave a un gestor externo. La copia local no sustituye una estrategia de respaldo externo periódico.
 
 La prueba de base aislada no equivale a levantar toda la infraestructura administrada de Supabase: no valida ejecución de sus extensiones de mantenimiento, servicio Auth, SMTP ni el servicio Storage. Las pruebas anteriores de cuentas y almacenamiento se documentan en el [informe de seguridad](seguridad-cuentas-2026-10-07.md).
+
+## Git y Vercel
+
+Los cambios de código se subieron a `main` en [GitHub](https://github.com/barvaro0411/Nutricionapp), commit `4808ab5b760680b6d83861db67357601fb896e55`.
+
+Se compiló en Vercel sin reutilizar la caché. El registro de instalación confirmó los cinco parches y aprobó `check:tooling` antes de compilar. El despliegue se verificó y luego se promovió al dominio público:
+
+- [Aplicación publicada](https://dist-two-alpha-18.vercel.app).
+- [Despliegue verificado](https://nutricionapp-3zjgorozo-barvaro0411s-projects.vercel.app), estado `READY`, identificador `dpl_7hFnvpk2zsdgrU2aTMs8tQo4SrGc`.
+- Proyecto existente `nutricionapp`, `prj_xpMJ7iR8zkdkYGjWdZTa3yAfRAnD`; propietario, commit y destino comprobados mediante la API.
+- El alias público apunta a ese mismo despliegue. Pasaron las comprobaciones de HTTPS, cabeceras, JavaScript idéntico al compilado localmente, manifest, service worker y rutas directas.
+- Cero valores de claves privadas encontrados en 58 archivos compilados y los diez archivos preparados para Git. Respaldos, claves y evidencias privadas excluidos del código publicado.
+
+La actualización de este informe se guarda en un commit posterior de documentación; no cambia los archivos de la aplicación desplegada.
