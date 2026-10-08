@@ -44,4 +44,14 @@ La [auditoría de seguridad](seguridad-cuentas-2026-10-07.md) documenta aislamie
 
 ## Publicación
 
-Proyecto Vercel existente: `nutricionapp`, identificador `prj_xpMJ7iR8zkdkYGjWdZTa3yAfRAnD`. Dominio de producción asociado: https://dist-two-alpha-18.vercel.app. El despliegue se verifica antes de asignarle el dominio; el resultado de esa comprobación se registra al terminar la publicación.
+Publicado en el proyecto Vercel existente `nutricionapp`, identificador `prj_xpMJ7iR8zkdkYGjWdZTa3yAfRAnD`, sin modificar otros proyectos.
+
+- **Producción:** https://dist-two-alpha-18.vercel.app.
+- **Despliegue verificado:** https://nutricionapp-oq9ywdea0-barvaro0411s-projects.vercel.app, estado `READY`, identificador `dpl_BZvxpUAsc4AAAvFPZDjej9hcgxKy`.
+- **Código:** commit `493afc9f27e08ce37209d1e3cf7c236c50ee9e0c`, subido a `main` en https://github.com/barvaro0411/Nutricionapp.
+
+Se creó un despliegue de producción sin asignar el dominio, se ejecutaron allí los 13 grupos de pruebas de navegador y después se promovió ese mismo despliegue. El dominio público apunta al nuevo despliegue. Su archivo JavaScript coincide byte por byte con el archivo probado localmente: 2.537.929 bytes sin comprimir, 665.581 bytes con gzip local. Se comprobaron HTTPS, cabeceras de protección, caché de recursos, manifest, service worker y acceso directo a rutas de la aplicación.
+
+En el dominio público se comprobó la instalación y el control del service worker actual, 26 recursos estáticos en caché sin respuestas de Auth/REST/Storage, apertura del formulario de acceso sin conexión y reconexión posterior. Esta prueba comprueba la disponibilidad de la interfaz precargada; guardar registros y usar IA sigue requiriendo conexión. No hubo errores JavaScript sin capturar.
+
+La revisión final de Supabase mantuvo 21 tablas con RLS, fotos privadas, perfiles y suscripciones completos, cero diferencias de totales y cero referencias rotas a fotos. Los datos originales respaldados de las cinco tablas comprobadas se conservaron tras limpiar las cuentas temporales. Las credenciales, respaldos privados y artefactos de diagnóstico quedaron excluidos de Git y del despliegue.
