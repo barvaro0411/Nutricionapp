@@ -31,11 +31,14 @@ import {
   Star,
   Target,
   HelpCircle,
+  Plus,
+  ArrowUpRight,
 } from "lucide-react-native";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useWaterTracker } from "@/hooks/useWaterTracker";
 import { useActivitySync } from "@/hooks/useActivitySync";
 import { CalorieHero } from "@/components/dashboard/CalorieHero";
+import { DayStrip } from "@/components/dashboard/DayStrip";
 import { MacroProgressBar } from "@/components/dashboard/MacroProgressBar";
 import { MealCard } from "@/components/dashboard/MealCard";
 import { WaterCard } from "@/components/dashboard/WaterCard";
@@ -56,7 +59,9 @@ import { MealType } from "@/types/meal";
 export default function DashboardScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ date?: string }>();
-  const wide = useWindowDimensions().width >= 820;
+  const { width } = useWindowDimensions();
+  const wide = width >= 820;
+  const compact = width < 380;
   const { profile } = useAuthStore();
   const { data: personalPlan } = usePersonalPlan();
   const beginMeal = () => {
@@ -115,6 +120,7 @@ export default function DashboardScreen() {
     <>
       <OfflineBanner />
       <ScrollView
+        testID="dashboard-scroll"
         style={styles.container}
         contentContainerStyle={styles.content}
         refreshControl={
@@ -129,7 +135,8 @@ export default function DashboardScreen() {
         {/* Encabezado con Saludo, Guía y Racha */}
         <View style={styles.topHeader}>
           <View style={styles.greetingWrap}>
-            <Text style={styles.greetingTitle}>
+            <Text style={styles.greetingEyebrow}>TU DIARIO PERSONAL</Text>
+            <Text accessibilityRole="header" style={styles.greetingTitle}>
               {profile?.full_name
                 ? `Hola, ${profile.full_name.split(" ")[0]}`
                 : "Tu espacio de bienestar"}
@@ -144,6 +151,7 @@ export default function DashboardScreen() {
               onPress={() => setShowGuideModal(true)}
               activeOpacity={0.8}
               accessibilityLabel="¿Cómo funciona la app?"
+              accessibilityRole="button"
             >
               <HelpCircle size={18} color={colors.primary} />
             </TouchableOpacity>
@@ -153,6 +161,7 @@ export default function DashboardScreen() {
 
         {/* Navegador de Fecha */}
         <View style={styles.dateSelector}>
+          <View style={styles.dateRow}>
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Día anterior"
@@ -190,6 +199,8 @@ export default function DashboardScreen() {
               color={isToday ? colors.textMuted : colors.text}
             />
           </TouchableOpacity>
+          </View>
+          <DayStrip date={selectedDate} onSelect={setSelectedDate} />
         </View>
 
         {isLoading ? (
@@ -205,6 +216,12 @@ export default function DashboardScreen() {
           />
         ) : (
           <>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir comida a este día" activeOpacity={0.85}
+              onPress={() => handleAddMeal("almuerzo")} style={styles.addMealAction}>
+              <View style={styles.addMealIcon}><Plus size={21} color="white" /></View>
+              <View style={styles.addMealCopy}><Text style={styles.addMealTitle}>Añadir comida</Text><Text style={styles.addMealDescription}>Busca, escribe o fotografía tu plato</Text></View>
+              <ArrowUpRight size={21} color={colors.primary} />
+            </TouchableOpacity>
             <View style={[styles.summaryLayout, wide && styles.summaryWide]}>
               <View style={styles.summaryMain}>
                 {/* Calorie Hero Dinámico con Calorías de Ejercicio */}
@@ -356,9 +373,11 @@ export default function DashboardScreen() {
                   </>
                 )}
                 {/* Banner Destacado: Coach Nutricional IA y Recetas (Fase 3) */}
-                <View style={styles.assistantBannersRow}>
+                <View style={[styles.assistantBannersRow, (compact || wide) && styles.assistantBannersStack]}>
                   <TouchableOpacity
                     style={styles.coachBanner}
+                    accessibilityRole="button"
+                    accessibilityLabel="Hablar con el coach"
                     onPress={() => router.push("/coach")}
                     activeOpacity={0.85}
                   >
@@ -376,6 +395,8 @@ export default function DashboardScreen() {
 
                   <TouchableOpacity
                     style={styles.recipesBanner}
+                    accessibilityRole="button"
+                    accessibilityLabel="Explorar recetas"
                     onPress={() => router.push("/recipes")}
                     activeOpacity={0.85}
                   >
@@ -433,7 +454,10 @@ export default function DashboardScreen() {
             </View>
 
             {/* Comidas del Día */}
-            <Text style={styles.mealsHeaderTitle}>Comidas del Día</Text>
+            <View style={styles.mealsHeading}>
+              <View><Text accessibilityRole="header" style={styles.mealsHeaderTitle}>Tus comidas</Text><Text style={styles.mealsDescription}>{data?.meals.length || 0} {(data?.meals.length || 0) === 1 ? "comida registrada" : "comidas registradas"} en este día</Text></View>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tendencias de alimentación" onPress={() => router.push("/(tabs)/history")} style={styles.progressLink}><Text style={styles.progressLinkText}>Ver progreso</Text><ArrowUpRight size={16} color={colors.primary} /></TouchableOpacity>
+            </View>
 
             <View style={styles.mealGrid}>
               {(["desayuno", "almuerzo", "cena", "snack"] as MealType[]).map(
@@ -564,6 +588,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
   },
+  greetingEyebrow: { fontSize: 9, letterSpacing: 1.6, fontWeight: "700", color: colors.primary, marginBottom: 7 },
   greetingTitle: {
     fontSize: 28,
     fontWeight: "800",
@@ -577,18 +602,25 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   dateSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    paddingVertical: 10,
+    borderRadius: 24,
+    paddingVertical: 12,
     paddingHorizontal: 14,
-    marginBottom: 14,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     ...shadows.card,
   },
+  dateRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  addMealAction: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, backgroundColor: colors.primaryLight, borderRadius: 18, marginBottom: 20, borderWidth: 1, borderColor: "#D3EADB" },
+  addMealIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  addMealCopy: { flex: 1, minWidth: 0 },
+  addMealTitle: { color: colors.primaryDark, fontSize: 15, fontWeight: "800" },
+  addMealDescription: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 3 },
+  mealsHeading: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 14, marginBottom: 18 },
+  mealsDescription: { color: colors.textSecondary, fontSize: 12, marginTop: 5 },
+  progressLink: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8 },
+  progressLinkText: { color: colors.primary, fontSize: 12, fontWeight: "700" },
   dateArrow: {
     width: 44,
     height: 44,
@@ -634,8 +666,12 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 14,
   },
+  assistantBannersStack: {
+    flexDirection: "column",
+  },
   coachBanner: {
     flex: 1,
+    minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -668,6 +704,7 @@ const styles = StyleSheet.create({
   },
   recipesBanner: {
     flex: 1,
+    minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -770,14 +807,10 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   mealsHeaderTitle: {
-    fontSize: 11,
+    fontSize: 21,
     fontWeight: "800",
-    color: colors.textSecondary,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    marginTop: 8,
-    marginBottom: 12,
-    marginLeft: 2,
+    color: colors.text,
+    letterSpacing: -0.5,
   },
   bottomSpacer: {
     height: 40,

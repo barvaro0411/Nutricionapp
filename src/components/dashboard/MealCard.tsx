@@ -115,6 +115,8 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardP
               style={styles.mealBlock}
               onPress={() => onMealPress && onMealPress(meal)}
               activeOpacity={0.7}
+              disabled={!onMealPress}
+              accessibilityRole={onMealPress ? "button" : undefined}
             >
               {meal.items.map((item) => (
                 <View key={item.id} style={styles.itemRow}>
@@ -122,8 +124,8 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardP
                     <View style={styles.itemBullet} />
                     <Text style={styles.itemName} numberOfLines={1}>
                       {item.food_name}
-                      {item.nutrition_reference ? " · USDA" : ""}
                     </Text>
+                    {item.nutrition_reference && <View style={styles.sourceBadge}><Text style={styles.sourceText}>USDA</Text></View>}
                   </View>
                   <View style={styles.itemMetrics}>
                     <View style={styles.quantityTag}>
@@ -161,8 +163,8 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardP
 const styles = StyleSheet.create({
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
-    padding: 16,
+    borderRadius: 24,
+    padding: 18,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     ...shadows.card,
@@ -172,6 +174,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 8,
   },
   headerLeft: {
     flexDirection: "row",
@@ -188,6 +191,7 @@ const styles = StyleSheet.create({
   },
   titleWrapper: {
     flex: 1,
+    minWidth: 0,
   },
   title: {
     fontSize: 15.5,
@@ -200,6 +204,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     marginTop: 4,
+    flexWrap: "wrap",
   },
   macroPill: {
     flexDirection: "row",
@@ -249,6 +254,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#DCFCE7",
+    minHeight: 44,
   },
   addBtnText: {
     fontSize: 12,
@@ -267,8 +273,10 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 6,
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingVertical: 10,
   },
   itemNameWrap: {
     flexDirection: "row",
@@ -276,6 +284,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
     gap: 8,
+    minWidth: 120,
+    flexWrap: "wrap",
   },
   itemBullet: {
     width: 4,
@@ -288,6 +298,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "600",
     flex: 1,
+    minWidth: 0,
   },
   itemMetrics: {
     flexDirection: "row",
@@ -318,6 +329,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingTop: 10,
     marginTop: 2,
+    minHeight: 44,
   },
   addMoreIconWrap: {
     width: 20,
@@ -332,4 +344,6 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
     fontWeight: "700",
   },
+  sourceBadge: { backgroundColor: colors.primaryLight, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
+  sourceText: { color: colors.primaryDark, fontSize: 8, fontWeight: "800" },
 });

@@ -17,7 +17,7 @@ export const colors = {
   fatLight: "#F0F9FF",
 
   // Hidratación
-  water: "#0284C7",
+  water: "#036FA2",
   waterLight: "#F0F9FF",
   waterTrack: "#E0F2FE",
 
@@ -31,7 +31,7 @@ export const colors = {
   // Tipografía
   text: "#17352C",
   textSecondary: "#586B63",
-  textMuted: "#6E8077",
+  textMuted: "#64746B",
 
   // Estados
   danger: "#C33F49",

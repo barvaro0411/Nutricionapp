@@ -17,7 +17,10 @@ function MacroCard({ label, consumed, goal, color, lightBg }: MacroCardProps) {
   const isComplete = progressPct >= 100;
 
   return (
-    <View style={styles.macroCard} accessible accessibilityLabel={`${label}: ${Math.round(consumed)} de ${goal} gramos`}>
+    <View style={[styles.macroCard, { backgroundColor: lightBg }]} accessible accessibilityRole="progressbar"
+      accessibilityLabel={`${label}: ${Math.round(consumed)} de ${goal} gramos`}
+      accessibilityValue={{ min: 0, max: goal, now: Math.min(consumed, goal) }}
+      aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.min(consumed, goal)}>
       <View style={styles.macroHeader}>
         <View style={styles.headerLeft}>
           <View style={[styles.haloDot, { backgroundColor: lightBg }]}>
@@ -25,15 +28,12 @@ function MacroCard({ label, consumed, goal, color, lightBg }: MacroCardProps) {
           </View>
           <Text style={styles.macroName}>{label}</Text>
         </View>
-        <View style={[styles.pctBadge, { backgroundColor: lightBg }]}>
-          <Text style={[styles.pctText, { color }]}>{progressPct}%</Text>
-        </View>
       </View>
 
       <View style={styles.numberRow}>
-        <Text style={styles.consumedNumber}>{Math.round(consumed)}</Text>
-        <Text style={styles.goalNumber}>/{goal}g</Text>
+        <Text style={styles.consumedNumber} numberOfLines={1} adjustsFontSizeToFit>{Math.round(consumed)}<Text style={styles.numberUnit}> g</Text></Text>
       </View>
+      <Text style={styles.goalNumber}>Meta {Math.round(goal)} g</Text>
 
       {/* Barra de progreso moderna tipo cápsula */}
       <View style={styles.track}>
@@ -52,8 +52,8 @@ function MacroCard({ label, consumed, goal, color, lightBg }: MacroCardProps) {
         ]}
       >
         {isComplete
-          ? "Meta lista ✓"
-          : `${Math.round(remaining)}g faltan`}
+          ? "Meta alcanzada"
+          : `${Math.round(remaining)} g faltan`}
       </Text>
     </View>
   );
@@ -79,7 +79,7 @@ export function MacroProgressBar({
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.sectionOverline}>MACRONUTRIENTES</Text>
+        <Text accessibilityRole="header" style={styles.sectionOverline}>Tus nutrientes</Text>
       </View>
 
       <View style={styles.grid}>
@@ -121,10 +121,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   sectionOverline: {
-    fontSize: 11,
+    fontSize: 15,
     fontWeight: "800",
-    color: colors.textSecondary,
-    letterSpacing: 0.8,
+    letterSpacing: -0.3,
+    color: colors.text,
   },
   grid: {
     flexDirection: "row",
@@ -134,8 +134,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 13,
+    borderRadius: 18,
+    padding: 12,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     ...shadows.card,
@@ -171,32 +171,26 @@ const styles = StyleSheet.create({
     color: colors.text,
     letterSpacing: -0.2,
   },
-  pctBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  pctText: {
-    fontSize: 10,
-    fontWeight: "800",
-  },
   numberRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "baseline",
-    marginBottom: 8,
+    marginBottom: 2,
   },
   consumedNumber: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: "900",
     color: colors.text,
     letterSpacing: -0.8,
+    flex: 1,
+    minWidth: 0,
   },
+  numberUnit: { fontSize: 12, fontWeight: "500", color: colors.textSecondary },
   goalNumber: {
     fontSize: 11.5,
     fontWeight: "600",
     color: colors.textMuted,
-    marginLeft: 2,
+    marginBottom: 12,
   },
   track: {
     height: 6,

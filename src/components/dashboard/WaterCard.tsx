@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
-import { Droplets, Plus } from "lucide-react-native";
+import { Droplets, Plus, GlassWater } from "lucide-react-native";
 import { colors, shadows } from "@/constants/colors";
 
 interface WaterCardProps {
@@ -21,8 +21,8 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
           <View style={styles.iconWrap}>
             <Droplets size={16} color={colors.water} />
           </View>
-          <View>
-            <Text style={styles.overline}>HIDRATACIÓN</Text>
+          <View style={styles.headerCopy}>
+            <Text accessibilityRole="header" style={styles.overline}>Tu hidratación</Text>
             <Text style={styles.valueText}>
               {totalMl.toLocaleString("es-CL")}{" "}
               <Text style={styles.targetText}>/ {safeTarget.toLocaleString("es-CL")} ml</Text>
@@ -36,8 +36,17 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
       </View>
 
       {/* Barra de progreso de agua */}
-      <View style={styles.track}>
-        <View style={[styles.fill, { width: `${progressPct}%` }]} />
+      <View style={styles.waterVisual}>
+        <View style={styles.glass} accessible accessibilityRole="progressbar" accessibilityLabel="Agua registrada"
+          accessibilityValue={{ min: 0, max: safeTarget, now: Math.min(totalMl, safeTarget), text: totalMl + " de " + safeTarget + " mililitros" }}
+          aria-valuemin={0} aria-valuemax={safeTarget} aria-valuenow={Math.min(totalMl, safeTarget)}>
+          <View style={[styles.glassFill, { height: `${progressPct}%` }]} />
+          <View style={styles.glassIcon}><Droplets size={23} color={colors.water} /></View>
+        </View>
+        <View style={styles.waterCopy}><Text style={styles.waterMessage}>{totalMl >= safeTarget ? "Meta de agua alcanzada" : "Un vaso a la vez"}</Text>
+          <Text style={styles.waterDescription}>{totalMl >= safeTarget ? "Tu registro de agua está al día." : `${Math.max(0, safeTarget - totalMl).toLocaleString("es-CL")} ml para tu meta`}</Text>
+          <View style={styles.track}><View style={[styles.fill, { width: `${progressPct}%` }]} /></View>
+        </View>
       </View>
 
       {/* Botones de acción rápida con estética moderna */}
@@ -50,9 +59,8 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
           accessibilityRole="button"
           accessibilityLabel="Añadir 250 ml de agua"
         >
-          <Plus size={12} color={colors.water} />
-          <Text style={styles.pillText}>250 ml</Text>
-          <Text style={styles.pillSubtext}>Vaso</Text>
+          <GlassWater size={16} color={colors.water} />
+          <View><Text style={styles.pillText}>250 ml</Text><Text style={styles.pillSubtext}>Añadir un vaso</Text></View>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -63,9 +71,8 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
           accessibilityRole="button"
           accessibilityLabel="Añadir 500 ml de agua"
         >
-          <Plus size={12} color={colors.water} />
-          <Text style={styles.pillText}>500 ml</Text>
-          <Text style={styles.pillSubtext}>Botella</Text>
+          <Plus size={16} color={colors.water} />
+          <View><Text style={styles.pillText}>500 ml</Text><Text style={styles.pillSubtext}>Añadir botella</Text></View>
         </TouchableOpacity>
 
         {loading && (
@@ -98,6 +105,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flex: 1,
+    minWidth: 0,
   },
   iconWrap: {
     width: 38,
@@ -109,11 +118,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E0F2FE",
   },
+  headerCopy: { flex: 1, minWidth: 0 },
   overline: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "800",
-    color: colors.textSecondary,
-    letterSpacing: 0.8,
+    color: colors.text,
+    letterSpacing: -0.2,
   },
   valueText: {
     fontSize: 20,
@@ -141,11 +151,11 @@ const styles = StyleSheet.create({
     color: colors.water,
   },
   track: {
-    height: 8,
+    height: 5,
     backgroundColor: "#E0F2FE",
     borderRadius: 4,
     overflow: "hidden",
-    marginBottom: 14,
+    marginTop: 12,
   },
   fill: {
     height: "100%",
@@ -156,17 +166,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     alignItems: "center",
+    flexWrap: "wrap",
   },
   pillBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 10,
+    minHeight: 52,
     borderRadius: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.waterLight,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    gap: 5,
+    gap: 8,
   },
   pillText: {
     fontSize: 12,
@@ -181,4 +194,11 @@ const styles = StyleSheet.create({
   loadingWrap: {
     marginLeft: 6,
   },
+  waterVisual: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 18 },
+  glass: { width: 52, height: 68, borderRadius: 14, borderWidth: 2, borderColor: "#BAE6FD", backgroundColor: colors.waterLight, overflow: "hidden", justifyContent: "flex-end" },
+  glassFill: { width: "100%", backgroundColor: "#BAE6FD", borderTopLeftRadius: 8, borderTopRightRadius: 8 },
+  glassIcon: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, alignItems: "center", justifyContent: "center" },
+  waterCopy: { flex: 1, minWidth: 0 },
+  waterMessage: { color: colors.text, fontSize: 13, fontWeight: "700" },
+  waterDescription: { fontSize: 11, color: colors.textSecondary, marginTop: 5, lineHeight: 17 },
 });

@@ -28,3 +28,7 @@ Guía centralizada de documentación técnica y operativa del proyecto.
 ## 7. Progreso y Registro de Alimentos
 
 - **[Progreso y Alimentos (2026-10-09)](progress-food-release-2026-10-09.md)**: Periodos de 7 y 30 días, tendencias por nutriente, búsqueda USDA con vista previa de porciones y registro manual desde etiquetas.
+
+## 8. Diseño de Inicio y Navegación
+
+- **[Inicio y Navegación (2026-10-09)](frontend-polish-release-2026-10-09.md)**: Selector semanal, acceso directo a alimentos, resumen de energía y nutrientes, hidratación visual y navegación adaptable.

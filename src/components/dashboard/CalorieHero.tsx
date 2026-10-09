@@ -6,9 +6,9 @@ import {
   Pressable,
   useWindowDimensions,
 } from "react-native";
-import Svg, { Circle, G } from "react-native-svg";
+import Svg, { Circle, G, Path } from "react-native-svg";
 import { ArrowUpRight, Flame, Target, Utensils } from "lucide-react-native";
-import { colors } from "@/constants/colors";
+import { colors, shadows } from "@/constants/colors";
 
 interface CalorieHeroProps {
   goal: number;
@@ -35,15 +35,19 @@ export function CalorieHero({
   const circumference = 2 * Math.PI * radius;
   return (
     <View style={styles.card}>
+      <View style={styles.decoration} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+        <Svg width={270} height={270} viewBox="0 0 270 270"><Circle cx={135} cy={135} r={110} fill="none" stroke={colors.mint} strokeWidth={1} /><Circle cx={135} cy={135} r={85} fill="none" stroke={colors.mint} strokeWidth={1} /><Path d="M80 200 Q80 80 200 65 Q210 185 80 200 M80 200 L200 65" fill="none" stroke={colors.mint} strokeWidth={2} /></Svg>
+      </View>
       <View style={styles.header}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.overline}>TU BALANCE DIARIO</Text>
-          <Text style={styles.title}>Cada registro cuenta.</Text>
+          <Text accessibilityRole="header" style={styles.title}>Tu energía del día</Text>
         </View>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>
             {Math.round((consumed / budget) * 100)}%
           </Text>
+          <Text style={styles.badgeLabel}>registrado</Text>
         </View>
       </View>
       <View style={styles.main}>
@@ -61,6 +65,10 @@ export function CalorieHero({
               Math.round(budget) +
               " kilocalorías",
           }}
+          aria-valuemin={0}
+          aria-valuemax={Math.round(budget)}
+          aria-valuenow={Math.round(Math.min(consumed, budget))}
+          aria-valuetext={`${Math.round(consumed)} de ${Math.round(budget)} kilocalorías`}
         >
           <Svg width={size} height={size}>
             <G rotation="-90" origin={center + ", " + center}>
@@ -154,10 +162,13 @@ export function CalorieHero({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.forest,
-    borderRadius: 26,
-    padding: 20,
+    borderRadius: 28,
+    padding: 22,
     marginBottom: 18,
+    overflow: "hidden",
+    ...shadows.card,
   },
+  decoration: { position: "absolute", top: -96, right: -96, opacity: 0.12 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -184,7 +195,8 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 12,
   },
-  badgeText: { color: colors.mint, fontWeight: "700", fontSize: 12 },
+  badgeText: { color: colors.mint, fontWeight: "800", fontSize: 15, textAlign: "center" },
+  badgeLabel: { color: "#CEE1D6", fontSize: 9, marginTop: 3 },
   main: {
     flexDirection: "row",
     alignItems: "center",
