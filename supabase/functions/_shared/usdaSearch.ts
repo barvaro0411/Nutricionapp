@@ -5,6 +5,7 @@ import { z } from "zod";
 import { enrichReviewedWithUsda, readUsdaMacros } from "./usda.ts";
 import type { Macros, UsdaFood, UsdaNutritionReference, EnrichedMealItem } from "./usda.ts";
 import type { MealItem } from "../analyze-meal/types.ts";
+import { scaleNutrition } from "./nutritionMath.ts";
 
 const DATA_TYPES = ["Foundation", "SR Legacy", "Survey (FNDDS)"];
 export interface UsdaCandidate { fdcId: number; description: string; dataType: string }
@@ -78,14 +79,17 @@ export function createUsdaSearch(options: { apiKey: () => string | undefined; fe
   const now = options.now || Date.now;
   const cache = new Map<string, { value: unknown; expires: number }>();
   const pending = new Map<string, Promise<unknown>>();
+  const referenceCache = new Map<number, { food: UsdaFood; expires: number }>();
+  const pendingReferences = new Map<number, Promise<void>>();
   let unavailableUntil = 0;
   async function request(path: string, body: unknown): Promise<unknown> {
     const key = options.apiKey()?.trim();
-    if (!key || now() < unavailableUntil) return null;
+    if (!key) return null;
     const cacheKey = path + JSON.stringify(body);
     const cached = cache.get(cacheKey);
     if (cached && cached.expires > now()) return cached.value;
     if (pending.has(cacheKey)) return pending.get(cacheKey);
+    if (now() < unavailableUntil) return null;
     const task = (async () => {
       let value: unknown = null;
       try {
@@ -97,8 +101,11 @@ export function createUsdaSearch(options: { apiKey: () => string | undefined; fe
         else unavailableUntil = now() + (response.status === 429 ? 3600000 : 60000);
       } catch { unavailableUntil = now() + 60000; }
       // Bound memory and suppress repeated misses/outages. Credentials are never cached or logged.
-      if (cache.size >= 300) cache.delete(cache.keys().next().value!);
-      cache.set(cacheKey, { value, expires: now() + (value ? 86400000 : 60000) });
+      // Details are cached only after validation, by ID, instead of retaining full raw batches.
+      if (path !== "foods") {
+        if (cache.size >= 300) cache.delete(cache.keys().next().value!);
+        cache.set(cacheKey, { value, expires: now() + (value ? 86400000 : 60000) });
+      }
       return value;
     })();
     pending.set(cacheKey, task);
@@ -118,19 +125,35 @@ export function createUsdaSearch(options: { apiKey: () => string | undefined; fe
     async details(ids: number[]): Promise<Map<number, UsdaFood>> {
       const unique = [...new Set(ids)].filter(id => Number.isSafeInteger(id) && id > 0).slice(0, 100);
       const foods = new Map<number, UsdaFood>();
+      if (!options.apiKey()?.trim()) return foods;
+      const missing = unique.filter(id => (referenceCache.get(id)?.expires || 0) <= now() && !pendingReferences.has(id));
       // FoodData Central permits at most 20 IDs per details request.
-      for (let offset = 0; offset < unique.length; offset += 60) {
-        const batches = [0, 20, 40].map(start => unique.slice(offset + start, offset + start + 20)).filter(batch => batch.length);
-        const responses = await Promise.all(batches.map(batch => request("foods", { fdcIds: batch, format: "full" })));
-        for (let index = 0; index < responses.length; index++) {
-          const response = responses[index];
-          if (!Array.isArray(response)) continue;
-          for (const food of response as UsdaFood[]) {
-            if (food && typeof food === "object" && food.fdcId && batches[index].includes(food.fdcId)
-              && typeof food.description === "string" && food.description.length <= 500 && DATA_TYPES.includes(food.dataType || "")
-              && readUsdaMacros(food)) foods.set(food.fdcId, food);
-          }
-        }
+      for (let offset = 0; offset < missing.length; offset += 60) {
+        const batches = [0, 20, 40].map(start => missing.slice(offset + start, offset + start + 20)
+          .filter(id => (referenceCache.get(id)?.expires || 0) <= now() && !pendingReferences.has(id))).filter(batch => batch.length);
+        const tasks = batches.map(batch => {
+          // Publish each ID's pending work before yielding to another request.
+          const task = (async () => {
+            const response = await request("foods", { fdcIds: [...batch].sort((a, b) => a - b), format: "full" });
+            if (!Array.isArray(response)) return;
+            for (const food of response as UsdaFood[]) {
+              if (food && typeof food === "object" && food.fdcId && batch.includes(food.fdcId)
+                && typeof food.description === "string" && food.description.length > 0 && food.description.length <= 500 && DATA_TYPES.includes(food.dataType || "")
+                && readUsdaMacros(food)) {
+                if (referenceCache.size >= 300 && !referenceCache.has(food.fdcId)) referenceCache.delete(referenceCache.keys().next().value!);
+                referenceCache.set(food.fdcId, { food: structuredClone(food), expires: now() + 86400000 });
+              }
+            }
+          })().finally(() => { for (const id of batch) pendingReferences.delete(id); });
+          for (const id of batch) pendingReferences.set(id, task);
+          return task;
+        });
+        await Promise.all(tasks);
+      }
+      await Promise.all(unique.map(id => pendingReferences.get(id)));
+      for (const id of unique) {
+        const cached = referenceCache.get(id);
+        if (cached && cached.expires > now()) foods.set(id, structuredClone(cached.food));
       }
       return foods;
     },
@@ -200,8 +223,7 @@ export async function enrichWithUsda(items: MealItem[], geminiKey?: string): Pro
       if (!food || food.description !== candidate.description || food.dataType !== candidate.dataType) continue;
       const reference = asSearchFood(food, item.unit);
       if (!reference) continue;
-      const scale = (value: number) => Math.round(value * item.grams / 100 * 10) / 10;
-      const macros = { calories: scale(reference.per100.calories), protein: scale(reference.per100.protein), carbs: scale(reference.per100.carbs), fat: scale(reference.per100.fat) };
+      const macros = scaleNutrition(reference.per100, item.grams);
       if (macros.calories > 50000 || [macros.protein, macros.carbs, macros.fat].some(value => value > 10000)) continue;
       reviewed[positions[index]] = { ...item, ...macros, nutrition_reference: reference.nutrition_reference };
     }

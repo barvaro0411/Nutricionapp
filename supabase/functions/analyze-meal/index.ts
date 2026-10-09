@@ -8,6 +8,7 @@ import { ApiError, authenticate, errorResponse, json, methodResponse, readBody, 
 import { getGeminiKey } from "../_shared/gemini.ts";
 import { resolveItemUnit } from "../_shared/liquidUnits.ts";
 import { enrichWithUsda } from "../_shared/usdaSearch.ts";
+import { sumNutrition } from "../_shared/nutritionMath.ts";
 import type { VisionProvider } from "./providers/provider.interface.ts";
 
 export async function handleRequest(req: Request) {
@@ -50,10 +51,7 @@ export async function handleRequest(req: Request) {
       unit: resolveItemUnit(item),
     }));
     const items = mode === "nutrition_label" ? normalizedItems : await enrichWithUsda(normalizedItems, geminiKey);
-    const totals = items.reduce((acc, item) => ({
-      calories: acc.calories + item.calories, protein: acc.protein + item.protein,
-      carbs: acc.carbs + item.carbs, fat: acc.fat + item.fat,
-    }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+    const totals = sumNutrition(items);
     return json({ success: true, data: { ...analysis.data, items, totals }, meta: {
       provider_used: analysis.providerName, tokens_prompt: analysis.tokensPrompt,
       tokens_completion: analysis.tokensCompletion, latency_ms: Date.now() - start,

@@ -6,6 +6,7 @@ import { generateText, optionalGeminiKey, withAiFallback } from "../_shared/aiRo
 import { transcribeGroq } from "../_shared/groq.ts";
 import { resolveItemUnit } from "../_shared/liquidUnits.ts";
 import { enrichWithUsda } from "../_shared/usdaSearch.ts";
+import { sumNutrition } from "../_shared/nutritionMath.ts";
 
 export async function handleRequest(req: Request) {
   const method = methodResponse(req);
@@ -56,10 +57,7 @@ export async function handleRequest(req: Request) {
       unit: resolveItemUnit(item),
     }));
     const items = await enrichWithUsda(normalizedItems, key);
-    const totals = items.reduce((acc, item) => ({
-      calories: acc.calories + item.calories, protein: acc.protein + item.protein,
-      carbs: acc.carbs + item.carbs, fat: acc.fat + item.fat,
-    }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+    const totals = sumNutrition(items);
     return json({ success: true, data: { ...output.data, items, totals }, meta: { provider_used: result.model,
       ...(transcriptionProvider ? { transcription_provider: transcriptionProvider } : {}), latency_ms: Date.now() - start } }, 200, req);
   } catch (error) { return errorResponse(error, req); }

@@ -1,5 +1,6 @@
 import type { MealItem } from "../analyze-meal/types.ts";
 import { findUsdaReference, USDA_REFERENCES } from "./usdaCatalog.ts";
+import { scaleNutrition } from "./nutritionMath.ts";
 
 export interface Macros { calories: number; protein: number; carbs: number; fat: number }
 export interface UsdaNutritionReference {
@@ -105,10 +106,7 @@ export function createUsdaEnricher(options: {
       const cached = id ? cache.get(id) : undefined;
       const data = cached && cached.expires > now() ? cached.data : null;
       if (!data) return item;
-      const portion = item.grams / 100;
-      const scale = (value: number) => Math.round(value * portion * 10) / 10;
-      const macros = { calories: scale(data.macros.calories), protein: scale(data.macros.protein),
-        carbs: scale(data.macros.carbs), fat: scale(data.macros.fat) };
+      const macros = scaleNutrition(data.macros, item.grams);
       // Keep the response within the same limits as the meal contracts.
       if (macros.calories > 50000 || [macros.protein, macros.carbs, macros.fat].some(value => value > 10000)) return item;
       return { ...item, ...macros, nutrition_reference: data.reference };

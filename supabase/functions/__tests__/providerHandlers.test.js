@@ -21,7 +21,7 @@ beforeEach(() => {
     auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: owner } }, error: null }) },
     rpc: jest.fn().mockResolvedValue({ data: { allowed: true }, error: null }),
     from: jest.fn(table => {
-      const query = { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), gte: jest.fn().mockReturnThis(), lt: jest.fn().mockReturnThis(), order: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), single: jest.fn().mockReturnThis(), maybeSingle: jest.fn().mockReturnThis(),
+      const query = { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), gte: jest.fn().mockReturnThis(), lt: jest.fn().mockReturnThis(), order: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), single: jest.fn().mockReturnThis(), maybeSingle: jest.fn().mockReturnThis(), returns: jest.fn().mockReturnThis(),
         then(resolve, reject) { return Promise.resolve({ data: tableData[table], error: null }).then(resolve, reject); },
         insert: jest.fn(async rows => { inserted.push(...rows); return { error: null }; }),
       }; queries.push({ table, query }); return query;
@@ -166,4 +166,50 @@ test('provider failure releases its claim without saving an incomplete response'
   expect(response.status).toBe(429);
   expect(client.rpc.mock.calls.map(([name]) => name)).toEqual(['begin_coach_request', 'reserve_ai_request', 'abandon_coach_request']);
   expect(inserted).toHaveLength(0);
+});
+
+test('simple calorie questions use exact recorded data with four reads and zero provider calls', async () => {
+  delete env.GROQ_API_KEY; delete env.GEMINI_API_KEY;
+  const response = await require('../nutrition-coach/index.ts').handleRequest(request({ message: '¿Cuántas calorías me quedan para mi meta de hoy?' }));
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.meta.model).toBe('nutrition-calculator');
+  expect(body.context.remainingCalories).toBe(1650);
+  expect(body.reply).toMatch(/1[., ]?650 calorías/);
+  expect(body.reply).toContain('actividad registradas');
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(queries.filter(q => q.query.select.mock.calls.length).map(q => q.table).sort()).toEqual(['activity_logs', 'goals', 'meals', 'personal_plans']);
+  expect(client.rpc).toHaveBeenCalledTimes(1); expect(inserted).toHaveLength(2);
+});
+
+test('new factual questions read updated meals while retries alone reuse saved replies', async () => {
+  const handler = require('../nutrition-coach/index.ts').handleRequest;
+  const ask = () => handler(request({ message: '¿Cuánta proteína me falta hoy?' }));
+  expect((await (await ask()).json()).reply).toContain('90 g de proteína');
+  tableData.meals[0].total_protein = 60;
+  expect((await (await ask()).json()).reply).toContain('60 g de proteína');
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+test('advice after a numerical question keeps AI, history and correctly recorded beverage units', async () => {
+  tableData.meals[0].meal_items.push({ food_name: 'Leche', grams: 250, unit: 'ml' });
+  fetchMock.mockResolvedValue(groqReply('Te propongo una cena con tus metas.'));
+  const response = await require('../nutrition-coach/index.ts').handleRequest(request({ message: '¿Cuántas calorías me quedan y qué puedo cenar?' }));
+  expect(response.status).toBe(200);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+  const context = JSON.parse(sent.messages[0].content.split('Contexto JSON: ')[1]);
+  expect(context.meals[0]).toMatchObject({ type: 'almuerzo', nutrients: { calories: 450, protein: 30 }, foods: [['Arroz', 150, 'g'], ['Leche', 250, 'ml']] });
+  expect(sent.messages.some(message => message.content === 'Consulta anterior')).toBe(true);
+  expect(queries.filter(q => q.query.select.mock.calls.length)).toHaveLength(7);
+});
+
+test('Sunday factual calculations preserve match-day goals and over-target balances', async () => {
+  tableData.personal_plans = { plan: { dailyGoals: { standard: { calories: 2000, proteinG: 120, carbsG: 250, fatG: 60 }, matchDay: { calories: 2400, proteinG: 140, carbsG: 300, fatG: 70 } } } };
+  const { loadCoachContext } = require('../_shared/coachContext.ts');
+  const loaded = await loadCoachContext(client, owner, new Date('2026-10-11T16:00:00Z'), 'nutrition');
+  expect(loaded.context.target.calories).toBe(2400);
+  expect(loaded.remaining.calories).toBe(2050);
+  tableData.meals[0].total_protein = 140.1;
+  expect((await loadCoachContext(client, owner, new Date('2026-10-11T16:00:00Z'), 'nutrition')).remaining.protein).toBe(-0.1);
 });

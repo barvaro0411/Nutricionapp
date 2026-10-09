@@ -4,6 +4,7 @@ import { generateText, optionalGeminiKey } from "../_shared/aiRouting.ts";
 import { loadCoachContext } from "../_shared/coachContext.ts";
 import { coachSystemInstruction } from "../_shared/coachPrompt.ts";
 import { claimCoachRequest } from "../_shared/coachRequest.ts";
+import { coachFactQuestion, coachFactReply } from "../_shared/coachFacts.ts";
 import type { ServerClient } from "../_shared/http.ts";
 const inputSchema = z.object({ message: z.string().trim().min(1).max(2000), request_id: z.string().uuid().optional(), client_time_iso: z.string().datetime({ offset: true }).optional() });
 export async function handleRequest(req: Request) {
@@ -20,10 +21,12 @@ export async function handleRequest(req: Request) {
       if (claim.response) return json({ ...claim.response, meta: { ...claim.response.meta, cached: true } }, 200, req);
       claimed = { client, userId: user.id, requestId: request_id, token: claim.token! };
     }
-    const { context, history, remaining, consumed, dateKey } = await loadCoachContext(client, user.id);
-    const key = await optionalGeminiKey(client);
+    const fact = coachFactQuestion(message);
+    const loaded = await loadCoachContext(client, user.id, new Date(), fact ? "nutrition" : "full");
+    const { context, history, remaining, consumed, dateKey } = loaded;
     await reserveAiRequest(client, user.id);
-    const result = await generateText({ task: "coach", geminiKey: key, temperature: 0.3, maxTokens: 1200, messages: [
+    const result = fact ? { text: coachFactReply(fact, loaded), model: "nutrition-calculator" }
+      : await generateText({ task: "coach", geminiKey: await optionalGeminiKey(client), temperature: 0.3, maxTokens: 1200, messages: [
       { role: "system", content: coachSystemInstruction(context) },
       ...history,
       { role: "user", content: message },

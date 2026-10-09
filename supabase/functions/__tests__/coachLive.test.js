@@ -11,7 +11,7 @@ beforeEach(() => {
   inserts = []; insertError = null;
   const data = { profiles: { objective: 'maintain' }, goals: { calories: 2000, protein_g: 120, carbs_g: 250, fat_g: 60 }, meals: [], coach_messages: [], personal_plans: null, activity_logs: null, water_logs: [] };
   client = { auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: owner } }, error: null }) }, rpc: jest.fn().mockResolvedValue({ data: { allowed: true } }), from: jest.fn(table => {
-    const q = { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), gte: jest.fn().mockReturnThis(), lt: jest.fn().mockReturnThis(), order: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), single: jest.fn().mockReturnThis(), maybeSingle: jest.fn().mockReturnThis(), then: (resolve, reject) => Promise.resolve({ data: data[table], error: null }).then(resolve, reject), insert: jest.fn(async rows => { inserts.push(...rows); return { error: insertError }; }) }; return q;
+    const q = { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), gte: jest.fn().mockReturnThis(), lt: jest.fn().mockReturnThis(), order: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), single: jest.fn().mockReturnThis(), maybeSingle: jest.fn().mockReturnThis(), returns: jest.fn().mockReturnThis(), then: (resolve, reject) => Promise.resolve({ data: data[table], error: null }).then(resolve, reject), insert: jest.fn(async rows => { inserts.push(...rows); return { error: insertError }; }) }; return q;
   }) };
   require('@supabase/supabase-js').createClient.mockReturnValue(client);
   global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ name: 'ephemeral-single-use-token' })));

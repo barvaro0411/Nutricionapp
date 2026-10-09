@@ -4,6 +4,7 @@ Las funciones distribuyen las modalidades entre Groq, Gemini y USDA. Las claves 
 
 | Trabajo | Principal | Respaldo |
 | --- | --- | --- |
+| Preguntas simples de calorías registradas/restantes o proteína restante | Cálculo del servidor con registros actuales | Las preguntas con consejos, condiciones o historial usan el coach de IA |
 | Coach con metas, comidas e historial | Groq `openai/gpt-oss-120b` | Gemini |
 | Conversación por voz en la web/PWA | Gemini `gemini-3.8-live`, con token temporal | Chat y lectura del dispositivo si la voz no está disponible |
 | Lectura de respuestas guardadas | Voz del navegador/dispositivo | Sin llamadas a IA |
@@ -17,8 +18,9 @@ El prefijo `openai/` en los modelos GPT-OSS identifica modelos abiertos ejecutad
 
 ## Paralelismo y ahorro
 
-- El coach obtiene perfil, metas, comidas, historial, plan, actividad y agua en paralelo. Envía contexto nutricional compacto y seis mensajes recientes, sin nombre ni identificadores de cuenta.
+- El coach obtiene perfil, metas, comidas, historial, plan, actividad y agua en paralelo para recomendaciones. Las preguntas numéricas explícitas cargan únicamente metas, totales de comidas, plan y actividad; no llaman a modelos. Una pregunta nueva consulta registros actuales, mientras un reintento con el mismo UUID recupera su respuesta original. El contexto de las recomendaciones conserva los seis mensajes recientes, nutrientes por comida y cada alimento/cantidad/unidad; su representación compacta no envía nombre ni identificadores de cuenta.
 - USDA busca dos formulaciones por alimento, deduplica búsquedas simultáneas y conserva caché acotada dentro de cada instancia. Obtiene detalles en hasta tres lotes concurrentes de veinte IDs.
+- Los detalles USDA se reutilizan por ID durante 24 horas, aunque cambie el orden o el lote solicitado. Los lotes simultáneos comparten las referencias en curso; los resultados incompletos o vencidos no se reutilizan como nutrientes válidos y cada consumidor recibe su propia copia. Los cálculos de porciones y totales comparten funciones verificadas; conservan la energía declarada por USDA/etiquetas y los saldos negativos cuando se supera una meta.
 - El buscador traduce etiquetas mientras USDA obtiene los nutrientes. Conserva las descripciones originales si falla esa traducción.
 - Cada consulta selecciona un proveedor y recurre al siguiente cuando falla; enviar la misma pregunta simultáneamente a todos duplicaría consumo. La transcripción precede a la extracción porque esta depende del texto obtenido.
 - El respaldo comparte un plazo total. Las claves Gemini reparten ese plazo para que una clave detenida deje tiempo a las siguientes. Errores 401, 403 y 429 permiten avanzar sin repetir la misma clave.
@@ -30,6 +32,8 @@ Se mantienen los controles de sesión, propiedad de imágenes, esquemas, prepara
 El coach envía un UUID por mensaje. La base guarda atómicamente ambos mensajes y su respuesta; un reintento de la misma consulta devuelve esa respuesta sin llamar a la IA ni reservar cuota nuevamente. Las consultas simultáneas con ese UUID reciben una indicación de espera. El resultado se conserva durante 24 horas y solo lo maneja el backend; las conversaciones continúan en su historial habitual.
 
 La etapa del coach animado y fiabilidad diaria está publicada: [versión y pruebas reales](coach-daily-release-2026-10-09.md).
+
+La siguiente etapa completa el ahorro de consultas y los cálculos del servidor: [implementación y verificaciones](nutrition-efficiency-release-2026-10-09.md).
 
 Las traducciones del buscador tienen caché acotada de seis horas y deduplicación concurrente. La traducción de consultas se aísla por usuario; las etiquetas de referencias públicas USDA pueden reutilizarse. Los fallos no se guardan en caché. El contador de la app distingue el límite de minuto del diario; el diario se renueva a medianoche en Chile y las respuestas incluyen el plazo para reintentar.
 

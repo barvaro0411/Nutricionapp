@@ -83,3 +83,38 @@ test('rate-limit cooldown, network failure and missing key do not leak credentia
   expect(await client.search('pasta')).toEqual([candidate()]);
   const missing=createUsdaSearch({apiKey:()=>undefined,fetcher}); expect(await missing.search('x')).toEqual([]); expect(fetcher).toHaveBeenCalledTimes(2);
 });
+
+test('overlapping and reordered batches reuse individual validated references', async () => {
+  const fetcher = jest.fn(async (_url, init) => new Response(JSON.stringify(JSON.parse(init.body).fdcIds.map(id => detail(id)))));
+  const client = createUsdaSearch({ apiKey: () => 'server-key', fetcher });
+  await client.details([1, 2]);
+  expect((await client.details([2, 1, 3])).size).toBe(3);
+  await client.details([3, 2, 1]);
+  expect(fetcher.mock.calls.map(([, init]) => JSON.parse(init.body).fdcIds)).toEqual([[1, 2], [3]]);
+});
+
+test('different concurrent batches fetch a common ID only once and callers cannot mutate cached nutrients', async () => {
+  const complete = [];
+  const fetcher = jest.fn((_url, init) => new Promise(resolve => complete.push(() => resolve(new Response(JSON.stringify(JSON.parse(init.body).fdcIds.map(id => detail(id))))))));
+  const client = createUsdaSearch({ apiKey: () => 'server-key', fetcher });
+  const first = client.details([1, 2]), second = client.details([2, 3]);
+  expect(fetcher.mock.calls.map(([, init]) => JSON.parse(init.body).fdcIds)).toEqual([[1, 2], [3]]);
+  complete.forEach(done => done());
+  const [a, b] = await Promise.all([first, second]);
+  expect(a.size).toBe(2); expect(b.size).toBe(2);
+  a.get(2).foodNutrients[0].amount = 999;
+  expect(readUsdaMacros((await client.details([2])).get(2)).calories).toBe(158);
+});
+
+test('expired references and incomplete nutrients cannot become reusable valid results', async () => {
+  let now = 1000;
+  const fetcher = jest.fn().mockResolvedValueOnce(new Response(JSON.stringify([detail(1)])))
+    .mockResolvedValueOnce(new Response(JSON.stringify([{ ...detail(1), foodNutrients: [] }])))
+    .mockResolvedValueOnce(new Response(JSON.stringify([detail(1)])));
+  const client = createUsdaSearch({ apiKey: () => 'server-key', fetcher, now: () => now });
+  expect((await client.details([1])).size).toBe(1);
+  now += 86400001;
+  expect((await client.details([1])).size).toBe(0);
+  expect((await client.details([1])).size).toBe(1);
+  expect(fetcher).toHaveBeenCalledTimes(3);
+});

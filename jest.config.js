@@ -10,4 +10,5 @@ module.exports = {
     "^npm:@supabase/supabase-js@2.117.2$": "@supabase/supabase-js",
   },
   testPathIgnorePatterns: ["/node_modules/", "<rootDir>/supabase/\\.private/"],
+  modulePathIgnorePatterns: ["<rootDir>/supabase/\\.private/"],
 };
