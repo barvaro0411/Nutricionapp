@@ -23,6 +23,9 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import {
   ChevronLeft,
   ChevronRight,
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
   Sparkles,
   ChefHat,
   Camera,
@@ -37,9 +40,8 @@ import {
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useWaterTracker } from "@/hooks/useWaterTracker";
 import { useActivitySync } from "@/hooks/useActivitySync";
-import { CalorieHero } from "@/components/dashboard/CalorieHero";
+import { DailySummary } from "@/components/dashboard/DailySummary";
 import { DayStrip } from "@/components/dashboard/DayStrip";
-import { MacroProgressBar } from "@/components/dashboard/MacroProgressBar";
 import { MealCard } from "@/components/dashboard/MealCard";
 import { WaterCard } from "@/components/dashboard/WaterCard";
 import { ActivityModal } from "@/components/dashboard/ActivityModal";
@@ -62,7 +64,7 @@ export default function DashboardScreen() {
   const { width } = useWindowDimensions();
   const wide = width >= 820;
   const compact = width < 380;
-  const { profile } = useAuthStore();
+  const profile = useAuthStore((state) => state.profile);
   const { data: personalPlan } = usePersonalPlan();
   const beginMeal = () => {
     useMealReviewStore.getState().reset();
@@ -82,6 +84,7 @@ export default function DashboardScreen() {
   const [showMasterPlanModal, setShowMasterPlanModal] = useState(false);
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [showDays, setShowDays] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>("almuerzo");
 
   const { data, error, isLoading, isRefetching, refetch } =
@@ -132,75 +135,60 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* Encabezado con Saludo, Guía y Racha */}
-        <View style={styles.topHeader}>
-          <View style={styles.greetingWrap}>
-            <Text style={styles.greetingEyebrow}>TU DIARIO PERSONAL</Text>
-            <Text accessibilityRole="header" style={styles.greetingTitle}>
-              {profile?.full_name
-                ? `Hola, ${profile.full_name.split(" ")[0]}`
-                : "Tu espacio de bienestar"}
-            </Text>
-            <Text style={styles.greetingSubtitle}>
-              Un día a la vez, a tu ritmo.
-            </Text>
-          </View>
-          <View style={styles.headerRightActions}>
-            <TouchableOpacity
-              style={styles.helpGuideBtn}
-              onPress={() => setShowGuideModal(true)}
-              activeOpacity={0.8}
-              accessibilityLabel="¿Cómo funciona la app?"
-              accessibilityRole="button"
-            >
-              <HelpCircle size={18} color={colors.primary} />
-            </TouchableOpacity>
-            <StreakBadge onPress={() => setShowStreakModal(true)} />
-          </View>
+        {/* Comidas del Día */}
+        <View style={styles.mealsHeading}>
+          <View><Text accessibilityRole="header" style={styles.mealsHeaderTitle}>Tus comidas</Text><Text style={styles.mealsDescription}>{data?.meals.length || 0} {(data?.meals.length || 0) === 1 ? "comida registrada" : "comidas registradas"} en este día</Text></View>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tendencias de alimentación" onPress={() => router.push("/(tabs)/history")} style={styles.progressLink}><Text style={styles.progressLinkText}>Ver progreso</Text><ArrowUpRight size={16} color={colors.primary} /></TouchableOpacity>
         </View>
+
 
         {/* Navegador de Fecha */}
         <View style={styles.dateSelector}>
           <View style={styles.dateRow}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Día anterior"
-            style={styles.dateArrow}
-            onPress={() => changeDay(-1)}
-          >
-            <ChevronLeft size={18} color={colors.text} />
-          </TouchableOpacity>
-          <View style={styles.dateCenter}>
-            <Text style={styles.dateTitle}>
-              {isToday ? "Hoy" : formattedDate}
-            </Text>
-            {!isToday && (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Volver a hoy"
-                onPress={() => setSelectedDate(new Date())}
-              >
-                <Text style={styles.todayLink}>Volver a hoy</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Día anterior"
+              style={styles.dateArrow}
+              onPress={() => changeDay(-1)}
+            >
+              <ChevronLeft size={18} color={colors.text} />
+            </TouchableOpacity>
+            <View style={styles.dateCenter}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Elegir fecha del diario"
+                accessibilityState={{ expanded: showDays }} aria-expanded={showDays}
+                onPress={() => setShowDays((value) => !value)} style={styles.datePickerButton}>
+                <CalendarDays size={16} color={colors.primary} />
+                <View style={styles.dateCopy}>
+                  <Text style={styles.dateTitle}>
+                    {isToday ? `Hoy, ${selectedDate.toLocaleDateString("es-CL", { timeZone: APP_TIME_ZONE, day: "numeric", month: "short" })}` : formattedDate}
+                  </Text>
+                </View>
+                {showDays ? <ChevronUp size={15} color={colors.textSecondary} /> : <ChevronDown size={15} color={colors.textSecondary} />}
               </TouchableOpacity>
-            )}
-            {isToday && (
-              <Text style={styles.dateSubtitle}>{formattedDate}</Text>
-            )}
+              {!isToday && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Volver a hoy"
+                  onPress={() => setSelectedDate(new Date())}
+                >
+                  <Text style={styles.todayLink}>Volver a hoy</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Día siguiente"
+              style={[styles.dateArrow, isToday && styles.dateArrowDisabled]}
+              onPress={() => !isToday && changeDay(1)}
+              disabled={isToday}
+            >
+              <ChevronRight
+                size={18}
+                color={isToday ? colors.textMuted : colors.text}
+              />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Día siguiente"
-            style={[styles.dateArrow, isToday && styles.dateArrowDisabled]}
-            onPress={() => !isToday && changeDay(1)}
-            disabled={isToday}
-          >
-            <ChevronRight
-              size={18}
-              color={isToday ? colors.textMuted : colors.text}
-            />
-          </TouchableOpacity>
-          </View>
-          <DayStrip date={selectedDate} onSelect={setSelectedDate} />
+          {showDays && <DayStrip date={selectedDate} onSelect={setSelectedDate} />}
         </View>
 
         {isLoading ? (
@@ -216,6 +204,65 @@ export default function DashboardScreen() {
           />
         ) : (
           <>
+            <DailySummary
+              calorieGoal={data?.goal.calories ?? 2000}
+              calories={data?.consumed.calories ?? 0}
+              protein={data?.consumed.protein ?? 0}
+              proteinGoal={data?.goal.protein_g ?? 140}
+              carbs={data?.consumed.carbs ?? 0}
+              carbsGoal={data?.goal.carbs_g ?? 220}
+              fat={data?.consumed.fat ?? 0}
+              fatGoal={data?.goal.fat_g ?? 65}
+              burnedCalories={burnedCalories}
+              onExercisePress={() => setShowActivityModal(true)}
+            />
+            <View style={styles.mealGrid}>
+              {(["desayuno", "almuerzo", "cena", "snack"] as MealType[]).map(
+                (type) => (
+                  <View
+                    key={type}
+                    style={[
+                      styles.mealGridItem,
+                      wide && styles.mealGridItemWide,
+                    ]}
+                  >
+                    <MealCard
+                      mealType={type}
+                      meals={data?.meals || []}
+                      onAddPress={handleAddMeal}
+                    />
+                  </View>
+                ),
+              )}
+            </View>
+
+            {/* Encabezado con Saludo, Guía y Racha */}
+            <View style={styles.topHeader}>
+              <View style={styles.greetingWrap}>
+                <Text style={styles.greetingEyebrow}>TUS HERRAMIENTAS</Text>
+                <Text accessibilityRole="header" style={styles.greetingTitle}>
+                  {profile?.full_name
+                    ? `Hola, ${profile.full_name.split(" ")[0]}`
+                    : "Tu espacio de bienestar"}
+                </Text>
+                <Text style={styles.greetingSubtitle}>
+                  Un día a la vez, a tu ritmo.
+                </Text>
+              </View>
+              <View style={styles.headerRightActions}>
+                <TouchableOpacity
+                  style={styles.helpGuideBtn}
+                  onPress={() => setShowGuideModal(true)}
+                  activeOpacity={0.8}
+                  accessibilityLabel="¿Cómo funciona la app?"
+                  accessibilityRole="button"
+                >
+                  <HelpCircle size={18} color={colors.primary} />
+                </TouchableOpacity>
+                <StreakBadge onPress={() => setShowStreakModal(true)} />
+              </View>
+            </View>
+
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir comida a este día" activeOpacity={0.85}
               onPress={() => handleAddMeal("almuerzo")} style={styles.addMealAction}>
               <View style={styles.addMealIcon}><Plus size={21} color="white" /></View>
@@ -224,25 +271,6 @@ export default function DashboardScreen() {
             </TouchableOpacity>
             <View style={[styles.summaryLayout, wide && styles.summaryWide]}>
               <View style={styles.summaryMain}>
-                {/* Calorie Hero Dinámico con Calorías de Ejercicio */}
-                <CalorieHero
-                  goal={data?.goal.calories || 2000}
-                  consumed={data?.consumed.calories || 0}
-                  remaining={data?.remaining.calories || 0}
-                  burnedCalories={burnedCalories}
-                  onExercisePress={() => setShowActivityModal(true)}
-                />
-
-                {/* Macronutrientes */}
-                <MacroProgressBar
-                  proteinConsumed={data?.consumed.protein || 0}
-                  proteinGoal={data?.goal.protein_g || 140}
-                  carbsConsumed={data?.consumed.carbs || 0}
-                  carbsGoal={data?.goal.carbs_g || 220}
-                  fatConsumed={data?.consumed.fat || 0}
-                  fatGoal={data?.goal.fat_g || 65}
-                />
-
                 {/* Barra de atajos de registro rápido */}
                 <View style={styles.quickActionsBar}>
                   <TouchableOpacity
@@ -453,32 +481,6 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            {/* Comidas del Día */}
-            <View style={styles.mealsHeading}>
-              <View><Text accessibilityRole="header" style={styles.mealsHeaderTitle}>Tus comidas</Text><Text style={styles.mealsDescription}>{data?.meals.length || 0} {(data?.meals.length || 0) === 1 ? "comida registrada" : "comidas registradas"} en este día</Text></View>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tendencias de alimentación" onPress={() => router.push("/(tabs)/history")} style={styles.progressLink}><Text style={styles.progressLinkText}>Ver progreso</Text><ArrowUpRight size={16} color={colors.primary} /></TouchableOpacity>
-            </View>
-
-            <View style={styles.mealGrid}>
-              {(["desayuno", "almuerzo", "cena", "snack"] as MealType[]).map(
-                (type) => (
-                  <View
-                    key={type}
-                    style={[
-                      styles.mealGridItem,
-                      wide && styles.mealGridItemWide,
-                    ]}
-                  >
-                    <MealCard
-                      mealType={type}
-                      meals={data?.meals || []}
-                      onAddPress={handleAddMeal}
-                    />
-                  </View>
-                ),
-              )}
-            </View>
-
             <View style={styles.bottomSpacer} />
           </>
         )}
@@ -560,14 +562,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.primary,
     fontWeight: "600",
-    paddingVertical: 4,
+    minHeight: 44,
+    paddingVertical: 12,
   },
   topHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 16,
-    marginTop: 4,
+    marginTop: 24,
   },
   headerRightActions: {
     flexDirection: "row",
@@ -590,7 +593,7 @@ const styles = StyleSheet.create({
   },
   greetingEyebrow: { fontSize: 9, letterSpacing: 1.6, fontWeight: "700", color: colors.primary, marginBottom: 7 },
   greetingTitle: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.5,
@@ -604,8 +607,8 @@ const styles = StyleSheet.create({
   dateSelector: {
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,
@@ -617,9 +620,9 @@ const styles = StyleSheet.create({
   addMealCopy: { flex: 1, minWidth: 0 },
   addMealTitle: { color: colors.primaryDark, fontSize: 15, fontWeight: "800" },
   addMealDescription: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 3 },
-  mealsHeading: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 14, marginBottom: 18 },
+  mealsHeading: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 4, marginBottom: 18 },
   mealsDescription: { color: colors.textSecondary, fontSize: 12, marginTop: 5 },
-  progressLink: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8 },
+  progressLink: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, borderRadius: 14, backgroundColor: colors.primaryLight },
   progressLinkText: { color: colors.primary, fontSize: 12, fontWeight: "700" },
   dateArrow: {
     width: 44,
@@ -654,6 +657,8 @@ const styles = StyleSheet.create({
     color: colors.text,
     letterSpacing: -0.3,
   },
+  datePickerButton: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 7, maxWidth: "100%" },
+  dateCopy: { flexShrink: 1 },
   dateSubtitle: {
     fontSize: 11,
     color: colors.textSecondary,

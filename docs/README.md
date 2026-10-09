@@ -33,3 +33,4 @@ Guía centralizada de documentación técnica y operativa del proyecto.
 
 - **[Inicio y Navegación (2026-10-09)](frontend-polish-release-2026-10-09.md)**: Selector semanal, acceso directo a alimentos, resumen de energía y nutrientes, hidratación visual y navegación adaptable.
 - **[Revisión de Navegación y Coach (2026-10-09)](navigation-coach-audit-2026-10-09.md)**: Barra alineada, controles del coach, revisión de 19 vistas, encabezados, metas y registro de alimentos.
+- **[Diario de Comidas (2026-10-09)](meal-diary-design-2026-10-09.md)**: Resumen compacto, comidas plegables, botones amplios, fotos privadas y totales verificados.
