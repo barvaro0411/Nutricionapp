@@ -2,6 +2,8 @@
 
 Actualizado el 9 de octubre de 2026. Los pendientes del 8 de octubre están resueltos: pruebas reales de API y navegador aprobadas, backend corregido y frontend publicado en el dominio existente. Ver [evidencias y límites de la publicación](usda-release-2026-10-09.md).
 
+La continuación de IA del mismo día agregó Groq, Whisper y una clave Google adicional; retiró el respaldo activo de OpenAI y publicó cuatro funciones. Ver [estado y verificaciones de proveedores](ai-providers-release-2026-10-09.md).
+
 ## Objetivo autorizado
 
 Ampliar USDA más allá de las once referencias iniciales, complementando Gemini en foto/texto/audio; permitir búsqueda manual en español; conservar referencias en comidas, historial y favoritas. Publicar en los proyectos existentes de Supabase/Vercel y guardar el trabajo en GitHub. No se necesita volver a pedir autorización para esos destinos ya autorizados.

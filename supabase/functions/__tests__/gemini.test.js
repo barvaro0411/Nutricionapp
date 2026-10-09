@@ -34,8 +34,8 @@ test.each([400, 401, 403, 404, 429])("HTTP %i is not retried with the same crede
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
-test("forbidden primary credentials can use the configured backup", async () => {
-  fetchMock.mockResolvedValueOnce(new Response("denied", { status: 403 })).mockResolvedValueOnce(success());
+test.each([401, 403, 429])("primary HTTP %i can use the configured backup", async status => {
+  fetchMock.mockResolvedValueOnce(new Response("denied", { status })).mockResolvedValueOnce(success());
   await expect(callGemini("primary,backup", {})).resolves.toMatchObject({ model: "gemini-test" });
   expect(fetchMock.mock.calls.map(call => call[1].headers["x-goog-api-key"])).toEqual(["primary", "backup"]);
 });
@@ -61,4 +61,14 @@ test("optional work shares its deadline across backup keys", async () => {
   await jest.advanceTimersByTimeAsync(12000);
   await rejected;
   expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test('a stalled primary key leaves time for the next key to answer', async () => {
+  fetchMock.mockImplementationOnce((_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+  })).mockResolvedValueOnce(success());
+  const pending = callGemini('primary,backup', {}, { timeoutMs: 12000 });
+  await jest.advanceTimersByTimeAsync(6000);
+  expect((await pending).text).toBe('{"items":[]}');
+  expect(fetchMock.mock.calls.map(call => call[1].headers['x-goog-api-key'])).toEqual(['primary','backup']);
 });

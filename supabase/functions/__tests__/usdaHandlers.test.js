@@ -167,3 +167,27 @@ test('manual meat sauce search recovers from a literal translation and excludes 
   expect(body.data.query).toBe('spaghetti sauce with meat');
   expect(body.data.foods.map(food => food.fdcId)).toEqual([2706470]);
 });
+
+test('manual search translates labels while USDA nutrient details are still pending', async () => {
+  const searchHandler = require('../search-foods/index.ts').handleRequest;
+  let releaseDetails, labelsStarted;
+  const labelSignal = new Promise(resolve => { labelsStarted = resolve; });
+  let modelCalls = 0;
+  fetchMock.mockImplementation(async url => {
+    if (String(url).includes('foods/search')) return new Response(JSON.stringify({ foods: [{ fdcId: 2708357, description: 'Pasta, cooked', dataType: 'Survey (FNDDS)' }] }));
+    if (String(url).includes('api.nal.usda.gov')) return new Promise(resolve => { releaseDetails = () => resolve(new Response(JSON.stringify([{ fdcId: 2708357, description: 'Pasta, cooked', dataType: 'Survey (FNDDS)', foodNutrients: [
+      { nutrient: { id: 1008, unitName: 'kcal' }, amount: 158 }, { nutrient: { id: 1003, unitName: 'g' }, amount: 5 },
+      { nutrient: { id: 1004, unitName: 'g' }, amount: 2 }, { nutrient: { id: 1005, unitName: 'g' }, amount: 30 },
+    ] }]))); });
+    const first = modelCalls++ === 0;
+    if (!first) labelsStarted();
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(first ? { query: 'pasta cooked' } : { foods: [{ fdc_id: 2708357, label: 'Fideos cocidos' }] }) }] } }] }));
+  });
+  const pending = searchHandler(request({ query: 'Fideos cocidos' }));
+  await labelSignal;
+  expect(typeof releaseDetails).toBe('function');
+  releaseDetails();
+  const response = await pending;
+  expect(response.status).toBe(200);
+  expect((await response.json()).data.foods[0].label).toBe('Fideos cocidos');
+});

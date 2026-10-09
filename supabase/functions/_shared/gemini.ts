@@ -1,22 +1,21 @@
 import { ApiError, ServerClient } from "./http.ts";
 export async function getGeminiKey(client: ServerClient): Promise<string> {
   const configured = Deno.env.get("GEMINI_API_KEY");
-  const fallback = Deno.env.get("GEMINI_API_KEY_FALLBACK") || Deno.env.get("GEMINI_API_KEY_BACKUP");
   const keys: string[] = [];
 
   if (configured) {
     keys.push(...configured.split(",").map((k) => k.trim()).filter(Boolean));
   }
-  if (fallback) {
-    keys.push(...fallback.split(",").map((k) => k.trim()).filter(Boolean));
+  for (const name of ["GEMINI_API_KEY_FALLBACK", "GEMINI_API_KEY_BACKUP", "GEMINI_API_KEY_ADDITIONAL"]) {
+    const fallback = Deno.env.get(name);
+    if (fallback) keys.push(...fallback.split(",").map((k) => k.trim()).filter(Boolean));
   }
 
-  if (keys.length > 0) {
-    return Array.from(new Set(keys)).join(",");
+  if (!configured?.trim()) {
+    const { data, error } = await client.rpc("get_vault_secret", { secret_name: "GEMINI_API_KEY" });
+    if (!error && typeof data === "string" && data.trim()) keys.unshift(...data.split(",").map(key => key.trim()).filter(Boolean));
   }
-
-  const { data, error } = await client.rpc("get_vault_secret", { secret_name: "GEMINI_API_KEY" });
-  if (!error && typeof data === "string" && data.trim()) return data.trim();
+  if (keys.length > 0) return Array.from(new Set(keys)).join(",");
   throw new ApiError(503, "CONFIGURATION_ERROR", "Falta configurar GEMINI_API_KEY en Supabase.");
 }
 
@@ -32,7 +31,8 @@ export async function callGemini(apiKey: string, body: unknown, options?: { time
     if (remaining <= 0) throw new ApiError(504, "AI_TIMEOUT", "La IA tardó demasiado. Inténtalo nuevamente.");
     const key = keys[i];
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), remaining);
+    // Reserve time for each remaining key so a stalled key cannot consume every backup's budget.
+    const timeout = setTimeout(() => controller.abort(), Math.ceil(remaining / (keys.length - i)));
 
     try {
       // Keep retries within the existing timeout; never retry credentials or invalid requests.
@@ -47,7 +47,7 @@ export async function callGemini(apiKey: string, body: unknown, options?: { time
         if (!response.ok) {
           // Log only operational metadata: provider bodies can contain credentials or user text.
           console.warn("Gemini request failed", { model, status: response.status, attempt: attempt + 1 });
-          if ((response.status === 429 || response.status === 403) && i < keys.length - 1) break;
+          if ([401, 403, 429].includes(response.status) && i < keys.length - 1) break;
           const transient = [500, 502, 503, 504].includes(response.status);
           if (transient && attempt < 2) {
             await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
@@ -75,10 +75,12 @@ export async function callGemini(apiKey: string, body: unknown, options?: { time
         return { text, usage: result.usageMetadata, model };
       }
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        throw new ApiError(504, "AI_TIMEOUT", "La IA tardó demasiado. Inténtalo nuevamente.");
-      }
-      throw error;
+      const failure = error instanceof DOMException && error.name === "AbortError"
+        ? new ApiError(504, "AI_TIMEOUT", "La IA tardó demasiado. Inténtalo nuevamente.")
+        : error instanceof ApiError ? error
+        : new ApiError(502, "AI_PROVIDER_ERROR", "No se pudo procesar la solicitud de IA. Inténtalo nuevamente.");
+      if (i < keys.length - 1 && [502, 503, 504].includes(failure.status)) continue;
+      throw failure;
     } finally {
       clearTimeout(timeout);
     }

@@ -1,8 +1,10 @@
 jest.mock("@supabase/supabase-js", () => ({ createClient: jest.fn() }));
-const { createClient } = require("@supabase/supabase-js");
+let createClient;
 const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 let client, env, fetchMock;
 beforeEach(() => {
+  jest.resetModules();
+  ({ createClient } = require("@supabase/supabase-js"));
   env = { SUPABASE_URL: "https://test.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "server-secret", GEMINI_API_KEY: "gemini-secret" };
   global.Deno = { env: { get: k => env[k] }, serve: jest.fn() };
   client = { auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: owner } }, error: null }) },

@@ -14,6 +14,7 @@ export interface VisionProvider {
     mimeType: string,
     prompt: string,
     clientTimeIso?: string,
-    userNote?: string
+    userNote?: string,
+    timeoutMs?: number
   ): Promise<VisionProviderResult>;
 }

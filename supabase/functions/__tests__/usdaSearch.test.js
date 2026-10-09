@@ -8,6 +8,11 @@ const detail = (fdcId = 2708357, description = 'Pasta, cooked') => ({ ...candida
 ] });
 const item = {food:'Fideos cocidos',usda_lookup:{query:'pasta cooked',state:'cooked'}};
 
+test('Chilean banana lookup corrects plantain translation but preserves explicit cooking plantain', () => {
+  expect(usdaLookupQueries({food:'Plátano crudo',usda_lookup:{query:'raw plantain',alternative_query:'plantains raw'}})).toEqual(['raw banana','banana raw']);
+  expect(usdaLookupQueries({food:'Plátano macho crudo',usda_lookup:{query:'raw plantain'}})).toEqual(['raw plantain']);
+});
+
 test('dynamic lookup searches three USDA datasets, deduplicates requests and caches results', async () => {
   const fetcher = jest.fn(async () => new Response(JSON.stringify({foods:[candidate()]})));
   const client = createUsdaSearch({apiKey:()=> 'server-key',fetcher});

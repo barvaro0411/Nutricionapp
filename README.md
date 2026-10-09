@@ -3,8 +3,10 @@
 Aplicación moderna de seguimiento nutricional con Inteligencia Artificial, adaptada para hábitos y alimentos chilenos. Funciona como **PWA (Progressive Web App)** en web/móvil y en **iOS / Android** mediante Expo y React Native.
 
 La integración opcional con USDA FoodData Central complementa los alimentos identificados
-por Gemini con referencias nutricionales revisadas. Configuración y alcance:
+por Gemini o Groq con referencias nutricionales revisadas. Configuración y alcance:
 [Gemini y USDA](docs/usda-integration.md).
+El coach, texto, audio e imágenes reparten el trabajo entre proveedores con respaldo automático:
+[proveedores y cuotas de IA](docs/ai-providers.md).
 
 ---
 
@@ -38,12 +40,10 @@ Copia la plantilla de ejemplo para crear tu archivo `.env.local`:
 cp .env.example .env.local
 ```
 
-Abre `.env.local` y completa las credenciales de tu proyecto Supabase y Google Gemini:
+Abre `.env.local` y completa las credenciales públicas de Supabase. Configura las claves de Gemini y Groq como secretos de las funciones del servidor según [esta guía](docs/ai-providers.md):
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-aqui
-GEMINI_API_KEY=tu-gemini-api-key-aqui
-GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
 ### 4. Iniciar la aplicación
@@ -82,7 +82,7 @@ GEMINI_MODEL=gemini-3.5-flash-lite
 * **`src/components/`**: Componentes reutilizables de UI (Dashboard, Modales, Tarjetas).
 * **`src/hooks/`**: Lógica de datos y sincronización con Supabase (React Query).
 * **`src/stores/`**: Manejo de estados globales rápidos con Zustand.
-* **`supabase/functions/`**: Edge Functions en Deno para procesar IA con Google Gemini:
+* **`supabase/functions/`**: Edge Functions en Deno para procesar IA con Gemini, Groq y USDA:
   * `analyze-meal`: Visión por computadora para fotos de platos.
   * `parse-meal-text`: Procesamiento de lenguaje natural y dictado por voz.
   * `nutrition-coach`: Asistente nutricional contextualizado con tus metas y comidas.
