@@ -29,6 +29,8 @@ Se mantienen los controles de sesión, propiedad de imágenes, esquemas, prepara
 
 El coach envía un UUID por mensaje. La base guarda atómicamente ambos mensajes y su respuesta; un reintento de la misma consulta devuelve esa respuesta sin llamar a la IA ni reservar cuota nuevamente. Las consultas simultáneas con ese UUID reciben una indicación de espera. El resultado se conserva durante 24 horas y solo lo maneja el backend; las conversaciones continúan en su historial habitual.
 
+La etapa del coach animado y fiabilidad diaria está publicada: [versión y pruebas reales](coach-daily-release-2026-10-09.md).
+
 Las traducciones del buscador tienen caché acotada de seis horas y deduplicación concurrente. La traducción de consultas se aísla por usuario; las etiquetas de referencias públicas USDA pueden reutilizarse. Los fallos no se guardan en caché. El contador de la app distingue el límite de minuto del diario; el diario se renueva a medianoche en Chile y las respuestas incluyen el plazo para reintentar.
 
 ## Secretos del servidor
