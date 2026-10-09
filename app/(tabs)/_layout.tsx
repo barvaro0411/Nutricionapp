@@ -1,10 +1,11 @@
 import React from "react";
 import { Tabs, useRouter } from "expo-router";
-import { View, Text, StyleSheet, Platform, Pressable, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LayoutDashboard, CalendarDays, Plus, Sparkles, UserRound, Leaf } from "lucide-react-native";
 import { colors } from "@/constants/colors";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { AppTabBar, appTabBarHeight } from "@/components/common/AppTabBar";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -12,57 +13,14 @@ export default function TabLayout() {
   const wide = useWindowDimensions().width >= 768;
   const fullName = useAuthStore(state => state.profile?.full_name);
 
-  // En móviles con barra gestual inferior (iOS / Android / PWA), insets.bottom es ~20-34px.
-  // Aseguramos un padding dinámico ergonómico para que los iconos y etiquetas nunca se corten.
-  const bottomInset = Math.max(insets.bottom, Platform.OS === "ios" ? 20 : 10);
-  const barHeight = 62 + bottomInset;
-
   return (
     <Tabs
+      tabBar={props => <AppTabBar {...props} />}
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         headerTitle: () => <View style={styles.brand}><View style={styles.brandIcon}><Leaf size={20} color={colors.primary}/></View><View><Text style={styles.brandText}>Nutrición IA</Text><Text style={styles.brandTagline}>Comer bien, a tu ritmo</Text></View></View>,
         headerRight: () => <Pressable accessibilityRole="button" accessibilityLabel="Abrir mi perfil" onPress={() => router.push("/(tabs)/settings")} style={({ pressed }) => [styles.profileShortcut, pressed && { opacity: 0.7 }]}><Text style={styles.profileInitial}>{fullName?.trim().charAt(0).toUpperCase() || "N"}</Text></Pressable>,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarActiveBackgroundColor: colors.primaryLight,
-        tabBarLabelPosition: wide ? "beside-icon" : "below-icon",
-        tabBarLabelStyle: {
-          fontSize: 11,
-          lineHeight: 14,
-          fontWeight: "700",
-          flexShrink: 0,
-          marginTop: 2,
-          marginBottom: 2,
-        },
-        tabBarItemStyle: {
-          borderRadius: 16,
-          overflow: "hidden",
-          marginHorizontal: 3,
-          marginTop: 2,
-          marginBottom: 2,
-        },
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.cardBorder,
-          borderTopWidth: 1,
-          borderLeftWidth: wide ? 1 : 0,
-          borderRightWidth: wide ? 1 : 0,
-          borderBottomWidth: wide ? 1 : 0,
-          borderColor: colors.cardBorder,
-          width: wide ? "96%" : "100%",
-          maxWidth: 1000,
-          alignSelf: "center",
-          borderRadius: wide ? 22 : 0,
-          marginBottom: wide ? 10 : 0,
-          height: barHeight,
-          paddingBottom: bottomInset,
-          paddingTop: 5,
-          shadowColor: "#0F172A",
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          elevation: 10,
-        },
+        tabBarStyle: { height: appTabBarHeight(insets.bottom, wide) },
         headerStyle: {
           backgroundColor: colors.background,
           elevation: 0,
@@ -116,11 +74,7 @@ export default function TabLayout() {
         options={{
           title: "Registrar",
           tabBarAccessibilityLabel: "Registrar comida",
-          tabBarIcon: ({ focused }) => (
-            <View style={[styles.centerButton, focused && styles.centerButtonActive]}>
-              <Plus size={24} color="#FFFFFF" strokeWidth={3} />
-            </View>
-          ),
+          tabBarIcon: ({ color }) => <Plus size={21} color={color} strokeWidth={2.5} />,
         }}
       />
 
@@ -167,24 +121,4 @@ const styles = StyleSheet.create({
   brandTagline: { fontSize: 9, color: colors.textSecondary, marginTop: 2 },
   profileShortcut: { width: 44, height: 44, borderRadius: 15, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center", marginRight: 16, borderWidth: 1, borderColor: "#D3EADB" },
   profileInitial: { color: colors.primaryDark, fontSize: 16, fontWeight: "800" },
-  centerButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: colors.primary,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: -8,
-    borderWidth: 3,
-    borderColor: "#FFFFFF",
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  centerButtonActive: {
-    backgroundColor: colors.primaryDark,
-    transform: [{ scale: 1.05 }],
-  },
 });

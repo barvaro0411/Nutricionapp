@@ -11,15 +11,18 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Camera, Image as ImageIcon, RotateCcw, ArrowLeft, Sparkles, AlertCircle } from "lucide-react-native";
+import { Camera, Image as ImageIcon, RotateCcw, Sparkles, AlertCircle } from "lucide-react-native";
 import { useMealAnalysis } from "@/hooks/useMealAnalysis";
 import { ScanningOverlay } from "@/components/meal/ScanningOverlay";
 import { colors, layout } from "@/constants/colors";
 import { MealType } from "@/types/meal";
 import { showAlert } from "@/utils/alerts";
+import { PageBackHeader } from "@/components/common/AppUI";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function CameraScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ suggestedMealType?: MealType }>();
 
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -97,24 +100,9 @@ export default function CameraScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 20) + 20 }]} keyboardShouldPersistTaps="handled">
       {/* Header superior */}
-      <View style={styles.topNav}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.back()}
-          disabled={analyzing}
-        >
-          <ArrowLeft size={20} color={colors.text} />
-          <Text style={styles.backBtnText}>Volver</Text>
-        </TouchableOpacity>
-
-        <View style={styles.navTitleWrap}>
-          <Text style={styles.navTitle}>Cámara IA</Text>
-        </View>
-
-        <View style={{ width: 60 }} />
-      </View>
+      <PageBackHeader title="Cámara IA" backLabel="Volver a añadir alimentos" disabled={analyzing} onBack={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/record")} />
 
       {/* Selector de horario de comida */}
       <View style={styles.mealTypeRow}>
@@ -127,6 +115,7 @@ export default function CameraScreen() {
           ] as const
         ).map((item) => (
           <TouchableOpacity
+            accessibilityRole="button" accessibilityLabel={"Elegir " + item.label} aria-pressed={mealType === item.key}
             key={item.key}
             style={[styles.typePill, mealType === item.key && styles.typePillActive]}
             onPress={() => setMealType(item.key)}
@@ -325,6 +314,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   typePill: {
+    minHeight: 44,
+    justifyContent: "center",
     flex: 1,
     paddingVertical: 10,
     backgroundColor: "#FFFFFF",

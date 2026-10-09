@@ -117,6 +117,7 @@ export default function GoalsReviewScreen() {
         <Text style={styles.calorieCardLabel}>Calorías diarias recomendadas</Text>
         <View style={styles.counterRow}>
           <TouchableOpacity accessibilityRole="button"
+            accessibilityLabel="Reducir meta de calorías"
             style={styles.adjustBtn}
             onPress={() => adjustValue(setCalories, calories, -50, 800)}
           >
@@ -133,6 +134,7 @@ export default function GoalsReviewScreen() {
             <Text style={styles.mainValueUnit}>kcal / día</Text>
           </View>
           <TouchableOpacity accessibilityRole="button"
+            accessibilityLabel="Aumentar meta de calorías"
             style={styles.adjustBtn}
             onPress={() => adjustValue(setCalories, calories, 50, 800)}
           >
@@ -163,6 +165,7 @@ export default function GoalsReviewScreen() {
           </View>
           <View style={styles.inlineControls}>
             <TouchableOpacity accessibilityRole="button"
+              accessibilityLabel="Reducir meta de proteínas"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setProteinG, proteinG, -5, 10)}
             >
@@ -177,6 +180,7 @@ export default function GoalsReviewScreen() {
             />
             <Text style={styles.macroUnit}>g</Text>
             <TouchableOpacity accessibilityRole="button"
+              accessibilityLabel="Aumentar meta de proteínas"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setProteinG, proteinG, 5, 10)}
             >
@@ -193,6 +197,7 @@ export default function GoalsReviewScreen() {
           </View>
           <View style={styles.inlineControls}>
             <TouchableOpacity accessibilityRole="button"
+              accessibilityLabel="Reducir meta de carbohidratos"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setCarbsG, carbsG, -5, 10)}
             >
@@ -207,6 +212,7 @@ export default function GoalsReviewScreen() {
             />
             <Text style={styles.macroUnit}>g</Text>
             <TouchableOpacity accessibilityRole="button"
+              accessibilityLabel="Aumentar meta de carbohidratos"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setCarbsG, carbsG, 5, 10)}
             >
@@ -223,6 +229,7 @@ export default function GoalsReviewScreen() {
           </View>
           <View style={styles.inlineControls}>
             <TouchableOpacity accessibilityRole="button"
+              accessibilityLabel="Reducir meta de grasas"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setFatG, fatG, -5, 5)}
             >
@@ -237,6 +244,7 @@ export default function GoalsReviewScreen() {
             />
             <Text style={styles.macroUnit}>g</Text>
             <TouchableOpacity accessibilityRole="button"
+              accessibilityLabel="Aumentar meta de grasas"
               style={styles.inlineBtn}
               onPress={() => adjustValue(setFatG, fatG, 5, 5)}
             >
@@ -325,6 +333,9 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   adjustBtn: {
+    minWidth: 48,
+    minHeight: 44,
+    justifyContent: "center",
     backgroundColor: colors.primaryLight,
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -383,10 +394,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   macroRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    alignItems: "center",
+    flexDirection: "column",
+    gap: 10,
+    alignItems: "stretch",
     justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -410,10 +420,13 @@ const styles = StyleSheet.create({
   inlineControls: {
     flexDirection: "row",
     alignItems: "center",
+    width: "100%",
+    maxWidth: 300,
+    justifyContent: "space-between",
   },
   inlineBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: 8,
     backgroundColor: colors.background,
     justifyContent: "center",
@@ -427,6 +440,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   macroInput: {
+    flex: 1,
     width: 54,
     textAlign: "center",
     fontSize: 16,

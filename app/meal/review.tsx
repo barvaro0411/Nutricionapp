@@ -797,6 +797,8 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   typeButton: {
+    minHeight: 44,
+    justifyContent: "center",
     flex: 1,
     paddingVertical: 8,
     backgroundColor: colors.card,
@@ -985,6 +987,8 @@ const styles = StyleSheet.create({
     borderColor: "#F1F5F9",
   },
   stepBtn: {
+    minHeight: 44,
+    justifyContent: "center",
     flexShrink: 0,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -1028,6 +1032,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   shortcutChip: {
+    minHeight: 44,
+    justifyContent: "center",
     flex: 1,
     paddingVertical: 7,
     backgroundColor: "#F8FAFC",
@@ -1102,6 +1108,8 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   favStarBtn: {
+    minHeight: 44,
+    justifyContent: "center",
     paddingVertical: 9,
     alignItems: "center",
     marginBottom: 8,

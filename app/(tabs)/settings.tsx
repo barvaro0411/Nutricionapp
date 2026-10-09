@@ -147,7 +147,6 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.identity}>
             <Text style={styles.name}>{profile?.full_name || "Tu perfil"}</Text>
-            <Text style={styles.email}>{user?.email}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -162,6 +161,7 @@ export default function SettingsScreen() {
             <Pencil size={17} color={colors.mint} />
           </Pressable>
         </View>
+        <Text selectable numberOfLines={1} style={styles.email}>{user?.email}</Text>
         {user?.email_confirmed_at && (
           <View style={styles.verified}>
             <CheckCircle2 size={13} color={colors.mint} />
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     marginBottom: 26,
   },
-  profileRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  profileRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   avatar: {
     width: 54,
     height: 54,
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 24, fontWeight: "800", color: colors.forest },
   identity: { flex: 1, minWidth: 0 },
   name: { fontSize: 19, fontWeight: "700", color: "#FFFFFF" },
-  email: { fontSize: 12, lineHeight: 18, color: "#CEE1D6", marginTop: 5 },
+  email: { fontSize: 12, lineHeight: 18, color: "#CEE1D6", marginTop: 16 },
   editButton: {
     width: 44,
     height: 44,

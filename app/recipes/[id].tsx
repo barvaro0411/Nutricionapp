@@ -14,9 +14,11 @@ import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { colors, layout } from "@/constants/colors";
 import { DetectedFoodItem } from "@/types/meal";
 import { isLiquidFood, formatQuantityDisplay } from "@/utils/liquidUnits";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function RecipeDetailScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: recipe, isLoading, error } = useRecipeDetail(id || "");
   const { initializeReview } = useMealReviewStore();
@@ -61,10 +63,10 @@ export default function RecipeDetailScreen() {
 
   if (!recipe || error) return <View style={styles.loadingContainer}><Text>{error?.message || "Receta no disponible."}</Text><TouchableOpacity onPress={() => router.back()}><Text>Volver</Text></TouchableOpacity></View>;
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 20) + 30 }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver al catálogo de recetas" style={styles.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/recipes")}>
           <Text style={styles.backBtnText}>‹ Catálogo</Text>
         </TouchableOpacity>
         <View style={styles.mealBadge}>
@@ -72,7 +74,7 @@ export default function RecipeDetailScreen() {
         </View>
       </View>
 
-      <Text style={styles.title}>{recipe.title}</Text>
+      <Text accessibilityRole="header" style={styles.title}>{recipe.title}</Text>
       <Text style={styles.prepTime}>⏱️ Tiempo estimado: {recipe.prepTimeMinutes} minutos</Text>
       {recipe.description && <Text style={styles.description}>{recipe.description}</Text>}
 
@@ -131,7 +133,7 @@ export default function RecipeDetailScreen() {
       </View>
 
       {/* Botón de acción: Registrar en comida */}
-      <TouchableOpacity style={styles.logButton} onPress={handleLogRecipe}>
+      <TouchableOpacity accessibilityRole="button" style={styles.logButton} onPress={handleLogRecipe}>
         <Text style={styles.logButtonText}>🍽️ Registrar esta Receta en mi Día</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -160,6 +162,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   backBtn: {
+    minHeight: 44,
+    justifyContent: "center",
     paddingVertical: 6,
   },
   backBtnText: {
@@ -253,6 +257,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   ingredientRow: {
+    gap: 12,
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 8,
@@ -260,11 +265,14 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.cardBorder,
   },
   ingredientName: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 14,
     color: colors.text,
     fontWeight: "500",
   },
   ingredientGrams: {
+    flexShrink: 0,
     fontSize: 13,
     color: colors.textSecondary,
     fontWeight: "600",
@@ -303,6 +311,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   logButton: {
+    minHeight: 52,
+    paddingHorizontal: 16,
     backgroundColor: colors.primary,
     paddingVertical: 18,
     borderRadius: 16,
@@ -314,6 +324,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   logButtonText: {
+    textAlign: "center",
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "800",

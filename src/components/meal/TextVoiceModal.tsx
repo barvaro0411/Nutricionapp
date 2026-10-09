@@ -11,7 +11,10 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from "react-native";
+import { PencilLine, Mic, X } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTextAudioMeal } from "@/hooks/useTextAudioMeal";
 import { colors } from "@/constants/colors";
 import { MealType } from "@/types/meal";
@@ -23,6 +26,7 @@ interface TextVoiceModalProps {
 }
 
 export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: TextVoiceModalProps) {
+  const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<"text" | "voice">("text");
   const [inputText, setInputText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -108,30 +112,32 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.overlay}
       >
-        <View style={styles.sheet}>
+        <ScrollView style={styles.sheet} contentContainerStyle={[styles.sheetContent, { paddingBottom: Math.max(insets.bottom, 24) }]} keyboardShouldPersistTaps="handled">
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.tabsRow}>
               <TouchableOpacity
+                accessibilityRole="button" accessibilityLabel="Escribir comida" aria-pressed={mode === "text"}
+                disabled={isRecording || processing}
                 style={[styles.tabBtn, mode === "text" && styles.tabBtnActive]}
                 onPress={() => { if (!isRecording && !processing) setMode("text"); }}
               >
-                <Text style={[styles.tabBtnText, mode === "text" && styles.tabBtnTextActive]}>
-                  ✍️ Escribir
-                </Text>
+                <PencilLine size={17} color={mode === "text" ? colors.primary : colors.textSecondary} />
+                <Text style={[styles.tabBtnText, mode === "text" && styles.tabBtnTextActive]}>Escribir</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                accessibilityRole="button" accessibilityLabel="Dictar comida por voz" aria-pressed={mode === "voice"}
+                disabled={isRecording || processing}
                 style={[styles.tabBtn, mode === "voice" && styles.tabBtnActive]}
                 onPress={() => setMode("voice")}
               >
-                <Text style={[styles.tabBtnText, mode === "voice" && styles.tabBtnTextActive]}>
-                  🎙️ Dictar por voz
-                </Text>
+                <Mic size={17} color={mode === "voice" ? colors.primary : colors.textSecondary} />
+                <Text style={[styles.tabBtnText, mode === "voice" && styles.tabBtnTextActive]}>Dictar</Text>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.closeBtn} onPress={() => { if (!processing) onClose(); }}>
-              <Text style={styles.closeBtnText}>✕</Text>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar registro por texto o voz" disabled={processing} style={styles.closeBtn} onPress={() => { if (!processing) onClose(); }}>
+              <X size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -214,7 +220,7 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
               {processing && <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} />}
             </View>
           )}
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -227,12 +233,16 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
+    flexGrow: 0,
+    maxHeight: "90%",
+    width: "100%",
+    maxWidth: 680,
+    alignSelf: "center",
     backgroundColor: colors.card,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    padding: 24,
-    paddingBottom: Platform.OS === "ios" ? 40 : 24,
   },
+  sheetContent: { padding: 20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -240,12 +250,21 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   tabsRow: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: "row",
     gap: 8,
   },
   tabBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    flex: 1,
+    minWidth: 0,
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: 12,
     backgroundColor: colors.background,
   },
@@ -262,7 +281,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   closeBtn: {
-    padding: 6,
+    width: 44,
+    height: 44,
+    marginLeft: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: colors.background,
   },
   closeBtnText: {
     fontSize: 18,

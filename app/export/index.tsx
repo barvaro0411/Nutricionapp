@@ -19,9 +19,12 @@ import {
   NutritionistReportData,
 } from "@/services/nutritionistReportService";
 import { colors, layout } from "@/constants/colors";
+import { PageBackHeader } from "@/components/common/AppUI";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ExportReportScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const userId = useAuthStore(s => s.user?.id);
 
   const [daysBack, setDaysBack] = useState<7 | 30>(7);
@@ -72,15 +75,9 @@ export default function ExportReportScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 24) + 24 }]}>
       {/* Top Nav */}
-      <View style={styles.topNav}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backBtnText}>‹ Volver</Text>
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Informe Nutricional</Text>
-        <View style={{ width: 50 }} />
-      </View>
+      <PageBackHeader title="Informe Nutricional" backLabel="Volver a mi perfil" onBack={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/settings")} />
 
       <Text style={styles.subtitle}>
         Exporta tus promedios reales y desglose de comidas para enviárselo directamente a tu nutricionista o médico tratante.
@@ -89,6 +86,7 @@ export default function ExportReportScreen() {
       {/* Selector de Rango */}
       <View style={styles.rangeRow}>
         <TouchableOpacity
+          accessibilityRole="button" accessibilityLabel="Informe de 7 días" aria-pressed={daysBack === 7}
           style={[styles.rangeBtn, daysBack === 7 && styles.rangeBtnActive]}
           onPress={() => setDaysBack(7)}
         >
@@ -98,6 +96,7 @@ export default function ExportReportScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
+          accessibilityRole="button" accessibilityLabel="Informe de 30 días" aria-pressed={daysBack === 30}
           style={[styles.rangeBtn, daysBack === 30 && styles.rangeBtnActive]}
           onPress={() => setDaysBack(30)}
         >
@@ -153,11 +152,11 @@ export default function ExportReportScreen() {
 
           {/* Botones de Acción */}
           <View style={styles.actionsContainer}>
-            <TouchableOpacity style={styles.shareBtn} onPress={handleShareWhatsApp}>
+            <TouchableOpacity accessibilityRole="button" style={styles.shareBtn} onPress={handleShareWhatsApp}>
               <Text style={styles.shareBtnText}>Compartir mi informe</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.csvBtn} onPress={handleExportCSV}>
+            <TouchableOpacity accessibilityRole="button" style={styles.csvBtn} onPress={handleExportCSV}>
               <Text style={styles.csvBtnText}>Descargar CSV para Excel</Text>
             </TouchableOpacity>
           </View>
@@ -266,6 +265,9 @@ const styles = StyleSheet.create({
     borderTopColor: colors.cardBorder,
   },
   avgCol: {
+    flexBasis: "42%",
+    flexGrow: 1,
+    minWidth: 0,
     alignItems: "center",
   },
   avgNum: {
@@ -294,6 +296,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   shareBtn: {
+    minHeight: 52,
+    paddingHorizontal: 16,
     backgroundColor: colors.primary,
     paddingVertical: 16,
     borderRadius: 16,
@@ -305,6 +309,8 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   csvBtn: {
+    minHeight: 52,
+    paddingHorizontal: 16,
     backgroundColor: colors.card,
     borderWidth: 1.5,
     borderColor: colors.cardBorder,

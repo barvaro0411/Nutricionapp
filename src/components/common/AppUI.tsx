@@ -8,8 +8,23 @@ import {
   ActivityIndicator,
   TextInputProps,
 } from "react-native";
-import { Eye, EyeOff, AlertCircle } from "lucide-react-native";
+import { Eye, EyeOff, AlertCircle, ArrowLeft } from "lucide-react-native";
 import { colors } from "@/constants/colors";
+
+export function PageBackHeader({ title, onBack, backLabel = "Volver", trailing, disabled }: {
+  title: string; onBack: () => void; backLabel?: string; trailing?: React.ReactNode; disabled?: boolean;
+}) {
+  return (
+    <View style={styles.backHeader}>
+      <Pressable accessibilityRole="button" accessibilityLabel={backLabel} onPress={onBack} disabled={disabled}
+        style={({ pressed }) => [styles.backControl, disabled && styles.disabled, pressed && styles.pressed]}>
+        <ArrowLeft size={20} color={colors.primary} />
+      </Pressable>
+      <Text accessibilityRole="header" style={styles.backTitle}>{title}</Text>
+      {trailing}
+    </View>
+  );
+}
 
 export function PageHeading({
   title,
@@ -159,6 +174,9 @@ export function StateCard({
 }
 
 const styles = StyleSheet.create({
+  backHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 20, minHeight: 44 },
+  backControl: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center" },
+  backTitle: { flex: 1, minWidth: 0, fontSize: 20, lineHeight: 26, fontWeight: "800", letterSpacing: -0.4, color: colors.text },
   headingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -199,6 +217,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buttonText: {
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: "700",
     color: "#FFFFFF",

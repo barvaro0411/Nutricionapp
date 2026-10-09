@@ -9,11 +9,12 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  useWindowDimensions,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useSegments } from "expo-router";
 import { useCoachChat } from "@/hooks/useCoachChat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Sparkles, ArrowLeft, Send, Volume2, Square, Mic } from "lucide-react-native";
+import { Sparkles, ArrowLeft, Send, Volume2, Square, Mic, Utensils, Target, Apple, ShoppingBasket, ArrowUpRight } from "lucide-react-native";
 import { StateCard } from "@/components/common/AppUI";
 import { colors } from "@/constants/colors";
 import { CoachMessageContent } from "@/components/coach/CoachMessageContent";
@@ -24,6 +25,8 @@ import { CoachBuddy, BuddyMood } from "@/components/coach/CoachBuddy";
 export default function CoachChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const withinTabs = useSegments()[0] === "(tabs)";
+  const wide = useWindowDimensions().width >= 760;
   const { initialPrompt } = useLocalSearchParams<{ initialPrompt?: string }>();
   const { messages, isLoading, error, refetch, sendMessage, isSending, sendError, pendingMessage } =
     useCoachChat();
@@ -43,7 +46,7 @@ export default function CoachChatScreen() {
   }, [initialPrompt]);
 
   useEffect(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    if (messages.length || isSending || live.draft.user || live.draft.assistant) scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages, isSending, live.draft]);
 
   const handleSend = async (textToSend?: string) => {
@@ -59,10 +62,10 @@ export default function CoachChatScreen() {
   };
 
   const quickPrompts = [
-    "¿Qué puedo cenar con las calorías que me faltan hoy?",
-    "¿Cómo voy con mi meta de proteína de hoy?",
-    "Recomiéndame un snack chileno alto en proteína",
-    "¿Qué comprar en el supermercado para mis metas?",
+    { title: "Ideas para cenar", description: "Según tus registros", prompt: "¿Qué puedo cenar con las calorías que me faltan hoy?", Icon: Utensils },
+    { title: "Mi proteína", description: "Revisa tu meta de hoy", prompt: "¿Cómo voy con mi meta de proteína de hoy?", Icon: Target },
+    { title: "Una colación", description: "Opciones con proteína", prompt: "Recomiéndame un snack chileno alto en proteína", Icon: Apple },
+    { title: "Mis compras", description: "Organiza tu semana", prompt: "¿Qué comprar en el supermercado para mis metas?", Icon: ShoppingBasket },
   ];
 
   return (
@@ -77,53 +80,50 @@ export default function CoachChatScreen() {
           accessibilityLabel="Volver al inicio"
           style={styles.backBtn}
           onPress={() =>
-            router.canGoBack() ? router.back() : router.replace("/(tabs)")
+            withinTabs ? router.navigate("/(tabs)") : router.canGoBack() ? router.back() : router.replace("/(tabs)")
           }
         >
           <ArrowLeft size={20} color={colors.primary} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Coach IA</Text>
+          <Text accessibilityRole="header" style={styles.headerTitle}>Coach IA</Text>
           <Text style={styles.headerSubtitle}>
             Ideas para tu rutina, por texto y voz
           </Text>
         </View>
-        <View style={{ width: 50 }} />
-      </View>
-
-      <View style={styles.companionCard}>
-        <CoachBuddy mood={buddyMood} />
-        <View style={styles.companionCopy}>
-          <Text style={styles.companionEyebrow}>TU COMPAÑERO DE CADA DÍA</Text>
-          <Text style={styles.companionTitle}>Pequeñas ideas. Grandes hábitos.</Text>
-          <View style={styles.statusRow}>
-            <View style={styles.statusDot} />
-            <Text style={styles.companionStatus} accessibilityLiveRegion="polite">{buddyStatus}</Text>
-          </View>
-        </View>
+        <View style={styles.headerIcon}><Sparkles size={20} color={colors.primary} /></View>
       </View>
 
       {live.supported && (
         <View style={styles.voiceBar}>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={live.active ? "Terminar conversación por voz" : "Conversar por voz"}
-            disabled={isSending || isLoading || !!error} style={styles.voiceButton}
+            disabled={!live.active && (isSending || isLoading || !!error)} style={[styles.voiceButton, live.active && styles.voiceButtonActive, !live.active && (isSending || isLoading || !!error) && styles.sendButtonDisabled]}
             onPress={() => { speech.stop(); if (live.active) live.stop(); else live.start(); }}>
-            {live.active ? <Square size={17} color={colors.primary} /> : <Mic size={17} color={colors.primary} />}
-            <Text style={styles.voiceButtonText}>{live.active ? "Terminar conversación" : "Conversar por voz"}</Text>
+            <View style={[styles.voiceIcon, live.active && styles.voiceIconActive]}>{live.active ? <Square size={19} color={colors.danger} /> : <Mic size={19} color="white" />}</View>
+            <View style={styles.voiceCopy}><Text style={[styles.voiceButtonText, live.active && { color: colors.danger }]}>{live.active ? "Terminar conversación" : "Conversar por voz"}</Text>
+              <Text style={styles.voiceHint} accessibilityLiveRegion="polite">{live.status === "connecting" ? "Conectando…" : live.status === "speaking" ? "El coach responde" : live.status === "listening" ? "Te escucho" : "Habla y escucha · hasta 2 min"}</Text></View>
+            {!live.active && <ArrowUpRight size={18} color={colors.primary} />}
           </TouchableOpacity>
-          <Text style={styles.voiceHint} accessibilityLiveRegion="polite">
-            {live.status === "connecting" ? "Conectando…" : live.status === "speaking" ? "El coach responde" : live.status === "listening" ? "Te escucho" : "Sesiones de hasta 2 min"}
-          </Text>
         </View>
       )}
       {(speech.error || live.error) && <Text style={styles.voiceError} accessibilityRole="alert">{live.error || speech.error}</Text>}
 
       {/* Mensajes */}
       <ScrollView
+        testID="coach-conversation"
         ref={scrollViewRef}
         style={styles.messagesList}
         contentContainerStyle={styles.messagesContent}
+        keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.companionCard}>
+          <CoachBuddy mood={buddyMood} />
+          <View style={styles.companionCopy}>
+            <Text style={styles.companionEyebrow}>TU COMPAÑERO DE CADA DÍA</Text>
+            <Text style={styles.companionTitle}>Pequeñas ideas. Grandes hábitos.</Text>
+            <View style={styles.statusRow}><View style={styles.statusDot} /><Text style={styles.companionStatus} accessibilityLiveRegion="polite">{buddyStatus}</Text></View>
+          </View>
+        </View>
         {/* Mensaje de bienvenida inicial si no hay historial */}
         {error && (
           <StateCard
@@ -137,14 +137,26 @@ export default function CoachChatScreen() {
         )}
         {messages.length === 0 && !isLoading && !error && (
           <View style={styles.welcomeCard}>
-            <View style={styles.welcomeIconWrap}>
-              <Sparkles size={28} color={colors.primary} />
-            </View>
             <Text style={styles.welcomeTitle}>¿Qué hacemos hoy?</Text>
             <Text style={styles.welcomeDesc}>
-              Explora ideas de comidas, aclara tus dudas sobre nutrientes y
-              organiza tu rutina a partir de tus registros y metas. Elige una idea abajo o cuéntame lo que necesitas.
+              Elige una idea o escribe tu pregunta. Usaré tus registros y metas para orientarte.
             </Text>
+          </View>
+        )}
+
+        {messages.length < 3 && !isLoading && !error && (
+          <View style={styles.promptsContainer}>
+            <Text style={styles.promptsTitle}>Empieza con una idea</Text>
+            <View style={styles.promptsRow}>
+              {quickPrompts.map(({ title, description, prompt, Icon }) => (
+                <TouchableOpacity key={prompt} accessibilityRole="button" accessibilityLabel={prompt}
+                  disabled={isSending || live.active} onPress={() => handleSend(prompt)}
+                  style={[styles.promptChip, wide && styles.promptWide, (isSending || live.active) && styles.sendButtonDisabled]}>
+                  <View style={styles.promptIcon}><Icon size={18} color={colors.primary} /></View>
+                  <Text style={styles.promptChipText}>{title}</Text><Text style={styles.promptDescription}>{description}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
 
@@ -227,32 +239,8 @@ export default function CoachChatScreen() {
         </TouchableOpacity>
       </View>}
 
-      {/* Chips de preguntas sugeridas */}
-      {messages.length < 3 && (
-        <View style={styles.promptsContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.promptsRow}
-          >
-            {quickPrompts.map((p) => (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={p}
-                disabled={isSending || live.active || !!error}
-                key={p}
-                style={styles.promptChip}
-                onPress={() => handleSend(p)}
-              >
-                <Text style={styles.promptChipText}>{p}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
       {/* Input inferior */}
-      <View style={styles.inputContainer}>
+      <View testID="coach-composer" style={[styles.inputContainer, { paddingBottom: withinTabs ? 12 : Math.max(insets.bottom, 12) }]}>
         <TextInput
           style={styles.textInput}
           accessibilityLabel="Mensaje para el asistente"
@@ -306,7 +294,10 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: colors.primaryLight,
+    borderRadius: 14,
   },
+  headerIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center" },
   backBtnText: {
     fontSize: 16,
     color: colors.primary,
@@ -327,7 +318,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
-  companionCard: { flexDirection: "row", alignItems: "center", marginHorizontal: 16, marginTop: 12, marginBottom: 4, padding: 10, borderRadius: 22, backgroundColor: "#EDF8F1", borderWidth: 1, borderColor: "#D5EBDD", gap: 8 },
+  companionCard: { flexDirection: "row", alignItems: "center", marginBottom: 16, padding: 10, borderRadius: 22, backgroundColor: "#EDF8F1", borderWidth: 1, borderColor: "#D5EBDD", gap: 8 },
   companionCopy: { flex: 1, minWidth: 0, gap: 7 },
   companionEyebrow: { color: "#39845A", fontSize: 9, fontWeight: "800", letterSpacing: 1 },
   companionTitle: { color: "#214B35", fontSize: 16, fontWeight: "800", lineHeight: 21 },
@@ -342,22 +333,18 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   welcomeCard: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    padding: 20,
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: colors.cardBorder,
-    marginVertical: 6,
+    paddingHorizontal: 2,
+    alignItems: "flex-start",
+    marginVertical: 8,
   },
   welcomeIconWrap: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     backgroundColor: colors.primaryLight,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 12,
   },
   welcomeIcon: {
     fontSize: 44,
@@ -372,7 +359,6 @@ const styles = StyleSheet.create({
   welcomeDesc: {
     fontSize: 13,
     color: colors.textSecondary,
-    textAlign: "center",
     lineHeight: 19,
   },
   messageRow: {
@@ -437,31 +423,38 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   promptsContainer: {
-    paddingVertical: 8,
-    backgroundColor: colors.background,
+    marginTop: 16,
+    marginBottom: 22,
   },
+  promptsTitle: { fontSize: 12, fontWeight: "700", color: colors.textSecondary, marginBottom: 10 },
   promptsRow: {
-    paddingHorizontal: 16,
-    gap: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
   },
   promptChip: {
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 12,
+    flexGrow: 1,
+    flexBasis: "46%",
+    minWidth: 0,
+    minHeight: 112,
+    padding: 14,
+    borderRadius: 18,
   },
+  promptWide: { flexBasis: "22%" },
+  promptIcon: { width: 32, height: 32, borderRadius: 11, backgroundColor: colors.primaryLight, justifyContent: "center", alignItems: "center", marginBottom: 10 },
   promptChipText: {
     fontSize: 12,
     color: colors.text,
-    fontWeight: "600",
+    fontWeight: "700",
   },
+  promptDescription: { fontSize: 11, lineHeight: 16, color: colors.textSecondary, marginTop: 4 },
   inputContainer: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     padding: 12,
-    paddingBottom: Platform.OS === "ios" ? 28 : 12,
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.cardBorder,
@@ -474,21 +467,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderWidth: 1.5,
     borderColor: colors.cardBorder,
-    borderRadius: 20,
+    borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 14,
     color: colors.text,
-    maxHeight: 90,
+    maxHeight: 120,
   },
   sendButton: {
-    minWidth: 48,
-    minHeight: 48,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
     borderRadius: 16,
   },
   sendButtonDisabled: {
@@ -499,12 +490,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 14,
   },
-  voiceBar: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderColor: colors.cardBorder },
-  voiceButton: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, paddingHorizontal: 12, backgroundColor: colors.primaryLight, borderRadius: 12 },
-  voiceButtonText: { color: colors.primary, fontWeight: "700", fontSize: 13 },
-  voiceHint: { color: colors.textSecondary, fontSize: 12 },
+  voiceBar: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderColor: colors.cardBorder },
+  voiceButton: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 64, padding: 12, backgroundColor: colors.primaryLight, borderRadius: 18, borderWidth: 1, borderColor: "#D3EADB" },
+  voiceButtonActive: { backgroundColor: "#FFF5F5", borderColor: "#ECCFD2" },
+  voiceIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  voiceIconActive: { backgroundColor: colors.dangerLight },
+  voiceCopy: { flex: 1, minWidth: 0 },
+  voiceButtonText: { color: colors.primaryDark, fontWeight: "700", fontSize: 13, flexShrink: 1 },
+  voiceHint: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 3 },
   voiceError: { color: colors.textSecondary, paddingHorizontal: 16, paddingVertical: 8, fontSize: 13 },
-  listenButton: { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start", minHeight: 44, paddingTop: 8, marginTop: 8, borderTopWidth: 1, borderColor: colors.cardBorder },
+  listenButton: { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start", minHeight: 44, paddingHorizontal: 12, marginTop: 12, backgroundColor: colors.primaryLight, borderRadius: 12 },
   liveDraft: { borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 16, backgroundColor: colors.primaryLight, padding: 14, gap: 6, marginBottom: 12 },
   draftText: { color: colors.text, fontSize: 14, lineHeight: 21 },
   retryCard: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#FFF7E8", borderTopWidth: 1, borderColor: "#F1DFC1" },

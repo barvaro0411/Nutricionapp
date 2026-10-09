@@ -22,7 +22,6 @@ import {
   Keyboard,
   RotateCcw,
   Sparkles,
-  ArrowLeft,
   CheckCircle2,
   AlertCircle,
   Camera as CameraIcon,
@@ -45,9 +44,12 @@ import {
 } from "@/utils/liquidUnits";
 import { colors, shadows, layout } from "@/constants/colors";
 import { nutritionPer100 } from "@/utils/productNutrition";
+import { PageBackHeader } from "@/components/common/AppUI";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function BarcodeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { addItem } = useMealReviewStore();
   const { analyzeProductPhoto } = useMealAnalysis();
@@ -323,15 +325,9 @@ export default function BarcodeScreen() {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 20) + 20 }]} keyboardShouldPersistTaps="handled">
       {/* Top Navigation */}
-      <View style={styles.topNav}>
-        <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
-          <ArrowLeft size={18} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Escanear Código de Barras</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <PageBackHeader title="Escanear Código de Barras" backLabel="Volver a añadir alimentos" onBack={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/record")} />
 
       {/* Selector de Modo: Cámara vs Manual */}
       <View style={styles.tabBar}>
