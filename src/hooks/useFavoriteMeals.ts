@@ -161,11 +161,11 @@ export function useFavoriteMeals() {
 
   // 3. Registrar comida favorita en 1 toque (0 llamadas a la IA, 0 tokens)
   const logFavoriteMealMutation = useMutation({
-    mutationFn: async (favoriteMeal: FavoriteMealWithItems) => {
+    mutationFn: async (favoriteMeal: FavoriteMealWithItems & { targetMealType?: MealType }) => {
       if (!user) throw new Error("No hay sesión de usuario");
 
       const newMeal = await saveMealToDatabase({
-        userId: user.id, mealType: favoriteMeal.meal_type,
+        userId: user.id, mealType: favoriteMeal.targetMealType || favoriteMeal.meal_type,
         items: favoriteMeal.items.map(i => ({ food: i.food_name, grams: i.grams, unit: i.unit || "g", calories: i.calories, protein: i.protein, carbs: i.carbs, fat: i.fat, confidence: 1, nutrition_reference: i.nutrition_reference })),
         totals: { calories: favoriteMeal.total_calories, protein: favoriteMeal.total_protein, carbs: favoriteMeal.total_carbs, fat: favoriteMeal.total_fat },
         imagePath: "", notes: "Registrado desde favorita: " + favoriteMeal.title,

@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Modal,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -22,7 +22,7 @@ import { UsdaSearchModal } from "@/components/meal/UsdaSearchModal";
 import { findFamilyForFood } from "@/constants/chileanPresets";
 import { colors, shadows, layout } from "@/constants/colors";
 import { FoodUnit, MealType, DetectedFoodItemSchema } from "@/types/meal";
-import { parseDecimal } from "@/utils/dates";
+import { parseDecimal, getDateKey, APP_TIME_ZONE } from "@/utils/dates";
 import {
   getStandardPortions,
   isLiquidFood,
@@ -33,6 +33,7 @@ import { getVariant } from "@/utils/drinkVariants";
 
 export default function MealReviewScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ manual?: string }>();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { saveFavorite, isSavingFavorite } = useFavoriteMeals();
@@ -60,21 +61,25 @@ export default function MealReviewScreen() {
 
   const [saving, setSaving] = useState(false);
   const [activeVariantIndex, setActiveVariantIndex] = useState<number | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(params.manual === "1");
   const [usdaTarget, setUsdaTarget] = useState<string | "new" | null>(null);
   const [showFavModal, setShowFavModal] = useState(false);
   const [favTitle, setFavTitle] = useState("");
   const [newFoodName, setNewFoodName] = useState("");
   const [newFoodUnit, setNewFoodUnit] = useState<FoodUnit>("g");
   const [newFoodGrams, setNewFoodGrams] = useState("100");
-  const [newFoodCals, setNewFoodCals] = useState("150");
-  const [newFoodProt, setNewFoodProt] = useState("10");
-  const [newFoodCarbs, setNewFoodCarbs] = useState("15");
-  const [newFoodFat, setNewFoodFat] = useState("5");
+  const [newFoodCals, setNewFoodCals] = useState("");
+  const [newFoodProt, setNewFoodProt] = useState("");
+  const [newFoodCarbs, setNewFoodCarbs] = useState("");
+  const [newFoodFat, setNewFoodFat] = useState("");
   const [inputValues, setInputValues] = useState<Record<number, string>>({});
   const [inputErrors, setInputErrors] = useState<Record<number, string>>({});
 
   const totals = getTotals();
+  const clearQuantityInput = (index: number) => {
+    setInputValues(previous => { const next = { ...previous }; delete next[index]; return next; });
+    setInputErrors(previous => { const next = { ...previous }; delete next[index]; return next; });
+  };
 
   const handleSaveFavorite = async () => {
     if (!favTitle.trim()) {
@@ -96,6 +101,7 @@ export default function MealReviewScreen() {
   };
 
   const handleConfirmMeal = async () => {
+    if (saving) return;
     if (!user) {
       showAlert("Error", "No se detectó sesión de usuario.");
       return;
@@ -103,6 +109,10 @@ export default function MealReviewScreen() {
 
     if (items.length === 0) {
       showAlert("Aviso", "Debes tener al menos un alimento en la lista.");
+      return;
+    }
+    if (items.some(item => item.grams <= 0) || Object.values(inputErrors).some(Boolean)) {
+      showAlert("Revisa las porciones", "Cada alimento necesita una cantidad válida mayor que cero antes de guardar.");
       return;
     }
 
@@ -120,17 +130,20 @@ export default function MealReviewScreen() {
       });
 
       // Invalidar queries de TanStack para refrescar Dashboard, Historial y Racha de inmediato
-      await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
-      await queryClient.invalidateQueries({ queryKey: ["weeklyStats"] });
-      await queryClient.invalidateQueries({ queryKey: ["userStreak"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] }),
+        queryClient.invalidateQueries({ queryKey: ["weeklyStats"] }),
+        queryClient.invalidateQueries({ queryKey: ["userStreak"] }),
+      ]);
 
       showToast({
         type: "success",
         title: "¡Comida registrada!",
         message: `${Math.round(totals.calories)} kcal agregadas a tu día.`,
       });
+      const date = loggedAt ? getDateKey(new Date(loggedAt)) : getDateKey();
       reset();
-      router.replace("/(tabs)");
+      router.replace({ pathname: "/(tabs)", params: { date } });
     } catch (err: any) {
       showAlert("Error al guardar", err?.message || "Ocurrió un error al persistir la comida.");
     } finally {
@@ -141,8 +154,8 @@ export default function MealReviewScreen() {
   const handleAddNewItem = () => {
     if (!newFoodName.trim()) return;
     const parseRes = parseQuantityInput(newFoodGrams, newFoodUnit);
-    if (!parseRes.ok) {
-      showAlert("Cantidad inválida", parseRes.error);
+    if (!parseRes.ok || parseRes.value <= 0) {
+      showAlert("Cantidad inválida", parseRes.ok ? "Ingresa una cantidad mayor que cero." : parseRes.error);
       return;
     }
     const calories = parseDecimal(newFoodCals);
@@ -176,12 +189,15 @@ export default function MealReviewScreen() {
 
     setNewFoodName("");
     setNewFoodGrams(newFoodUnit === "ml" ? "250" : "100");
+    setNewFoodCals(""); setNewFoodProt(""); setNewFoodCarbs(""); setNewFoodFat("");
     setShowAddModal(false);
   };
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <Text accessibilityRole="header" style={styles.reviewIntro}>Revisa tu comida</Text>
+        <Text style={styles.reviewDate}>{(loggedAt ? new Date(loggedAt) : new Date()).toLocaleDateString("es-CL", { timeZone: APP_TIME_ZONE, day: "numeric", month: "long" })} · Ajusta las porciones antes de guardar</Text>
         {/* Banner de foto y resumen */}
         <View style={styles.topSummaryCard}>
           {localImageUri && (
@@ -203,6 +219,10 @@ export default function MealReviewScreen() {
           {(["desayuno", "almuerzo", "cena", "snack"] as MealType[]).map((type) => (
             <TouchableOpacity
               key={type}
+              accessibilityRole="button"
+              accessibilityLabel={"Cambiar comida a " + type}
+              accessibilityState={{ selected: mealType === type }}
+              aria-pressed={mealType === type}
               style={[styles.typeButton, mealType === type && styles.typeButtonActive]}
               onPress={() => setMealType(type)}
             >
@@ -215,20 +235,20 @@ export default function MealReviewScreen() {
 
         {/* Título de la lista */}
         <View style={styles.listHeaderRow}>
-          <Text style={styles.listHeaderTitle}>Alimentos Detectados ({items.length})</Text>
-          <TouchableOpacity onPress={() => setShowAddModal(true)}>
-            <Text style={styles.addFoodLink}>+ Agregar otro</Text>
-          </TouchableOpacity>
+          <Text style={styles.listHeaderTitle}>Tu comida · {items.length} {items.length === 1 ? "alimento" : "alimentos"}</Text>
         </View>
 
         {/* Modal simple de agregado manual */}
-        <TouchableOpacity accessibilityRole="button" onPress={() => setUsdaTarget("new")} style={styles.variantBtn}>
-          <Text style={styles.variantBtnText}>+ Agregar desde USDA</Text>
-        </TouchableOpacity>
+        <View style={styles.addActions}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir otro alimento desde USDA" onPress={() => setUsdaTarget("new")} style={styles.addSearchBtn}><Text style={styles.addSearchText}>+ Buscar alimento</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir alimento manualmente" onPress={() => setShowAddModal(true)} style={styles.addManualBtn}><Text style={styles.addFoodLink}>Ingreso manual</Text></TouchableOpacity>
+        </View>
         {showAddModal && (
           <View style={styles.manualAddCard}>
-            <Text style={styles.manualAddTitle}>Agregar Alimento Manual</Text>
+            <Text style={styles.manualAddTitle}>Datos de tu etiqueta</Text>
+            <Text style={styles.manualHelp}>Ingresa los nutrientes de la porción indicada abajo, no los del envase completo. Si la etiqueta indica valores por 100 g o ml, añade esa cantidad y luego ajusta la porción.</Text>
             <TextInput
+              accessibilityLabel="Nombre del alimento manual"
               style={styles.manualInput}
               placeholder="Nombre (ej: Palta Hass o Gatorade)"
               placeholderTextColor={colors.textMuted}
@@ -280,6 +300,7 @@ export default function MealReviewScreen() {
                   {newFoodUnit === "ml" ? "Volumen (ml / L)" : "Gramos (g)"}
                 </Text>
                 <TextInput
+                  accessibilityLabel="Cantidad del alimento manual"
                   style={styles.manualInput}
                   value={newFoodGrams}
                   onChangeText={setNewFoodGrams}
@@ -290,6 +311,7 @@ export default function MealReviewScreen() {
               <View style={styles.manualCol}>
                 <Text style={styles.manualColLabel}>Calorías</Text>
                 <TextInput
+                  accessibilityLabel="Calorías de la porción manual"
                   style={styles.manualInput}
                   keyboardType="numeric"
                   value={newFoodCals}
@@ -301,6 +323,7 @@ export default function MealReviewScreen() {
               <View style={styles.manualCol}>
                 <Text style={styles.manualColLabel}>Prot (g)</Text>
                 <TextInput
+                  accessibilityLabel="Proteína de la porción manual"
                   style={styles.manualInput}
                   keyboardType="numeric"
                   value={newFoodProt}
@@ -310,6 +333,7 @@ export default function MealReviewScreen() {
               <View style={styles.manualCol}>
                 <Text style={styles.manualColLabel}>Carbs (g)</Text>
                 <TextInput
+                  accessibilityLabel="Carbohidratos de la porción manual"
                   style={styles.manualInput}
                   keyboardType="numeric"
                   value={newFoodCarbs}
@@ -319,6 +343,7 @@ export default function MealReviewScreen() {
               <View style={styles.manualCol}>
                 <Text style={styles.manualColLabel}>Grasas (g)</Text>
                 <TextInput
+                  accessibilityLabel="Grasas de la porción manual"
                   style={styles.manualInput}
                   keyboardType="numeric"
                   value={newFoodFat}
@@ -333,8 +358,8 @@ export default function MealReviewScreen() {
               >
                 <Text style={styles.cancelManualText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveManualBtn} onPress={handleAddNewItem}>
-                <Text style={styles.saveManualText}>Añadir</Text>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir alimento manual" style={styles.saveManualBtn} onPress={handleAddNewItem}>
+                <Text style={styles.saveManualText}>Añadir alimento</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -346,7 +371,7 @@ export default function MealReviewScreen() {
             <Text style={styles.emptyIcon}>🍽️</Text>
             <Text style={styles.emptyTitle}>Bandeja de comida vacía</Text>
             <Text style={styles.emptyDescription}>
-              Esta pantalla es para revisar y confirmar los alimentos detectados por la IA después de tomar una foto o ingresar una comida.
+              Busca un alimento o copia los nutrientes de su etiqueta. Aquí podrás ajustar cada porción antes de guardar.
             </Text>
             <View style={styles.emptyButtonsContainer}>
               <TouchableOpacity
@@ -370,7 +395,7 @@ export default function MealReviewScreen() {
           <View style={styles.portionGuideCard}>
             <Text style={styles.portionGuideTitle}>💡 Calibra tus porciones con facilidad</Text>
             <Text style={styles.portionGuideSubtitle}>
-              La IA estima la porción. Ajusta la cantidad consumida para mejorar la estimación:
+              Estas medidas son aproximadas. Si puedes, pesa tu porción para registrarla con mayor precisión:
             </Text>
             <View style={styles.portionPillsRow}>
               <View style={styles.portionPill}>
@@ -416,7 +441,9 @@ export default function MealReviewScreen() {
                 </View>
                 <TouchableOpacity
                   style={styles.removeBtn}
-                  onPress={() => removeItem(index)}
+                  accessibilityRole="button"
+                  accessibilityLabel={"Quitar " + item.food}
+                  onPress={() => { removeItem(index); setInputValues({}); setInputErrors({}); setActiveVariantIndex(null); }}
                 >
                   <Text style={styles.removeBtnText}>✕</Text>
                 </TouchableOpacity>
@@ -481,7 +508,7 @@ export default function MealReviewScreen() {
               <View style={styles.gramsControlRow}>
                 <TouchableOpacity
                   style={styles.stepBtn}
-                  onPress={() => adjustItemGramsDelta(index, isMl ? -50 : -10)}
+                  onPress={() => { adjustItemGramsDelta(index, isMl ? -50 : -10); clearQuantityInput(index); }}
                   accessibilityRole="button"
                   accessibilityLabel={`Disminuir porción de ${item.food}`}
                 >
@@ -524,7 +551,7 @@ export default function MealReviewScreen() {
 
                 <TouchableOpacity
                   style={styles.stepBtn}
-                  onPress={() => adjustItemGramsDelta(index, isMl ? 50 : 10)}
+                  onPress={() => { adjustItemGramsDelta(index, isMl ? 50 : 10); clearQuantityInput(index); }}
                   accessibilityRole="button"
                   accessibilityLabel={`Aumentar porción de ${item.food}`}
                 >
@@ -642,21 +669,27 @@ export default function MealReviewScreen() {
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.favStarBtn}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: saving || !items.length }}
+          disabled={saving || !items.length}
           onPress={() => setShowFavModal(true)}
         >
           <Text style={styles.favStarBtnText}>⭐ Guardar como frecuente</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.confirmBtn, saving && styles.confirmBtnDisabled]}
+          accessibilityRole="button"
+          accessibilityLabel="Guardar comida"
+          accessibilityState={{ disabled: saving || !items.length, busy: saving }}
+          style={[styles.confirmBtn, (saving || !items.length) && styles.confirmBtnDisabled]}
           onPress={handleConfirmMeal}
-          disabled={saving}
+          disabled={saving || !items.length}
         >
           {saving ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text style={styles.confirmBtnText}>
-              Confirmar Comida ({Math.round(totals.calories)} kcal) ✓
+              Guardar comida · {Math.round(totals.calories)} kcal
             </Text>
           )}
         </TouchableOpacity>
@@ -672,8 +705,15 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     ...layout.narrowPage,
-    paddingBottom: 110,
+    paddingBottom: 190,
   },
+  reviewIntro: { color: colors.text, fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },
+  reviewDate: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 6, marginBottom: 20 },
+  addActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 18 },
+  addSearchBtn: { minHeight: 44, paddingHorizontal: 14, justifyContent: "center", borderRadius: 12, backgroundColor: colors.primaryLight },
+  addSearchText: { color: colors.primaryDark, fontSize: 13, fontWeight: "700" },
+  addManualBtn: { minHeight: 44, justifyContent: "center", paddingHorizontal: 12 },
+  manualHelp: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 14 },
   topSummaryCard: {
     flexDirection: "row",
     backgroundColor: colors.card,
@@ -783,6 +823,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
     marginBottom: 12,
   },
   listHeaderTitle: {
@@ -899,8 +941,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   removeBtn: {
-    width: 28,
-    height: 28,
+    width: 44,
+    height: 44,
     borderRadius: 14,
     backgroundColor: colors.surfaceMuted,
     alignItems: "center",
@@ -1011,6 +1053,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: "#F1F5F9",

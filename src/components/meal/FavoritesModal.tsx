@@ -11,18 +11,20 @@ import {
 } from "react-native";
 import { useFavoriteMeals, FavoriteMealWithItems } from "@/hooks/useFavoriteMeals";
 import { colors } from "@/constants/colors";
+import { MealType } from "@/types/meal";
 
 interface FavoritesModalProps {
   visible: boolean;
   onClose: () => void;
+  mealType?: MealType;
 }
 
-export function FavoritesModal({ visible, onClose }: FavoritesModalProps) {
+export function FavoritesModal({ visible, onClose, mealType }: FavoritesModalProps) {
   const { favorites, isLoading, logFavoriteMeal, isLoggingFavorite } = useFavoriteMeals();
 
   const handleSelectFavorite = async (fav: FavoriteMealWithItems) => {
     try {
-      await logFavoriteMeal(fav);
+      await logFavoriteMeal({ ...fav, targetMealType: mealType });
       showAlert("¡Listo!", `Se registró "${fav.title}" en tus comidas del día.`);
       onClose();
     } catch (err: any) {
@@ -36,7 +38,7 @@ export function FavoritesModal({ visible, onClose }: FavoritesModalProps) {
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>⭐ Mis Comidas Frecuentes</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar comidas frecuentes" onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -59,6 +61,8 @@ export function FavoritesModal({ visible, onClose }: FavoritesModalProps) {
               {favorites.map((fav) => (
                 <TouchableOpacity
                   key={fav.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={"Registrar favorita " + fav.title}
                   style={styles.card}
                   onPress={() => handleSelectFavorite(fav)}
                   disabled={isLoggingFavorite}

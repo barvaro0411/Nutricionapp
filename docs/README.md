@@ -24,3 +24,7 @@ Guía centralizada de documentación técnica y operativa del proyecto.
 
 ## 6. Especificaciones Técnicas
 - **[Unidades Líquidas y Registro de Bebidas](superpowers/specs/2026-10-07-liquid-units-and-beverage-logging-design.md)**: Diseño de soporte para `ml` y conversión de densidad.
+
+## 7. Progreso y Registro de Alimentos
+
+- **[Progreso y Alimentos (2026-10-09)](progress-food-release-2026-10-09.md)**: Periodos de 7 y 30 días, tendencias por nutriente, búsqueda USDA con vista previa de porciones y registro manual desde etiquetas.

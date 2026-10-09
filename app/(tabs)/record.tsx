@@ -15,10 +15,15 @@ import {
   Sparkles,
   ChevronRight,
   ArrowLeft,
+  Search,
+  PencilLine,
+  CalendarDays,
+  Check,
 } from "lucide-react-native";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { TextVoiceModal } from "@/components/meal/TextVoiceModal";
 import { FavoritesModal } from "@/components/meal/FavoritesModal";
+import { UsdaSearchModal } from "@/components/meal/UsdaSearchModal";
 import { MealType } from "@/types/meal";
 import { colors, layout } from "@/constants/colors";
 import { PageHeading } from "@/components/common/AppUI";
@@ -33,6 +38,7 @@ export default function RecordScreen() {
   );
   const [showTextVoiceModal, setShowTextVoiceModal] = useState(false);
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
 
   useEffect(() => {
     if (params.mealType) setSelectedMealType(params.mealType);
@@ -57,16 +63,15 @@ export default function RecordScreen() {
   return (
     <>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <PageHeading eyebrow="Tu diario" title="¿Qué comiste?" description="Elige la forma que te resulte más cómoda. Podrás revisar las porciones antes de guardar." />
-        {dateKey !== getDateKey() && <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Registrar para el {selectedDate.toLocaleDateString("es-CL", { timeZone: APP_TIME_ZONE })}</Text>
-          <TouchableOpacity accessibilityRole="button" onPress={() => router.setParams({ date: getDateKey() })}>
-            <Text style={{ color: colors.primary }}>Cambiar a hoy</Text>
-          </TouchableOpacity>
-        </View>}
+        <PageHeading eyebrow="Tu diario de alimentación" title="Añadir alimentos" description="Busca un alimento o registra tu plato completo. Revisa la porción y guarda cuando esté listo." />
+        <View style={styles.dateBanner}>
+          <CalendarDays size={18} color={colors.primary} />
+          <Text style={styles.dateText}>{dateKey === getDateKey() ? "Hoy" : "Registrando para"} · {selectedDate.toLocaleDateString("es-CL", { timeZone: APP_TIME_ZONE, day: "numeric", month: "long" })}</Text>
+          {dateKey !== getDateKey() && <TouchableOpacity accessibilityRole="button" onPress={() => router.setParams({ date: getDateKey() })} style={styles.todayButton}><Text style={styles.todayText}>Ir a hoy</Text></TouchableOpacity>}
+        </View>
         {/* Selector de Tiempo de Comida */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>¿Qué comida vas a registrar?</Text>
+          <Text style={styles.sectionTitle}>1. Elige la comida</Text>
           <View style={styles.mealTypesRow}>
             {mealTypes.map((m) => {
               const active = selectedMealType === m.type;
@@ -77,6 +82,7 @@ export default function RecordScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`Elegir ${m.label}`}
                   accessibilityState={{ selected: active }}
+                  aria-pressed={active}
                   onPress={() => setSelectedMealType(m.type)}
                   activeOpacity={0.8}
                 >
@@ -89,6 +95,7 @@ export default function RecordScreen() {
                   >
                     {m.label}
                   </Text>
+                  {active && <View style={styles.mealCheck}><Check size={10} color="white" strokeWidth={3} /></View>}
                 </TouchableOpacity>
               );
             })}
@@ -96,7 +103,19 @@ export default function RecordScreen() {
         </View>
 
         {/* Sección de Métodos de Registro */}
-        <Text style={styles.sectionTitle}>Una comida, varias formas de registrarla</Text>
+        <Text style={styles.sectionTitle}>2. Añade lo que comiste</Text>
+        <TouchableOpacity style={styles.searchCard} accessibilityRole="button" accessibilityLabel="Buscar un alimento" activeOpacity={0.85}
+          onPress={() => { beginMeal(); setShowSearchModal(true); }}>
+          <View style={styles.searchTop}><View style={styles.searchIcon}><Search size={24} color={colors.mint} /></View><View style={styles.catalogBadge}><Text style={styles.catalogBadgeText}>CATÁLOGO USDA</Text></View></View>
+          <Text style={styles.searchTitle}>Encuentra tu alimento</Text>
+          <Text style={styles.searchDescription}>Busca en español, elige cómo está preparado y ajusta tu porción.</Text>
+          <View style={styles.searchField}><Search size={17} color={colors.primary} /><Text style={styles.searchPlaceholder}>Arroz cocido, pollo, yogur…</Text><ChevronRight size={18} color={colors.primary} /></View>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.manualCard} accessibilityRole="button" accessibilityLabel="Ingresar alimento manualmente" activeOpacity={0.8}
+          onPress={() => { beginMeal(); router.push({ pathname: "/meal/review", params: { manual: "1" } }); }}>
+          <PencilLine size={20} color={colors.primary} /><View style={styles.methodInfo}><Text style={styles.methodTitle}>Tengo la etiqueta nutricional</Text><Text style={styles.methodDesc}>Ingresa la porción y sus nutrientes a mano.</Text></View><ChevronRight size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+        <Text style={styles.otherMethodsTitle}>O registra tu plato de otra forma</Text>
 
         {/* 1. Foto con IA (Destacada) */}
         <TouchableOpacity
@@ -124,7 +143,7 @@ export default function RecordScreen() {
               </View>
             </View>
             <Text style={styles.methodDesc}>
-              Toma una foto de tu comida. La IA detecta alimentos, estima porciones y calcula calorías automáticamente.
+              Fotografía tu plato y revisa los alimentos y las porciones que estima la IA.
             </Text>
           </View>
           <ChevronRight size={18} color={colors.primary} />
@@ -145,7 +164,7 @@ export default function RecordScreen() {
             <Mic size={24} color="#6366F1" />
           </View>
           <View style={styles.methodInfo}>
-            <Text style={styles.methodTitle}>Texto o Dictado por Voz</Text>
+            <Text style={styles.methodTitle}>Escribir o dictar</Text>
             <Text style={styles.methodDesc}>
               Describe tu comida con tus palabras, por escrito o con tu voz.
             </Text>
@@ -202,7 +221,8 @@ export default function RecordScreen() {
         {/* Botón para volver al Inicio */}
         <TouchableOpacity
           style={styles.backHomeBtn}
-          onPress={() => router.replace("/(tabs)")}
+          accessibilityRole="button"
+          onPress={() => router.replace({ pathname: "/(tabs)", params: { date: dateKey } })}
           activeOpacity={0.8}
         >
           <ArrowLeft size={16} color={colors.textSecondary} />
@@ -216,10 +236,15 @@ export default function RecordScreen() {
         mealType={selectedMealType}
         onClose={() => setShowTextVoiceModal(false)}
       />
+      {showSearchModal && <UsdaSearchModal onClose={() => setShowSearchModal(false)} onSelect={item => {
+        useMealReviewStore.getState().addItem(item);
+        router.push("/meal/review");
+      }} />}
 
       {/* Modal de Comidas Frecuentes */}
       <FavoritesModal
         visible={showFavoritesModal}
+        mealType={selectedMealType}
         onClose={() => setShowFavoritesModal(false)}
       />
     </>
@@ -238,6 +263,22 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     marginTop: 4,
   },
+  dateBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 14, backgroundColor: colors.primaryLight, marginBottom: 24 },
+  dateText: { flex: 1, color: colors.primaryDark, fontSize: 12, fontWeight: "600" },
+  todayButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: 6 },
+  todayText: { color: colors.primary, fontWeight: "700", fontSize: 12 },
+  mealCheck: { position: "absolute", top: 5, right: 5, backgroundColor: colors.primary, width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  searchCard: { backgroundColor: colors.forest, padding: 22, borderRadius: 24, marginBottom: 12 },
+  searchTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
+  searchIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#275747", alignItems: "center", justifyContent: "center" },
+  catalogBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: "#275747" },
+  catalogBadgeText: { color: colors.mint, fontSize: 9, fontWeight: "700", letterSpacing: 1 },
+  searchTitle: { fontSize: 23, fontWeight: "800", color: "white", letterSpacing: -0.5 },
+  searchDescription: { fontSize: 13, lineHeight: 20, color: "#CEE1D6", marginTop: 8, marginBottom: 18 },
+  searchField: { minHeight: 52, backgroundColor: "white", borderRadius: 14, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  searchPlaceholder: { flex: 1, color: colors.textSecondary, fontSize: 13 },
+  manualCard: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: colors.cardBorder, backgroundColor: colors.card, padding: 16, borderRadius: 18, marginBottom: 24 },
+  otherMethodsTitle: { fontSize: 13, color: colors.textSecondary, fontWeight: "600", marginBottom: 12 },
   sectionTitle: {
     fontSize: 15,
     fontWeight: "700",
