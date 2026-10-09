@@ -37,6 +37,11 @@ Las cuentas, registros y la imagen sintética se eliminan al finalizar. Las prue
 
 ## Publicación
 
-La exportación local está terminada y pasa los 25 recorridos de navegador. La revisión automática de permisos rechazó la subida a Vercel por falta de autorización explícita para ese destino y evidencia de propiedad. Se solicitó autorización para publicar en el sitio existente y guardar el cambio en GitHub; el dominio público conserva la versión anterior.
+Disponible en [Nutrición IA](https://dist-two-alpha-18.vercel.app).
 
-Antes de promover, se deben repetir los recorridos sobre el build preparado de Vercel, publicar ese mismo build y verificar su igualdad con el bundle del dominio público.
+- Build del proyecto Vercel existente: `dpl_8T7wcH5BvGWd1gBD4mAuppfefcCp`, probado antes de promover ese mismo build sin reconstruir.
+- Los 25 recorridos de diario, diseño y controles pasaron en la versión preparada. Se verificaron cuatro tamaños de pantalla, sin desbordamientos horizontales ni errores de página.
+- Tres comprobaciones adicionales en el dominio público verificaron los valores del diario, el acceso a alimentos y perfil, el coach y las cinco pestañas.
+- Bundle público y preparado iguales: `/_expo/static/js/web/entry-31bed263afc82076a5f7811404a87a0c.js`. SHA-256: `95b9c6f9a1f8dd5a532bac7725436b6e7a95433de1c6319427e517ce2625c049`.
+- No se encontraron claves privadas en la fuente ni en el bundle. Las funciones del coach conservan el rechazo de peticiones sin sesión con estado 401.
+- Se eliminaron las cuentas sintéticas, sus registros y la imagen de prueba.
