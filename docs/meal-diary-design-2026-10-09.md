@@ -2,9 +2,10 @@
 
 ## Diseño
 
-Inicio adopta el estilo de la referencia compartida: tarjetas blancas con bordes suaves, verde menta, resumen compacto y botones amplios. Las comidas aparecen antes de las herramientas de registro, hidratación y coach.
+Inicio adopta el estilo de la referencia compartida: tarjetas blancas con bordes suaves, verde menta, resumen compacto y botones amplios. El orden prioriza el saludo personal y la hidratación: saludo, fecha, agua, resumen diario y comidas. Las herramientas de registro y el coach siguen después de las comidas.
 
 - «Tus comidas» muestra la cantidad real de registros y un acceso a Progreso.
+- El saludo, la guía y la racha encabezan Inicio. La tarjeta de agua y los botones de 250 y 500 ml aparecen antes del resumen y las comidas, sin duplicar el registro de hidratación.
 - El selector de fecha ocupa una fila. Al tocar la fecha se despliegan los siete días; se mantienen las flechas y «Volver a hoy».
 - El resumen reúne calorías consumidas, meta, porcentaje y nutrientes. En escritorio distribuye energía y nutrientes en una misma fila.
 - Desayuno y Almuerzo empiezan abiertos. Once / Cena y Colación empiezan cerrados cuando tienen registros. Las categorías vacías presentan directamente «Añadir alimento».
@@ -25,6 +26,10 @@ Se modifican cuatro archivos de interfaz. No se agregan dependencias, migracione
 
 ## Verificación
 
+El ajuste del saludo y la hidratación modifica únicamente Inicio y su documentación. Pasa TypeScript, ESLint y exportación PWA. Nueve recorridos sobre el build preparado y cuatro comprobaciones del dominio público verifican el orden visual y de lectura, los botones de agua completamente visibles al abrir Inicio y el guardado por fecha. Se probaron anchos de 320, 390, 768 y 1366 píxeles a 640 píxeles de altura.
+
+La publicación inicial del diseño se comprobó además con:
+
 - TypeScript, ESLint y exportación PWA correctos; la fuente aislada también pasa TypeScript.
 - 247 pruebas existentes correctas en 32 suites. El total incluye tres pruebas del trabajo local previo conservado.
 - Ocho comprobaciones específicas: comidas plegadas y totales; nombres completos y mililitros; foto privada cargada y firma reutilizada; tamaños de pantalla y botones; selector de fecha con teclado; añadir según tipo y fecha; exceso sobre la meta; actividad y presupuesto persistido.
@@ -39,9 +44,9 @@ Las cuentas, registros y la imagen sintética se eliminan al finalizar. Las prue
 
 Disponible en [Nutrición IA](https://dist-two-alpha-18.vercel.app).
 
-- Build del proyecto Vercel existente: `dpl_8T7wcH5BvGWd1gBD4mAuppfefcCp`, probado antes de promover ese mismo build sin reconstruir.
-- Los 25 recorridos de diario, diseño y controles pasaron en la versión preparada. Se verificaron cuatro tamaños de pantalla, sin desbordamientos horizontales ni errores de página.
-- Tres comprobaciones adicionales en el dominio público verificaron los valores del diario, el acceso a alimentos y perfil, el coach y las cinco pestañas.
-- Bundle público y preparado iguales: `/_expo/static/js/web/entry-31bed263afc82076a5f7811404a87a0c.js`. SHA-256: `95b9c6f9a1f8dd5a532bac7725436b6e7a95433de1c6319427e517ce2625c049`.
+- Build del proyecto Vercel existente: `dpl_CTDaEF4o786VF21MtomeJj8eChRv`, probado antes de promover ese mismo build sin reconstruir.
+- Los nueve recorridos de diario y orden de Inicio pasaron en la versión preparada. Se verificaron cuatro tamaños de pantalla, sin desbordamientos horizontales ni errores de página.
+- Cuatro comprobaciones adicionales en el dominio público verificaron los valores del diario, el saludo y el agua al inicio, el acceso a alimentos y perfil, el coach y las cinco pestañas.
+- Bundle público y preparado iguales: `/_expo/static/js/web/entry-3aef6c5634e22b4236fd89a1104437d5.js`. SHA-256: `edaf2d9059e69bca5fd5c0e8bfcc9571b615cb3242d243b9ed007cb5bf64dba6`.
 - No se encontraron claves privadas en la fuente ni en el bundle. Las funciones del coach conservan el rechazo de peticiones sin sesión con estado 401.
-- Se eliminaron las cuentas sintéticas, sus registros y la imagen de prueba.
+- Se eliminaron las cuentas sintéticas y sus registros.

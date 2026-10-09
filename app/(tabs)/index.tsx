@@ -135,12 +135,32 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* Comidas del Día */}
-        <View style={styles.mealsHeading}>
-          <View><Text accessibilityRole="header" style={styles.mealsHeaderTitle}>Tus comidas</Text><Text style={styles.mealsDescription}>{data?.meals.length || 0} {(data?.meals.length || 0) === 1 ? "comida registrada" : "comidas registradas"} en este día</Text></View>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tendencias de alimentación" onPress={() => router.push("/(tabs)/history")} style={styles.progressLink}><Text style={styles.progressLinkText}>Ver progreso</Text><ArrowUpRight size={16} color={colors.primary} /></TouchableOpacity>
+        {/* Encabezado con Saludo, Guía y Racha */}
+        <View style={styles.topHeader}>
+          <View style={styles.greetingWrap}>
+            <Text style={styles.greetingEyebrow}>TU DIARIO PERSONAL</Text>
+            <Text accessibilityRole="header" style={styles.greetingTitle}>
+              {profile?.full_name
+                ? `Hola, ${profile.full_name.split(" ")[0]}`
+                : "Tu espacio de bienestar"}
+            </Text>
+            <Text style={styles.greetingSubtitle}>
+              Un día a la vez, a tu ritmo.
+            </Text>
+          </View>
+          <View style={styles.headerRightActions}>
+            <TouchableOpacity
+              style={styles.helpGuideBtn}
+              onPress={() => setShowGuideModal(true)}
+              activeOpacity={0.8}
+              accessibilityLabel="¿Cómo funciona la app?"
+              accessibilityRole="button"
+            >
+              <HelpCircle size={18} color={colors.primary} />
+            </TouchableOpacity>
+            <StreakBadge onPress={() => setShowStreakModal(true)} />
+          </View>
         </View>
-
 
         {/* Navegador de Fecha */}
         <View style={styles.dateSelector}>
@@ -204,6 +224,23 @@ export default function DashboardScreen() {
           />
         ) : (
           <>
+            {/* Widget de Agua */}
+            <WaterCard
+              totalMl={totalMl}
+              targetMl={targetMl}
+              onAddWater={async (ml) => {
+                try {
+                  await addWater(ml);
+                } catch {
+                  showAlert(
+                    "Agua",
+                    "No se pudo guardar. Revisa la conexión.",
+                  );
+                }
+              }}
+              loading={isAdding}
+            />
+
             <DailySummary
               calorieGoal={data?.goal.calories ?? 2000}
               calories={data?.consumed.calories ?? 0}
@@ -216,6 +253,12 @@ export default function DashboardScreen() {
               burnedCalories={burnedCalories}
               onExercisePress={() => setShowActivityModal(true)}
             />
+            {/* Comidas del Día */}
+            <View style={styles.mealsHeading}>
+              <View><Text accessibilityRole="header" style={styles.mealsHeaderTitle}>Tus comidas</Text><Text style={styles.mealsDescription}>{data?.meals.length || 0} {(data?.meals.length || 0) === 1 ? "comida registrada" : "comidas registradas"} en este día</Text></View>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tendencias de alimentación" onPress={() => router.push("/(tabs)/history")} style={styles.progressLink}><Text style={styles.progressLinkText}>Ver progreso</Text><ArrowUpRight size={16} color={colors.primary} /></TouchableOpacity>
+            </View>
+
             <View style={styles.mealGrid}>
               {(["desayuno", "almuerzo", "cena", "snack"] as MealType[]).map(
                 (type) => (
@@ -234,33 +277,6 @@ export default function DashboardScreen() {
                   </View>
                 ),
               )}
-            </View>
-
-            {/* Encabezado con Saludo, Guía y Racha */}
-            <View style={styles.topHeader}>
-              <View style={styles.greetingWrap}>
-                <Text style={styles.greetingEyebrow}>TUS HERRAMIENTAS</Text>
-                <Text accessibilityRole="header" style={styles.greetingTitle}>
-                  {profile?.full_name
-                    ? `Hola, ${profile.full_name.split(" ")[0]}`
-                    : "Tu espacio de bienestar"}
-                </Text>
-                <Text style={styles.greetingSubtitle}>
-                  Un día a la vez, a tu ritmo.
-                </Text>
-              </View>
-              <View style={styles.headerRightActions}>
-                <TouchableOpacity
-                  style={styles.helpGuideBtn}
-                  onPress={() => setShowGuideModal(true)}
-                  activeOpacity={0.8}
-                  accessibilityLabel="¿Cómo funciona la app?"
-                  accessibilityRole="button"
-                >
-                  <HelpCircle size={18} color={colors.primary} />
-                </TouchableOpacity>
-                <StreakBadge onPress={() => setShowStreakModal(true)} />
-              </View>
             </View>
 
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir comida a este día" activeOpacity={0.85}
@@ -361,23 +377,6 @@ export default function DashboardScreen() {
               <View
                 style={[styles.summarySide, wide && styles.summarySideWide]}
               >
-                {/* Widget de Agua */}
-                <WaterCard
-                  totalMl={totalMl}
-                  targetMl={targetMl}
-                  onAddWater={async (ml) => {
-                    try {
-                      await addWater(ml);
-                    } catch {
-                      showAlert(
-                        "Agua",
-                        "No se pudo guardar. Revisa la conexión.",
-                      );
-                    }
-                  }}
-                  loading={isAdding}
-                />
-
                 {isToday && (
                   <>
                     {/* Smart Coach Proactivo (Fase 3) */}
@@ -570,7 +569,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 16,
-    marginTop: 24,
+    marginTop: 4,
   },
   headerRightActions: {
     flexDirection: "row",
@@ -593,7 +592,7 @@ const styles = StyleSheet.create({
   },
   greetingEyebrow: { fontSize: 9, letterSpacing: 1.6, fontWeight: "700", color: colors.primary, marginBottom: 7 },
   greetingTitle: {
-    fontSize: 20,
+    fontSize: 26,
     fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.5,
