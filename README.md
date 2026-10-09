@@ -70,7 +70,12 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-aqui
 | `npm start` | Inicia el bundler Metro de Expo para móviles y web. |
 | `npm test` | Ejecuta la suite de pruebas unitarias (Jest). |
 | `npm run type-check` | Verifica que no existan errores de tipos con TypeScript. |
-| `npm run build:pwa` | Compila la PWA lista para producción en la carpeta `dist/`. |
+| `npm run lint` | Ejecuta validación estática de código con ESLint. |
+| `npm run build:pwa` | Compila la PWA lista para producción e inyecta Service Worker en `dist/`. |
+| `npm run icons` | Genera favicon y recursos PNG PWA a partir de `assets/icon.svg`. |
+| `npm run check:tooling` | Verifica integridad de seguridad en la cadena de compilación. |
+
+Para documentación detallada de arquitectura, integraciones y voz, consulta el **[Índice de Documentación](docs/README.md)**.
 
 ---
 
@@ -89,6 +94,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-aqui
   * `parse-meal-text`: Procesamiento de lenguaje natural y dictado por voz.
   * `nutrition-coach`: Asistente nutricional contextualizado con tus metas y comidas.
   * `coach-live-session`: Tokens temporales para Gemini Live y guardado del diálogo por voz.
+  * `search-foods`: Búsqueda y enriquecimiento nutricional de alimentos USDA.
 * **`supabase/migrations/`**: Esquema de base de datos relacional PostgreSQL con RLS.
 
 ---
