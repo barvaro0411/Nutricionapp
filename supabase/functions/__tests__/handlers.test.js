@@ -3,6 +3,10 @@ let createClient;
 const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 let client, env, fetchMock;
 beforeEach(() => {
+  jest.spyOn(crypto.subtle, 'digest').mockImplementation(async (_, bytes) => {
+    const hash = require('node:crypto').createHash('sha256').update(Buffer.from(bytes)).digest();
+    return hash.buffer.slice(hash.byteOffset, hash.byteOffset + hash.byteLength);
+  });
   jest.resetModules();
   ({ createClient } = require("@supabase/supabase-js"));
   env = { SUPABASE_URL: "https://test.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "server-secret", GEMINI_API_KEY: "gemini-secret" };
@@ -14,6 +18,7 @@ beforeEach(() => {
   global.fetch = fetchMock = jest.fn();
 });
 const request = body => new Request("https://test/functions/v1/test", { method: "POST", headers: { Authorization: "Bearer user-token", "Content-Type": "application/json" }, body: JSON.stringify(body) });
+afterEach(() => jest.restoreAllMocks());
 test("photo rejects forged sessions and never downloads", async () => {
   client.auth.getUser.mockResolvedValue({ data: { user: null }, error: new Error("invalid") });
   const { handleRequest } = require("../analyze-meal/index.ts");

@@ -1,5 +1,6 @@
 module.exports = {
   testEnvironment: "node",
+  setupFiles: ["<rootDir>/scripts/jest-webcrypto.cjs"],
   transform: {
     "^.+\\.(ts|tsx|js|jsx)$": "babel-jest",
   },

@@ -22,10 +22,14 @@ El prefijo `openai/` en los modelos GPT-OSS identifica modelos abiertos ejecutad
 - El buscador traduce etiquetas mientras USDA obtiene los nutrientes. Conserva las descripciones originales si falla esa traducción.
 - Cada consulta selecciona un proveedor y recurre al siguiente cuando falla; enviar la misma pregunta simultáneamente a todos duplicaría consumo. La transcripción precede a la extracción porque esta depende del texto obtenido.
 - El respaldo comparte un plazo total. Las claves Gemini reparten ese plazo para que una clave detenida deje tiempo a las siguientes. Errores 401, 403 y 429 permiten avanzar sin repetir la misma clave.
-- Los errores 429, de configuración o temporales suspenden brevemente ese modelo **dentro de una instancia Edge activa**. Este estado no se comparte globalmente entre funciones o instancias. Los errores de negocio y autenticación no activan otra interpretación.
+- Los errores 429, de configuración o temporales suspenden esa credencial y modelo. Con `AI_PROVIDER_HEALTH_SHARED=true` y la migración `20261009000000`, el estado se comparte entre funciones e instancias mediante RPC privados, con hashes SHA-256 de las claves. Si esa consulta falla, queda protección local. Se respeta `Retry-After`, los reinicios de cuotas de Groq y la medianoche del Pacífico para límites diarios de Gemini. Una credencial inválida suspende sus modelos; no suspende las demás claves. Los errores de negocio y autenticación no activan otra interpretación.
 - Groq reintenta hasta tres veces únicamente errores HTTP transitorios, dentro del plazo. GPT-OSS usa razonamiento bajo sin devolver pensamientos; Qwen usa el modo sin razonamiento y un prompt visual compacto. La prueba con el prompt largo recibió 429 (`Limit 1000`, `Requested 1027`); el compacto obtuvo respuesta válida en la misma cuenta.
 
 Se mantienen los controles de sesión, propiedad de imágenes, esquemas, preparación, porciones y procedencia USDA. Se reserva una sola solicitud de la cuota de la app aunque el flujo utilice transcripción, extracción, USDA y respaldo. Los valores predeterminados siguen siendo **100 solicitudes por usuario al día y 10 por minuto**, configurables mediante `AI_DAILY_LIMIT` y `AI_MINUTE_LIMIT`.
+
+El coach envía un UUID por mensaje. La base guarda atómicamente ambos mensajes y su respuesta; un reintento de la misma consulta devuelve esa respuesta sin llamar a la IA ni reservar cuota nuevamente. Las consultas simultáneas con ese UUID reciben una indicación de espera. El resultado se conserva durante 24 horas y solo lo maneja el backend; las conversaciones continúan en su historial habitual.
+
+Las traducciones del buscador tienen caché acotada de seis horas y deduplicación concurrente. La traducción de consultas se aísla por usuario; las etiquetas de referencias públicas USDA pueden reutilizarse. Los fallos no se guardan en caché. El contador de la app distingue el límite de minuto del diario; el diario se renueva a medianoche en Chile y las respuestas incluyen el plazo para reintentar.
 
 ## Secretos del servidor
 

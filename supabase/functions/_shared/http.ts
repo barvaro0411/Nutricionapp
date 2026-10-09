@@ -24,7 +24,7 @@ export function getCorsHeaders(req?: Request): Record<string, string> {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string) { super(message); }
+  constructor(public status: number, public code: string, message: string, public retryAfterSeconds?: number) { super(message); }
 }
 export function json(body: unknown, status = 200, req?: Request) {
   return new Response(JSON.stringify(body), { status, headers: getCorsHeaders(req) });
@@ -35,7 +35,13 @@ export function methodResponse(req: Request) {
   return null;
 }
 export function errorResponse(error: unknown, req?: Request) {
-  if (error instanceof ApiError) return json({ success: false, error: { code: error.code, message: error.message } }, error.status, req);
+  if (error instanceof ApiError) {
+    const seconds = error.retryAfterSeconds ? Math.min(86400, Math.max(1, Math.ceil(error.retryAfterSeconds))) : undefined;
+    const response = json({ success: false, error: { code: error.code, message: error.message, ...(seconds ? { retry_after_seconds: seconds } : {}) } }, error.status, req);
+    if (seconds) response.headers.set("Retry-After", String(seconds));
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
   console.error("Fallo del servicio de IA:", error instanceof Error ? error.name : "UnknownError");
   return json({ success: false, error: { code: "SERVER_ERROR", message: "No se pudo completar la solicitud. Inténtalo nuevamente." } }, 500, req);
 }
@@ -68,5 +74,7 @@ export async function reserveAiRequest(client: ServerClient, userId: string) {
     minute_limit: parseLimit(Deno.env.get("AI_MINUTE_LIMIT"), 10),
   });
   if (error) throw new ApiError(503, "DATABASE_CONFIGURATION_ERROR", "Falta actualizar la configuración de IA en la base de datos.");
-  if (!data?.allowed) throw new ApiError(429, "RATE_LIMITED", "Alcanzaste el límite de solicitudes de IA. Espera antes de volver a intentar.");
+  if (!data?.allowed) throw new ApiError(429, "RATE_LIMITED", data?.scope === "daily"
+    ? "Alcanzaste el límite diario de IA. Se renueva a medianoche en Chile; puedes consultar tus registros guardados."
+    : "Has consultado varias veces seguidas. Espera un momento antes de volver a intentar.", Number(data?.retry_after_seconds) || 60);
 }

@@ -1,7 +1,13 @@
 jest.mock("@supabase/supabase-js", () => ({ createClient: jest.fn() }));
-const { callGemini } = require("../_shared/gemini.ts");
+let callGemini;
 let fetchMock;
 beforeEach(() => {
+  jest.resetModules();
+  jest.spyOn(crypto.subtle, 'digest').mockImplementation(async (_, bytes) => {
+    const hash = require('node:crypto').createHash('sha256').update(Buffer.from(bytes)).digest();
+    return hash.buffer.slice(hash.byteOffset, hash.byteOffset + hash.byteLength);
+  });
+  ({ callGemini } = require("../_shared/gemini.ts"));
   jest.useFakeTimers();
   global.Deno = { env: { get: key => key === "GEMINI_MODEL" ? "gemini-test" : undefined } };
   global.fetch = fetchMock = jest.fn();
@@ -30,7 +36,7 @@ test("persistent unavailability stops after three attempts and returns a safe me
 
 test.each([400, 401, 403, 404, 429])("HTTP %i is not retried with the same credentials", async status => {
   fetchMock.mockResolvedValue(new Response("private-key", { status }));
-  await expect(callGemini("private-key", {})).rejects.toMatchObject({ code: [401, 403, 404].includes(status) ? "AI_PROVIDER_CONFIGURATION_ERROR" : "AI_PROVIDER_ERROR" });
+  await expect(callGemini("private-key", {})).rejects.toMatchObject({ code: [401, 403, 404].includes(status) ? "AI_PROVIDER_CONFIGURATION_ERROR" : status === 429 ? "AI_PROVIDER_QUOTA" : "AI_PROVIDER_ERROR" });
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 

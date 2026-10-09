@@ -38,7 +38,7 @@ export async function handleRequest(req: Request) {
     const chunks: string[] = [];
     for (let i = 0; i < bytes.length; i += 8192) chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
     const image = btoa(chunks.join(""));
-    const analysis = await withAiFallback(providers.map(selected => ({ id: selected.name,
+    const analysis = await withAiFallback(providers.map(selected => ({ id: selected.name, managedHealth: true,
       run: (timeoutMs: number) => selected.analyzeImage(image, photo.type, systemPrompt, client_time_iso, user_note, timeoutMs),
     })), { timeoutMs: 36000, perProviderMs: 18000 });
     if (!analysis.data.items.length) throw new ApiError(422, "NO_FOOD_DETECTED", "No se detectaron alimentos. Prueba con otra foto.");

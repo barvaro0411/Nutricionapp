@@ -5,6 +5,11 @@ const groqReply = text => new Response(JSON.stringify({ choices: [{ message: { c
 const geminiReply = text => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }));
 beforeEach(() => {
   jest.resetModules();
+  // Hash semantics stay real; remove native worker timing from fake-clock retry tests.
+  jest.spyOn(crypto.subtle, 'digest').mockImplementation(async (_, bytes) => {
+    const hash = require('node:crypto').createHash('sha256').update(Buffer.from(bytes)).digest();
+    return hash.buffer.slice(hash.byteOffset, hash.byteOffset + hash.byteLength);
+  });
   env = { GROQ_API_KEY: 'groq-secret', GEMINI_MODEL: 'gemini-test' };
   global.Deno = { env: { get: name => env[name] } };
   global.fetch = fetchMock = jest.fn();

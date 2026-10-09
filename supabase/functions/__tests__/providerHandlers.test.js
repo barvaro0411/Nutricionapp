@@ -125,3 +125,45 @@ test('all Gemini keys are deduplicated and retain the existing primary order', a
   env.GEMINI_API_KEY_FALLBACK = 'old-backup,gemini-secret'; env.GEMINI_API_KEY_BACKUP = 'other-backup'; env.GEMINI_API_KEY_ADDITIONAL = 'new-google-key';
   expect(await require('../_shared/gemini.ts').getGeminiKey(client)).toBe('gemini-secret,old-backup,other-backup,new-google-key');
 });
+
+const requestId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+function rpcResult(data) {
+  const promise = Promise.resolve({ data, error: null });
+  promise.abortSignal = () => promise;
+  return promise;
+}
+test('retrying a completed request returns its reply without AI calls or another quota reservation', async () => {
+  client.rpc.mockImplementation(name => rpcResult(name === 'begin_coach_request'
+    ? { state: 'cached', response: { success: true, reply: 'Respuesta guardada', meta: { model: 'test' } } } : {}));
+  const response = await require('../nutrition-coach/index.ts').handleRequest(request({ message: 'Hola', request_id: requestId }));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ reply: 'Respuesta guardada', meta: { cached: true } });
+  expect(fetchMock).not.toHaveBeenCalled(); expect(client.from).not.toHaveBeenCalled();
+  expect(client.rpc).toHaveBeenCalledTimes(1);
+});
+
+test('new identified requests save both messages with one atomic completion RPC', async () => {
+  client.rpc.mockImplementation((name, args) => rpcResult(name === 'begin_coach_request' ? { state: 'acquired', claim_token: requestId }
+    : name === 'finish_coach_request' ? args.p_response : { allowed: true }));
+  fetchMock.mockResolvedValue(groqReply('Respuesta completa'));
+  const response = await require('../nutrition-coach/index.ts').handleRequest(request({ message: 'Hola', request_id: requestId }));
+  expect(response.status).toBe(200); expect(inserted).toHaveLength(0);
+  expect(client.rpc.mock.calls.map(([name]) => name)).toEqual(['begin_coach_request', 'reserve_ai_request', 'finish_coach_request']);
+  expect(client.rpc.mock.calls[2][1]).toMatchObject({ p_user_id: owner, p_request_id: requestId, p_user_text: 'Hola', p_assistant_text: 'Respuesta completa' });
+});
+
+test('a request in progress avoids duplicate work and provides a retry interval', async () => {
+  client.rpc.mockImplementation(() => rpcResult({ state: 'processing' }));
+  const response = await require('../nutrition-coach/index.ts').handleRequest(request({ message: 'Hola', request_id: requestId }));
+  expect(response.status).toBe(409); expect(response.headers.get('Retry-After')).toBe('3');
+  expect(fetchMock).not.toHaveBeenCalled(); expect(inserted).toHaveLength(0);
+});
+
+test('provider failure releases its claim without saving an incomplete response', async () => {
+  client.rpc.mockImplementation(name => rpcResult(name === 'begin_coach_request' ? { state: 'acquired', claim_token: requestId } : { allowed: true }));
+  fetchMock.mockResolvedValue(new Response('', { status: 429 }));
+  const response = await require('../nutrition-coach/index.ts').handleRequest(request({ message: 'Hola', request_id: requestId }));
+  expect(response.status).toBe(429);
+  expect(client.rpc.mock.calls.map(([name]) => name)).toEqual(['begin_coach_request', 'reserve_ai_request', 'abandon_coach_request']);
+  expect(inserted).toHaveLength(0);
+});

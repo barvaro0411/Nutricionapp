@@ -27,7 +27,7 @@ export async function handleRequest(req: Request) {
     const groqKey = Deno.env.get("GROQ_API_KEY")?.trim();
     if (audio_base64 && groqKey) {
       try {
-        const transcription = await withAiFallback([{ id: Deno.env.get("GROQ_AUDIO_MODEL") || "whisper-large-v3-turbo",
+        const transcription = await withAiFallback([{ id: Deno.env.get("GROQ_AUDIO_MODEL") || "whisper-large-v3-turbo", managedHealth: true,
           run: timeoutMs => transcribeGroq(groqKey, audio_base64, audio_mime_type, timeoutMs),
         }], { timeoutMs: 15000 });
         description = transcription.text;
@@ -35,7 +35,7 @@ export async function handleRequest(req: Request) {
       } catch (error) { if (!key) throw error; }
     }
     const result = audio_base64 && !transcriptionProvider
-      ? await withAiFallback([{ id: Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite", run: async timeoutMs => {
+      ? await withAiFallback([{ id: Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite", managedHealth: true, run: async timeoutMs => {
         if (!key) throw new ApiError(503, "CONFIGURATION_ERROR", "No hay un proveedor de audio disponible.");
         const response = await callGemini(key, {
           contents: [{ role: "user", parts: [{ text: prompt },

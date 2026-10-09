@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useCoachChat } from "@/hooks/useCoachChat";
-import { showAlert } from "@/utils/alerts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Sparkles, ArrowLeft, Send, Volume2, Square, Mic } from "lucide-react-native";
 import { StateCard } from "@/components/common/AppUI";
@@ -20,17 +19,22 @@ import { colors } from "@/constants/colors";
 import { CoachMessageContent } from "@/components/coach/CoachMessageContent";
 import { useCoachSpeech } from "@/hooks/useCoachSpeech";
 import { useCoachLive } from "@/hooks/useCoachLive";
+import { CoachBuddy, BuddyMood } from "@/components/coach/CoachBuddy";
 
 export default function CoachChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { initialPrompt } = useLocalSearchParams<{ initialPrompt?: string }>();
-  const { messages, isLoading, error, refetch, sendMessage, isSending } =
+  const { messages, isLoading, error, refetch, sendMessage, isSending, sendError, pendingMessage } =
     useCoachChat();
   const [inputText, setInputText] = useState("");
   const scrollViewRef = useRef<ScrollView>(null);
   const speech = useCoachSpeech();
   const live = useCoachLive();
+  const buddyMood: BuddyMood = isSending ? "thinking" : live.status === "speaking" || speech.speakingId
+    ? "speaking" : live.active ? "listening" : "ready";
+  const buddyStatus = isSending ? "Preparando ideas para ti…" : buddyMood === "speaking"
+    ? "Tengo algo para contarte" : live.active ? "Estoy contigo. Te escucho" : "Un paso a la vez, juntos";
 
   useEffect(() => {
     if (initialPrompt && typeof initialPrompt === "string") {
@@ -40,7 +44,7 @@ export default function CoachChatScreen() {
 
   useEffect(() => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
-  }, [messages]);
+  }, [messages, isSending, live.draft]);
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
@@ -49,12 +53,8 @@ export default function CoachChatScreen() {
     setInputText("");
     try {
       await sendMessage(text);
-    } catch (e) {
+    } catch {
       setInputText(text);
-      showAlert(
-        "Coach IA",
-        e instanceof Error ? e.message : "No se pudo enviar el mensaje.",
-      );
     }
   };
 
@@ -83,12 +83,24 @@ export default function CoachChatScreen() {
           <ArrowLeft size={20} color={colors.primary} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Tu asistente nutricional</Text>
+          <Text style={styles.headerTitle}>Coach IA</Text>
           <Text style={styles.headerSubtitle}>
             Ideas para tu rutina, por texto y voz
           </Text>
         </View>
         <View style={{ width: 50 }} />
+      </View>
+
+      <View style={styles.companionCard}>
+        <CoachBuddy mood={buddyMood} />
+        <View style={styles.companionCopy}>
+          <Text style={styles.companionEyebrow}>TU COMPAÑERO DE CADA DÍA</Text>
+          <Text style={styles.companionTitle}>Pequeñas ideas. Grandes hábitos.</Text>
+          <View style={styles.statusRow}>
+            <View style={styles.statusDot} />
+            <Text style={styles.companionStatus} accessibilityLiveRegion="polite">{buddyStatus}</Text>
+          </View>
+        </View>
       </View>
 
       {live.supported && (
@@ -128,10 +140,10 @@ export default function CoachChatScreen() {
             <View style={styles.welcomeIconWrap}>
               <Sparkles size={28} color={colors.primary} />
             </View>
-            <Text style={styles.welcomeTitle}>Hablemos de tu día.</Text>
+            <Text style={styles.welcomeTitle}>¿Qué hacemos hoy?</Text>
             <Text style={styles.welcomeDesc}>
               Explora ideas de comidas, aclara tus dudas sobre nutrientes y
-              organiza tu rutina a partir de tus registros y metas.
+              organiza tu rutina a partir de tus registros y metas. Elige una idea abajo o cuéntame lo que necesitas.
             </Text>
           </View>
         )}
@@ -178,6 +190,14 @@ export default function CoachChatScreen() {
           {!!live.draft.assistant && <Text style={styles.draftText}>Coach: {live.draft.assistant}</Text>}
         </View>}
 
+        {isSending && !!pendingMessage && (
+          <View style={[styles.messageRow, styles.userRow]}>
+            <View style={[styles.bubble, styles.userBubble]}>
+              <Text style={[styles.bubbleText, styles.userText]}>{pendingMessage}</Text>
+            </View>
+          </View>
+        )}
+
         {isSending && (
           <View style={[styles.messageRow, styles.assistantRow]}>
             <View style={styles.botAvatar}>
@@ -198,6 +218,14 @@ export default function CoachChatScreen() {
           </View>
         )}
       </ScrollView>
+
+      {!!sendError && !isSending && <View style={styles.retryCard} accessibilityRole="alert">
+        <Text style={styles.retryText}>{sendError instanceof Error ? sendError.message : "No pudimos enviar el mensaje. Tu texto sigue aquí."}</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reintentar mensaje"
+          disabled={!inputText.trim() || live.active || !!error} style={styles.retryButton} onPress={() => handleSend()}>
+          <Text style={styles.voiceButtonText}>Reintentar</Text>
+        </TouchableOpacity>
+      </View>}
 
       {/* Chips de preguntas sugeridas */}
       {messages.length < 3 && (
@@ -234,7 +262,7 @@ export default function CoachChatScreen() {
           value={inputText}
           onChangeText={setInputText}
           multiline
-          maxLength={400}
+          maxLength={2000}
         />
         <TouchableOpacity
           accessibilityRole="button"
@@ -299,6 +327,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  companionCard: { flexDirection: "row", alignItems: "center", marginHorizontal: 16, marginTop: 12, marginBottom: 4, padding: 10, borderRadius: 22, backgroundColor: "#EDF8F1", borderWidth: 1, borderColor: "#D5EBDD", gap: 8 },
+  companionCopy: { flex: 1, minWidth: 0, gap: 7 },
+  companionEyebrow: { color: "#39845A", fontSize: 9, fontWeight: "800", letterSpacing: 1 },
+  companionTitle: { color: "#214B35", fontSize: 16, fontWeight: "800", lineHeight: 21 },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#2FAD77" },
+  companionStatus: { flex: 1, color: "#44735A", fontSize: 11, lineHeight: 16 },
   messagesList: {
     flex: 1,
   },
@@ -309,11 +344,11 @@ const styles = StyleSheet.create({
   welcomeCard: {
     backgroundColor: colors.card,
     borderRadius: 24,
-    padding: 24,
+    padding: 20,
     alignItems: "center",
     borderWidth: 1.5,
     borderColor: colors.cardBorder,
-    marginVertical: 20,
+    marginVertical: 6,
   },
   welcomeIconWrap: {
     width: 62,
@@ -381,6 +416,7 @@ const styles = StyleSheet.create({
   loadingBubble: {
     flexDirection: "row",
     alignItems: "center",
+    flexShrink: 1,
     gap: 8,
   },
   bubbleText: {
@@ -395,6 +431,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   typingText: {
+    flexShrink: 1,
     fontSize: 12,
     color: colors.textSecondary,
     fontStyle: "italic",
@@ -470,4 +507,7 @@ const styles = StyleSheet.create({
   listenButton: { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start", minHeight: 44, paddingTop: 8, marginTop: 8, borderTopWidth: 1, borderColor: colors.cardBorder },
   liveDraft: { borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 16, backgroundColor: colors.primaryLight, padding: 14, gap: 6, marginBottom: 12 },
   draftText: { color: colors.text, fontSize: 14, lineHeight: 21 },
+  retryCard: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#FFF7E8", borderTopWidth: 1, borderColor: "#F1DFC1" },
+  retryText: { flex: 1, color: "#6D532D", fontSize: 12, lineHeight: 18 },
+  retryButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: 10 },
 });

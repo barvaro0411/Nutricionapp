@@ -1,4 +1,6 @@
-import { ApiError, ServerClient } from "./http.ts";
+import { ApiError, type ServerClient } from "./http.ts";
+import { providerHealth } from "./providerHealth.ts";
+import { abortableDelay, providerRetrySeconds } from "./providerRetry.ts";
 export async function getGeminiKey(client: ServerClient): Promise<string> {
   const configured = Deno.env.get("GEMINI_API_KEY");
   const keys: string[] = [];
@@ -20,73 +22,57 @@ export async function getGeminiKey(client: ServerClient): Promise<string> {
 }
 
 export async function callGemini(apiKey: string, body: unknown, options?: { timeoutMs: number }) {
-  const keys = apiKey.split(",").map((k) => k.trim()).filter(Boolean);
+  const keys = [...new Set(apiKey.split(",").map(k => k.trim()).filter(Boolean))];
   const model = Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite";
   if (!/^gemini-[a-zA-Z0-9.-]+$/.test(model)) throw new ApiError(503, "CONFIGURATION_ERROR", "GEMINI_MODEL no es válido.");
-  // Optional work has one deadline shared by all backup keys and retries.
-  const deadline = options ? Date.now() + options.timeoutMs : undefined;
-
+  const deadline = Date.now() + (options?.timeoutMs ?? 45000);
+  const failures: ApiError[] = [];
   for (let i = 0; i < keys.length; i++) {
-    const remaining = deadline === undefined ? 45000 : deadline - Date.now();
-    if (remaining <= 0) throw new ApiError(504, "AI_TIMEOUT", "La IA tardó demasiado. Inténtalo nuevamente.");
     const key = keys[i];
+    try { await providerHealth.check("gemini", key, model); }
+    catch (error) { if (error instanceof ApiError) { failures.push(error); continue; } throw error; }
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) { failures.push(new ApiError(504, "AI_TIMEOUT", "La IA tardó demasiado. Inténtalo nuevamente.")); break; }
     const controller = new AbortController();
-    // Reserve time for each remaining key so a stalled key cannot consume every backup's budget.
     const timeout = setTimeout(() => controller.abort(), Math.ceil(remaining / (keys.length - i)));
-
     try {
-      // Keep retries within the existing timeout; never retry credentials or invalid requests.
       for (let attempt = 0; attempt < 3; attempt++) {
+        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-          body: JSON.stringify(body),
-          signal: controller.signal,
+          method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify(body), signal: controller.signal,
         });
-
         if (!response.ok) {
-          // Log only operational metadata: provider bodies can contain credentials or user text.
           console.warn("Gemini request failed", { model, status: response.status, attempt: attempt + 1 });
-          if ([401, 403, 429].includes(response.status) && i < keys.length - 1) break;
           const transient = [500, 502, 503, 504].includes(response.status);
-          if (transient && attempt < 2) {
-            await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
-            continue;
-          }
-          if ([401, 403, 404].includes(response.status)) {
-            throw new ApiError(503, "AI_PROVIDER_CONFIGURATION_ERROR", "El servicio de IA requiere revisar su configuración. Inténtalo más tarde.");
-          }
-          throw new ApiError(
-            response.status === 429 ? 429 : transient ? 503 : 502,
-            "AI_PROVIDER_ERROR",
-            response.status === 429 || transient
-              ? "El proveedor de IA está temporalmente ocupado. Inténtalo en unos minutos."
-              : "El proveedor de IA no pudo procesar la solicitud."
-          );
+          if (transient && attempt < 2) { await abortableDelay(500 * 2 ** attempt, controller.signal); continue; }
+          const retry = response.status === 429 ? await providerRetrySeconds(response, "gemini")
+            : [401, 403, 404].includes(response.status) ? 300 : 10;
+          await providerHealth.block("gemini", key, model, response.status, retry);
+          throw new ApiError(response.status === 429 ? 429 : [401, 403, 404].includes(response.status) || transient ? 503 : 502,
+            [401, 403, 404].includes(response.status) ? "AI_PROVIDER_CONFIGURATION_ERROR" : "AI_PROVIDER_ERROR",
+            response.status === 429 || transient ? "El proveedor de IA está temporalmente ocupado. Inténtalo en unos minutos."
+              : "El proveedor de IA no pudo procesar la solicitud.", response.status === 429 ? retry : undefined);
         }
-
         const result = await response.json();
-        const text = (result.candidates?.[0]?.content?.parts || [])
-          .filter((part: { text?: string; thought?: boolean }) => part.text && !part.thought)
-          .map((part: { text: string }) => part.text)
-          .join("");
-
-        if (!text) throw new ApiError(502, "AI_EMPTY_RESPONSE", "La IA no pudo generar una respuesta. Prueba con otra descripción.");
-        return { text, usage: result.usageMetadata, model };
+        const text = (result.candidates?.[0]?.content?.parts || []).filter((part: { text?: string; thought?: boolean }) => part.text && !part.thought)
+          .map((part: { text: string }) => part.text).join("");
+        if (!text.trim()) throw new ApiError(502, "AI_EMPTY_RESPONSE", "La IA no pudo generar una respuesta. Prueba con otra descripción.");
+        return { text: text.trim(), usage: result.usageMetadata, model };
       }
     } catch (error) {
-      const failure = error instanceof DOMException && error.name === "AbortError"
-        ? new ApiError(504, "AI_TIMEOUT", "La IA tardó demasiado. Inténtalo nuevamente.")
-        : error instanceof ApiError ? error
-        : new ApiError(502, "AI_PROVIDER_ERROR", "No se pudo procesar la solicitud de IA. Inténtalo nuevamente.");
-      if (i < keys.length - 1 && [502, 503, 504].includes(failure.status)) continue;
-      throw failure;
-    } finally {
-      clearTimeout(timeout);
-    }
+      const failure = error instanceof DOMException && error.name === "AbortError" ? new ApiError(504, "AI_TIMEOUT", "La IA tardó demasiado. Inténtalo nuevamente.")
+        : error instanceof ApiError ? error : new ApiError(502, "AI_PROVIDER_ERROR", "No se pudo procesar la solicitud de IA. Inténtalo nuevamente.");
+      if (!(error instanceof ApiError)) await providerHealth.block("gemini", key, model, failure.status, failure.status === 504 ? 5 : 10);
+      failures.push(failure);
+    } finally { clearTimeout(timeout); }
   }
-
-  throw new ApiError(502, "AI_PROVIDER_ERROR", "No se pudo procesar la solicitud con las claves configuradas.");
+  // An exhausted pool is retried at the earliest eligible key, not the last key's reset.
+  if (failures.length && failures.every(error => error.status === 429)) {
+    throw new ApiError(429, "AI_PROVIDER_QUOTA", "Las cuotas gratuitas están temporalmente ocupadas. Inténtalo cuando se liberen.",
+      Math.min(...failures.map(error => error.retryAfterSeconds || 60)));
+  }
+  throw failures.at(-1) || new ApiError(503, "CONFIGURATION_ERROR", "No hay una clave de Gemini disponible.");
 }
 
 export function parseModelJson(text: string) {

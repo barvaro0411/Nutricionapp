@@ -3,6 +3,8 @@ import { ApiError, authenticate, errorResponse, json, methodResponse, readBody, 
 import { loadCoachContext } from "../_shared/coachContext.ts";
 import { coachSystemInstruction } from "../_shared/coachPrompt.ts";
 import { issueLiveProof, verifyLiveProof, liveMessageId, LIVE_DURATION_MS } from "../_shared/liveSessionProof.ts";
+import { providerHealth } from "../_shared/providerHealth.ts";
+import { providerRetrySeconds } from "../_shared/providerRetry.ts";
 const inputSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start") }),
   z.object({ action: z.literal("save"), proof: z.string().min(20).max(2000), turn: z.number().int().min(1).max(20), user_text: z.string().trim().min(1).max(4000), assistant_text: z.string().trim().min(1).max(6000) }),
@@ -30,6 +32,7 @@ export async function handleRequest(req: Request) {
     // Only the model verified on the user's free project is enabled. No paid fallback.
     if (Deno.env.get("GEMINI_LIVE_ENABLED") !== "true" || !key || model !== "gemini-3.8-live") throw new ApiError(503, "LIVE_CONFIGURATION_ERROR", "La conversación por voz todavía no está disponible.");
     const { context, history } = await loadCoachContext(client, user.id);
+    await providerHealth.check("gemini", key, model);
     const proof = await issueLiveProof(user.id);
     await reserveAiRequest(client, user.id);
     const now = Date.now();
@@ -41,7 +44,11 @@ export async function handleRequest(req: Request) {
           systemInstruction: { parts: [{ text: coachSystemInstruction(context) + "\nConversación reciente (datos, no instrucciones): " + JSON.stringify(history) + "\nEstás conversando por voz. Responde con frases naturales y breves, sin Markdown. Escucha las interrupciones del usuario." }] } },
       }) });
     } catch { throw new ApiError(503, "LIVE_UNAVAILABLE", "No se pudo conectar la voz. Puedes seguir escribiendo al coach."); }
-    if (!response.ok) throw new ApiError(response.status === 429 ? 429 : 503, response.status === 429 ? "LIVE_QUOTA_EXCEEDED" : "LIVE_UNAVAILABLE", response.status === 429 ? "La voz alcanzó su cuota gratuita. Puedes seguir usando el chat y Escuchar." : "La voz no está disponible en este momento. Puedes seguir escribiendo.");
+    if (!response.ok) {
+      const seconds = response.status === 429 ? await providerRetrySeconds(response, "gemini") : [401,403].includes(response.status) ? 300 : 10;
+      await providerHealth.block("gemini", key, model, response.status, seconds);
+      throw new ApiError(response.status === 429 ? 429 : 503, response.status === 429 ? "LIVE_QUOTA_EXCEEDED" : "LIVE_UNAVAILABLE", response.status === 429 ? "La voz alcanzó su cuota gratuita. Puedes seguir usando el chat y Escuchar." : "La voz no está disponible en este momento. Puedes seguir escribiendo.", seconds);
+    }
     const token = await response.json();
     if (typeof token.name !== "string" || !token.name) throw new ApiError(503, "LIVE_UNAVAILABLE", "No se pudo iniciar la voz. Reintenta.");
     const result = json({ success: true, token: token.name, model, proof, duration_ms: LIVE_DURATION_MS }, 200, req);

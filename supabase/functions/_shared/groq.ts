@@ -1,4 +1,6 @@
 import { ApiError } from "./http.ts";
+import { providerHealth } from "./providerHealth.ts";
+import { abortableDelay, providerRetrySeconds } from "./providerRetry.ts";
 
 export type GroqMessage = {
   role: "system" | "user" | "assistant";
@@ -9,10 +11,12 @@ async function requestGroq(apiKey: string, endpoint: string, model: string, body
   if (!/^[a-zA-Z0-9][a-zA-Z0-9./_-]*$/.test(model)) {
     throw new ApiError(503, "CONFIGURATION_ERROR", "El modelo de Groq no es válido.");
   }
+  await providerHealth.check("groq", apiKey, model);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     for (let attempt = 0; attempt < 3; attempt++) {
+      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
       const multipart = body instanceof FormData;
       const response = await fetch("https://api.groq.com/openai/v1/" + endpoint, {
         method: "POST",
@@ -25,10 +29,11 @@ async function requestGroq(apiKey: string, endpoint: string, model: string, body
         console.warn("Groq request failed", { model, status: response.status, attempt: attempt + 1 });
         const transient = [500, 502, 503, 504].includes(response.status);
         if (transient && attempt < 2) {
-          await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
+          await abortableDelay(500 * 2 ** attempt, controller.signal);
           continue;
         }
         if ([401, 403, 404].includes(response.status)) {
+          await providerHealth.block("groq", apiKey, model, response.status, 300);
           throw new ApiError(503, "AI_PROVIDER_CONFIGURATION_ERROR", "El servicio de IA requiere revisar su configuración. Inténtalo más tarde.");
         }
         const failure = new ApiError(
@@ -38,8 +43,9 @@ async function requestGroq(apiKey: string, endpoint: string, model: string, body
             ? "El proveedor de IA está temporalmente ocupado. Inténtalo en unos minutos."
             : "El proveedor de IA no pudo procesar la solicitud.",
         );
-        const retryAfter = Number(response.headers.get("Retry-After"));
-        if (response.status === 429 && Number.isFinite(retryAfter) && retryAfter > 0) Object.assign(failure, { retryAfterSeconds: retryAfter });
+        const retryAfter = response.status === 429 ? await providerRetrySeconds(response, "groq") : 10;
+        await providerHealth.block("groq", apiKey, model, response.status, retryAfter);
+        if (response.status === 429) failure.retryAfterSeconds = retryAfter;
         throw failure;
       }
       let result;
@@ -53,9 +59,11 @@ async function requestGroq(apiKey: string, endpoint: string, model: string, body
     throw new ApiError(502, "AI_PROVIDER_ERROR", "La IA no pudo completar la solicitud.");
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
+      await providerHealth.block("groq", apiKey, model, 504, 5);
       throw new ApiError(504, "AI_TIMEOUT", "La IA tardó demasiado. Inténtalo nuevamente.");
     }
     if (error instanceof ApiError) throw error;
+    await providerHealth.block("groq", apiKey, model, 503, 10);
     throw new ApiError(503, "AI_PROVIDER_ERROR", "No se pudo conectar con el proveedor de IA. Inténtalo nuevamente.");
   } finally {
     clearTimeout(timeout);

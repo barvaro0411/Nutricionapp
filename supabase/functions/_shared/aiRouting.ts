@@ -4,12 +4,12 @@ import { callGroq } from "./groq.ts";
 
 // Best-effort cooldowns within a warm Edge instance. Provider quotas remain authoritative.
 const cooldowns = new Map<string, { until: number; failure: ApiError }>();
-export async function withAiFallback<T>(providers: { id: string; run: (timeoutMs: number) => Promise<T> }[], options: { timeoutMs?: number; perProviderMs?: number } = {}): Promise<T> {
+export async function withAiFallback<T>(providers: { id: string; managedHealth?: boolean; run: (timeoutMs: number) => Promise<T> }[], options: { timeoutMs?: number; perProviderMs?: number } = {}): Promise<T> {
   const deadline = Date.now() + (options.timeoutMs ?? 30000);
   let failure: unknown;
   for (const provider of providers) {
     const cooling = cooldowns.get(provider.id);
-    if (cooling && cooling.until > Date.now()) { failure = cooling.failure; continue; }
+    if (!provider.managedHealth && cooling && cooling.until > Date.now()) { failure = cooling.failure; continue; }
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
     try {
@@ -20,6 +20,7 @@ export async function withAiFallback<T>(providers: { id: string; run: (timeoutMs
       failure = error;
       if (!(error instanceof ApiError)) throw error;
       if (![429, 502, 503, 504].includes(error.status)) throw error;
+      if (provider.managedHealth || ["AI_INVALID_RESPONSE", "AI_EMPTY_RESPONSE"].includes(error.code)) continue;
       const retryAfter = (error as ApiError & { retryAfterSeconds?: number }).retryAfterSeconds;
       const seconds = error.status === 429 ? Math.min(86400, Math.max(1, retryAfter || 60))
         : error.code === "AI_PROVIDER_CONFIGURATION_ERROR" ? 300 : 10;
@@ -51,13 +52,13 @@ export async function generateText(options: {
     : Deno.env.get("GROQ_TEXT_MODEL") || "openai/gpt-oss-20b";
   const geminiModel = Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite";
   const validate = (text: string) => { if (options.json) parseModelJson(text); options.validate?.(text); };
-  const providers: { id: string; run: (timeoutMs: number) => Promise<{ text: string; model: string }> }[] = [];
-  if (groqKey) providers.push({ id: groqModel, run: async timeoutMs => {
+  const providers: { id: string; managedHealth?: boolean; run: (timeoutMs: number) => Promise<{ text: string; model: string }> }[] = [];
+  if (groqKey) providers.push({ id: groqModel, managedHealth: true, run: async timeoutMs => {
     const result = await callGroq(groqKey, options.messages, { model: groqModel, json: options.json,
       maxTokens: options.maxTokens ?? 1200, temperature: options.temperature ?? 0.1, timeoutMs });
     validate(result.text); return result;
   } });
-  if (options.geminiKey) providers.push({ id: geminiModel, run: async timeoutMs => {
+  if (options.geminiKey) providers.push({ id: geminiModel, managedHealth: true, run: async timeoutMs => {
     const system = options.messages.filter(m => m.role === "system").map(m => m.content).join("\n");
     const result = await callGemini(options.geminiKey!, {
       ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
