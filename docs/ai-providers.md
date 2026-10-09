@@ -5,6 +5,8 @@ Las funciones distribuyen las modalidades entre Groq, Gemini y USDA. Las claves 
 | Trabajo | Principal | Respaldo |
 | --- | --- | --- |
 | Coach con metas, comidas e historial | Groq `openai/gpt-oss-120b` | Gemini |
+| Conversación por voz en la web/PWA | Gemini `gemini-3.8-live`, con token temporal | Chat y lectura del dispositivo si la voz no está disponible |
+| Lectura de respuestas guardadas | Voz del navegador/dispositivo | Sin llamadas a IA |
 | Interpretación de texto | Groq `openai/gpt-oss-20b` | Gemini |
 | Dictado de comidas | Groq `whisper-large-v3-turbo`, luego extracción de texto | Gemini recibe el audio original si falla la transcripción |
 | Fotos y etiquetas nutricionales | Gemini `gemini-3.5-flash-lite` | Groq `qwen/qwen3.8-27b` |
@@ -55,3 +57,4 @@ Las cuotas efectivas dependen de cada cuenta, proyecto y modelo. Dos claves Gemi
 Esta integración no activa facturación, no contrata planes ni añade gateways de pago. El plan de la cuenta del proveedor determina si sus llamadas están dentro del nivel gratuito. La suscripción de ChatGPT no se utiliza para autenticar esta aplicación.
 
 Ver [pruebas de publicación del 9 de octubre](ai-providers-release-2026-10-09.md).
+La configuración, los límites y las plataformas de voz se describen en [coach por voz](coach-voice.md).

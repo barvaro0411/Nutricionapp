@@ -7,6 +7,8 @@ por Gemini o Groq con referencias nutricionales revisadas. Configuración y alca
 [Gemini y USDA](docs/usda-integration.md).
 El coach, texto, audio e imágenes reparten el trabajo entre proveedores con respaldo automático:
 [proveedores y cuotas de IA](docs/ai-providers.md).
+El coach permite escuchar sus respuestas y conversar con Gemini Live en la web/PWA:
+[voz y formato de mensajes](docs/coach-voice.md).
 
 ---
 
@@ -86,6 +88,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-aqui
   * `analyze-meal`: Visión por computadora para fotos de platos.
   * `parse-meal-text`: Procesamiento de lenguaje natural y dictado por voz.
   * `nutrition-coach`: Asistente nutricional contextualizado con tus metas y comidas.
+  * `coach-live-session`: Tokens temporales para Gemini Live y guardado del diálogo por voz.
 * **`supabase/migrations/`**: Esquema de base de datos relacional PostgreSQL con RLS.
 
 ---

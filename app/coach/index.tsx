@@ -14,9 +14,12 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useCoachChat } from "@/hooks/useCoachChat";
 import { showAlert } from "@/utils/alerts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Sparkles, ArrowLeft, Send } from "lucide-react-native";
+import { Sparkles, ArrowLeft, Send, Volume2, Square, Mic } from "lucide-react-native";
 import { StateCard } from "@/components/common/AppUI";
 import { colors } from "@/constants/colors";
+import { CoachMessageContent } from "@/components/coach/CoachMessageContent";
+import { useCoachSpeech } from "@/hooks/useCoachSpeech";
+import { useCoachLive } from "@/hooks/useCoachLive";
 
 export default function CoachChatScreen() {
   const router = useRouter();
@@ -26,6 +29,8 @@ export default function CoachChatScreen() {
     useCoachChat();
   const [inputText, setInputText] = useState("");
   const scrollViewRef = useRef<ScrollView>(null);
+  const speech = useCoachSpeech();
+  const live = useCoachLive();
 
   useEffect(() => {
     if (initialPrompt && typeof initialPrompt === "string") {
@@ -39,7 +44,7 @@ export default function CoachChatScreen() {
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
-    if (!text || isSending) return;
+    if (!text || isSending || live.active) return;
 
     setInputText("");
     try {
@@ -80,11 +85,26 @@ export default function CoachChatScreen() {
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Tu asistente nutricional</Text>
           <Text style={styles.headerSubtitle}>
-            Ideas para tu rutina, con ayuda de IA
+            Ideas para tu rutina, por texto y voz
           </Text>
         </View>
         <View style={{ width: 50 }} />
       </View>
+
+      {live.supported && (
+        <View style={styles.voiceBar}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={live.active ? "Terminar conversación por voz" : "Conversar por voz"}
+            disabled={isSending || isLoading || !!error} style={styles.voiceButton}
+            onPress={() => { speech.stop(); if (live.active) live.stop(); else live.start(); }}>
+            {live.active ? <Square size={17} color={colors.primary} /> : <Mic size={17} color={colors.primary} />}
+            <Text style={styles.voiceButtonText}>{live.active ? "Terminar conversación" : "Conversar por voz"}</Text>
+          </TouchableOpacity>
+          <Text style={styles.voiceHint} accessibilityLiveRegion="polite">
+            {live.status === "connecting" ? "Conectando…" : live.status === "speaking" ? "El coach responde" : live.status === "listening" ? "Te escucho" : "Sesiones de hasta 2 min"}
+          </Text>
+        </View>
+      )}
+      {(speech.error || live.error) && <Text style={styles.voiceError} accessibilityRole="alert">{live.error || speech.error}</Text>}
 
       {/* Mensajes */}
       <ScrollView
@@ -137,18 +157,26 @@ export default function CoachChatScreen() {
                   isUser ? styles.userBubble : styles.assistantBubble,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.bubbleText,
-                    isUser ? styles.userText : styles.assistantText,
-                  ]}
-                >
-                  {msg.content}
-                </Text>
+                {isUser ? <Text selectable style={[styles.bubbleText, styles.userText]}>{msg.content}</Text> : (
+                  <>
+                    <CoachMessageContent content={msg.content} />
+                    {speech.supported && <TouchableOpacity accessibilityRole="button"
+                      accessibilityLabel={speech.speakingId === msg.id ? "Detener lectura" : "Escuchar respuesta"}
+                      style={styles.listenButton} onPress={() => { live.stop(); speech.toggle(msg.id, msg.content); }}>
+                      {speech.speakingId === msg.id ? <Square size={15} color={colors.primary} /> : <Volume2 size={15} color={colors.primary} />}
+                      <Text style={styles.voiceButtonText}>{speech.speakingId === msg.id ? "Detener" : "Escuchar"}</Text>
+                    </TouchableOpacity>}
+                  </>
+                )}
               </View>
             </View>
           );
         })}
+
+        {live.active && (live.draft.user || live.draft.assistant) && <View style={styles.liveDraft} accessibilityLiveRegion="polite">
+          {!!live.draft.user && <Text style={styles.draftText}>Tú: {live.draft.user}</Text>}
+          {!!live.draft.assistant && <Text style={styles.draftText}>Coach: {live.draft.assistant}</Text>}
+        </View>}
 
         {isSending && (
           <View style={[styles.messageRow, styles.assistantRow]}>
@@ -183,7 +211,7 @@ export default function CoachChatScreen() {
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={p}
-                disabled={isSending || !!error}
+                disabled={isSending || live.active || !!error}
                 key={p}
                 style={styles.promptChip}
                 onPress={() => handleSend(p)}
@@ -201,7 +229,7 @@ export default function CoachChatScreen() {
           style={styles.textInput}
           accessibilityLabel="Mensaje para el asistente"
           placeholder="¿Qué te gustaría saber?"
-          editable={!isSending && !error}
+          editable={!isSending && !live.active && !error}
           placeholderTextColor={colors.textMuted}
           value={inputText}
           onChangeText={setInputText}
@@ -213,11 +241,11 @@ export default function CoachChatScreen() {
           accessibilityLabel="Enviar mensaje"
           style={[
             styles.sendButton,
-            (!inputText.trim() || isSending || !!error) &&
+            (!inputText.trim() || isSending || live.active || !!error) &&
               styles.sendButtonDisabled,
           ]}
           onPress={() => handleSend()}
-          disabled={!inputText.trim() || isSending || !!error}
+          disabled={!inputText.trim() || isSending || live.active || !!error}
         >
           <Send size={18} color="#FFFFFF" />
         </TouchableOpacity>
@@ -343,6 +371,8 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   assistantBubble: {
+    flexShrink: 1,
+    maxWidth: "88%",
     backgroundColor: colors.card,
     borderBottomLeftRadius: 4,
     borderWidth: 1,
@@ -432,4 +462,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 14,
   },
+  voiceBar: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderColor: colors.cardBorder },
+  voiceButton: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, paddingHorizontal: 12, backgroundColor: colors.primaryLight, borderRadius: 12 },
+  voiceButtonText: { color: colors.primary, fontWeight: "700", fontSize: 13 },
+  voiceHint: { color: colors.textSecondary, fontSize: 12 },
+  voiceError: { color: colors.textSecondary, paddingHorizontal: 16, paddingVertical: 8, fontSize: 13 },
+  listenButton: { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start", minHeight: 44, paddingTop: 8, marginTop: 8, borderTopWidth: 1, borderColor: colors.cardBorder },
+  liveDraft: { borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 16, backgroundColor: colors.primaryLight, padding: 14, gap: 6, marginBottom: 12 },
+  draftText: { color: colors.text, fontSize: 14, lineHeight: 21 },
 });

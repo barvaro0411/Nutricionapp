@@ -26,6 +26,7 @@ export function useCoachChat() {
         .select("id, role, content, created_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
+        .order("role", { ascending: true })
         .limit(50)
         .abortSignal(signal);
 
