@@ -49,3 +49,16 @@ test("a stalled request retains the existing 45 second deadline", async () => {
   await rejected;
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
+
+test("optional work shares its deadline across backup keys", async () => {
+  fetchMock.mockImplementationOnce(async () => {
+    await new Promise(resolve => setTimeout(resolve, 7000));
+    return new Response('busy', { status: 429 });
+  }).mockImplementation((_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+  }));
+  const rejected = expect(callGemini('primary,backup', {}, { timeoutMs: 12000 })).rejects.toMatchObject({ status: 504, code: 'AI_TIMEOUT' });
+  await jest.advanceTimersByTimeAsync(12000);
+  await rejected;
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});

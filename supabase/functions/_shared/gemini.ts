@@ -20,15 +20,19 @@ export async function getGeminiKey(client: ServerClient): Promise<string> {
   throw new ApiError(503, "CONFIGURATION_ERROR", "Falta configurar GEMINI_API_KEY en Supabase.");
 }
 
-export async function callGemini(apiKey: string, body: unknown) {
+export async function callGemini(apiKey: string, body: unknown, options?: { timeoutMs: number }) {
   const keys = apiKey.split(",").map((k) => k.trim()).filter(Boolean);
   const model = Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite";
   if (!/^gemini-[a-zA-Z0-9.-]+$/.test(model)) throw new ApiError(503, "CONFIGURATION_ERROR", "GEMINI_MODEL no es válido.");
+  // Optional work has one deadline shared by all backup keys and retries.
+  const deadline = options ? Date.now() + options.timeoutMs : undefined;
 
   for (let i = 0; i < keys.length; i++) {
+    const remaining = deadline === undefined ? 45000 : deadline - Date.now();
+    if (remaining <= 0) throw new ApiError(504, "AI_TIMEOUT", "La IA tardó demasiado. Inténtalo nuevamente.");
     const key = keys[i];
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
+    const timeout = setTimeout(() => controller.abort(), remaining);
 
     try {
       // Keep retries within the existing timeout; never retry credentials or invalid requests.

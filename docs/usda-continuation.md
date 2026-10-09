@@ -1,6 +1,6 @@
 # Punto de continuación: integración USDA
 
-Estado al detener el trabajo el 8 de octubre de 2026. La implementación está en curso; no darla por terminada ni promover el frontend hasta resolver la prueba real.
+Actualizado el 9 de octubre de 2026. Los pendientes del 8 de octubre están resueltos: pruebas reales de API y navegador aprobadas, backend corregido y frontend publicado en el dominio existente. Ver [evidencias y límites de la publicación](usda-release-2026-10-09.md).
 
 ## Objetivo autorizado
 
@@ -18,12 +18,14 @@ Ampliar USDA más allá de las once referencias iniciales, complementando Gemini
 
 ## Verificaciones
 
-- 143 pruebas en 22 suites pasan.
+- 150 pruebas en 22 suites pasan.
 - TypeScript de frontend y las tres funciones Edge pasa; ESLint pasa sin advertencias.
 - Exportación PWA pasa; clave USDA ausente del código publicable y del bundle.
 - Consultas reales USDA confirmaron `Pasta, cooked` (2708357), `Spaghetti sauce with meat` (2706470) y porciones pesadas de leche.
-- La prueba real de enriquecimiento automático FALLÓ: Gemini detectó fideos, salsa, manzana y leche, pero ninguno recibió referencia USDA. La respuesta tardó aproximadamente 72,7 segundos y conservó estimaciones.
-- La reproducción local encontró HTTP 429 al usar la clave local de Gemini, tanto con el modelo local como con el modelo configurado en producción. Esto no prueba aún que la misma causa explique el fallo remoto: investigar sin asumirlo.
+- La reproducción local identificó HTTP 429 en la cuota de tokens de entrada de Gemini con la misma clave configurada en producción. Se redujo el prompt a seis candidatos por alimento, conservando ambas formulaciones, y se limitó el plazo de las llamadas opcionales.
+- La prueba real final obtuvo cuatro referencias USDA para fideos, salsa con carne, manzana y leche en aproximadamente 7,1 segundos. La salsa usa `Spaghetti sauce with meat`, sin incluir pasta ni un plato de carne con salsa.
+- Búsqueda manual en español, conversión ml, persistencia en comidas/favoritas, reutilización, idempotencia y rechazo de metadatos inválidos y solicitudes anónimas: aprobados.
+- Navegador móvil en la versión preparada y en el dominio público: análisis de fideos/salsa, agregado manual USDA, cambio de cantidades, guardado, recarga/historial y favoritas aprobados, sin errores de JavaScript.
 
 ## Estado remoto
 
@@ -31,19 +33,19 @@ Ampliar USDA más allá de las once referencias iniciales, complementando Gemini
 - Migración `20261008000000_usda_complete` aplicada. Se conservaron los diez ítems anteriores; se agregaron dos columnas de procedencia. Los RPC anteriores están respaldados localmente.
 - Publicados `analyze-meal`, `parse-meal-text` y `search-foods`. El enriquecimiento opcional conserva la estimación si falla.
 - Vercel: proyecto `nutricionapp`, `prj_xpMJ7iR8zkdkYGjWdZTa3yAfRAnD`, equipo `team_M17DUR4Kn9NfnqdsYfdn6XNn`.
-- Nueva versión preparada y verificada, **sin promover ni cambiar el dominio**: `dpl_4ebraXT3mzMPhnsfUgsrS9QEGx41`, https://nutricionapp-apl7yk7up-barvaro0411s-projects.vercel.app.
-- Dominio público: https://dist-two-alpha-18.vercel.app. Mantiene el frontend anterior, despliegue `dpl_9a6DZRtHwCFjLuK3ceBaGy8HbPgX`.
+- Versión verificada y promovida: `dpl_4ebraXT3mzMPhnsfUgsrS9QEGx41`, https://nutricionapp-apl7yk7up-barvaro0411s-projects.vercel.app. El frontend preparado el 8 de octubre se reutilizó porque las correcciones de esta continuación afectan al backend.
+- Dominio público verificado: https://dist-two-alpha-18.vercel.app. Sirve el frontend USDA y pasó la prueba completa de navegador tras promoverlo.
 - Todos los usuarios de prueba se eliminaron; sesiones usadas solo en memoria.
 
-## Próximos pasos
+## Cierre de los pendientes
 
-1. Investigar por qué no se aplica el enriquecimiento real. Se agregó logging de códigos operativos a `usdaSearch.ts` después de desplegar; esa última modificación todavía no está en Supabase.
-2. Revisar cuota/tiempo del segundo llamado Gemini y evitar que una selección adicional vuelva inútil el enriquecimiento. Mantener IDs y cocción verificables; no sustituir por el primer resultado arbitrariamente.
-3. Corregir ejemplos contradictorios del prompt: para salsa con carne, `spaghetti sauce with meat` encuentra la salsa; `tomato meat sauce` devuelve primero platos completos. El modelo ignoró la alternativa en la primera prueba real.
-4. Verificar manualmente `search-foods`, la persistencia real, reutilización de favoritas, conversión ml y autenticación. Estas partes de la prueba real no se alcanzaron porque la primera aserción falló.
-5. Ejecutar prueba de navegador: detectar pasta/salsa, agregar desde USDA, cambiar cantidad, guardar, recargar historial y comprobar favoritas. Falta adaptar el script del navegador anterior.
-6. Repetir comprobaciones únicamente tras los cambios pertinentes; respaldar/deplegar las funciones corregidas. Si cambió frontend, preparar y verificar una versión nueva de Vercel.
-7. Solo después de las pruebas reales exitosas promover y asignar el dominio público, verificarlo y llevar la rama de continuación a `main`.
+1. Diagnóstico y logs operativos publicados, sin claves ni texto de usuarios.
+2. Candidatos acotados y plazos compartidos entre reintentos/claves de respaldo; fallos opcionales conservan referencias previas y estimaciones.
+3. Prompts coherentes, término indexado de salsa aplicado también por el servidor y controles de platos completos, con/sin carne y piel/cáscara.
+4. Prueba de API real aprobada con cuenta temporal eliminada.
+5. Prueba completa de navegador aprobada en preparación y producción con cuentas temporales eliminadas.
+6. Funciones respaldadas antes de publicar; compilación, tipos, lint y secretos verificados.
+7. Frontend promovido y dominio público verificado. El cierre y la integración de la rama se conservan en Git.
 
 ## Herramientas locales
 

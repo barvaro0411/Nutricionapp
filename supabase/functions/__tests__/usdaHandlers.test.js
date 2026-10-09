@@ -107,3 +107,63 @@ test('manual USDA search requires a valid session, enforces quota and returns ve
   expect(body.data.foods[0]).toMatchObject({label:'Fideos cocidos',per100:{calories:158},nutrition_reference:{fdc_id:2708357,basis:'100g'}});
   expect(JSON.stringify(body)).not.toMatch(/usda-secret|gemini-secret/);
 });
+
+test('selection bounds its candidates, retains alternative results and verifies the selected detail', async () => {
+  const oats = { ...aiOutput.items[0], food: 'Avena cocida', usda_lookup: { query: 'oatmeal cooked', alternative_query: 'oats cooked', state: 'cooked' } };
+  let calls = 0;
+  fetchMock.mockImplementation(async (url, init) => {
+    const body = JSON.parse(init.body);
+    if (String(url).includes('foods/search')) return new Response(JSON.stringify({ foods: Array.from({ length: 12 }, (_, i) => ({ fdcId: (body.query === 'oatmeal cooked' ? 100 : 200) + i, description: 'Oats, cooked, variant ' + i, dataType: 'Survey (FNDDS)' })) }));
+    if (String(url).includes('api.nal.usda.gov')) return new Response(JSON.stringify([{ fdcId: 200, description: 'Oats, cooked, variant 0', dataType: 'Survey (FNDDS)', foodNutrients: [
+      { nutrient: { id: 1008, unitName: 'kcal' }, amount: 70 }, { nutrient: { id: 1003, unitName: 'g' }, amount: 2 },
+      { nutrient: { id: 1005, unitName: 'g' }, amount: 12 }, { nutrient: { id: 1004, unitName: 'g' }, amount: 1 },
+    ] }]));
+    if (calls++ === 0) return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ meal_type_guess: 'desayuno', items: [oats] }) }] } }] }));
+    const selection = JSON.parse(body.contents[0].parts[0].text.split('\n').at(-1));
+    expect(selection[0].candidates.map(c => c.fdcId)).toEqual([100, 200, 101, 201, 102, 202]);
+    expect(selection[0].candidates.every(c => c.dataType === undefined)).toBe(true);
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ matches: [{ index: 0, fdc_id: 200, confidence: .9 }] }) }] } }] }));
+  });
+  const res = await textHandler(request({ text: 'Avena cocida' }));
+  expect(res.status).toBe(200);
+  expect((await res.json()).data.items[0]).toMatchObject({ calories: 105, nutrition_reference: { fdc_id: 200 } });
+});
+
+test('a selection quota failure preserves verified references and the remaining AI estimates', async () => {
+  const pasta = { ...aiOutput.items[1], food: 'Fideos cocidos', usda_lookup: { query: 'pasta cooked', state: 'cooked' } };
+  const original = fetchMock.getMockImplementation(); let geminiCalls = 0;
+  fetchMock.mockImplementation(async (url, init) => {
+    if (String(url).includes('foods/search')) return new Response(JSON.stringify({ foods: [{ fdcId: 2708357, description: 'Pasta, cooked', dataType: 'Survey (FNDDS)' }] }));
+    if (String(url).includes('api.nal.usda.gov')) return original(url, init);
+    if (geminiCalls++ > 0) return new Response('quota', { status: 429 });
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ ...aiOutput, items: [aiOutput.items[0], pasta] }) }] } }] }));
+  });
+  const res = await textHandler(request({ text: 'Arroz y fideos cocidos' }));
+  expect(res.status).toBe(200);
+  const body = await res.json();
+  expect(body.data.items[0]).toMatchObject({ calories: 195, nutrition_reference: { fdc_id: 168878 } });
+  expect(body.data.items[1]).toEqual(pasta);
+  expect(body.data.totals.calories).toBe(505);
+});
+
+test('manual meat sauce search recovers from a literal translation and excludes complete dishes', async () => {
+  const searchHandler = require('../search-foods/index.ts').handleRequest;
+  const sauce = { fdcId: 2706470, description: 'Spaghetti sauce with meat', dataType: 'Survey (FNDDS)' };
+  const dish = { fdcId: 2706469, description: 'Meat with tomato-based sauce', dataType: 'Survey (FNDDS)' };
+  let geminiCalls = 0;
+  fetchMock.mockImplementation(async (url, init) => {
+    const body = JSON.parse(init.body);
+    if (String(url).includes('foods/search')) return new Response(JSON.stringify({ foods: body.query === 'spaghetti sauce with meat' ? [dish, sauce] : [dish] }));
+    if (String(url).includes('api.nal.usda.gov')) return new Response(JSON.stringify([{ ...sauce, foodNutrients: [
+      { nutrient: { id: 1008, unitName: 'kcal' }, amount: 90 }, { nutrient: { id: 1003, unitName: 'g' }, amount: 5 },
+      { nutrient: { id: 1005, unitName: 'g' }, amount: 7 }, { nutrient: { id: 1004, unitName: 'g' }, amount: 4 },
+    ] }]));
+    const payload = geminiCalls++ === 0 ? { query: 'tomato sauce with ground meat' } : { foods: [{ fdc_id: 2706470, label: 'Salsa de tomate con carne' }] };
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }] }));
+  });
+  const response = await searchHandler(request({ query: 'salsa de tomate con carne molida' }));
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.data.query).toBe('spaghetti sauce with meat');
+  expect(body.data.foods.map(food => food.fdcId)).toEqual([2706470]);
+});

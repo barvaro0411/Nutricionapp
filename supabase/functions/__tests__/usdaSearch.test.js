@@ -1,5 +1,5 @@
 global.Deno = { env: { get: () => undefined }, serve: jest.fn() };
-const { createUsdaSearch, compatiblePreparation, validateSelections, gramsPerMl, asSearchFood } = require('../_shared/usdaSearch.ts');
+const { createUsdaSearch, compatiblePreparation, usdaLookupQueries, validateSelections, gramsPerMl, asSearchFood } = require('../_shared/usdaSearch.ts');
 const { readUsdaMacros } = require('../_shared/usda.ts');
 const candidate = (fdcId = 2708357, description = 'Pasta, cooked') => ({ fdcId, description, dataType: 'Survey (FNDDS)' });
 const detail = (fdcId = 2708357, description = 'Pasta, cooked') => ({ ...candidate(fdcId, description), foodNutrients: [
@@ -35,6 +35,31 @@ test('rejects invented IDs, low confidence, duplicate selections and raw/cooked 
 test('uses Foundation Atwater energy and rejects missing macros instead of filling zeros', () => {
   const food = detail(); food.foodNutrients[0].nutrient.id=2048;
   expect(readUsdaMacros(food).calories).toBe(158); food.foodNutrients.pop(); expect(readUsdaMacros(food)).toBeNull();
+});
+
+test('a separate meat sauce rejects main dishes and meat-free sauces even with high model confidence', () => {
+  const sauce = { food: 'Salsa de tomate con carne molida de vacuno', usda_lookup: { query: 'tomato meat sauce', state: 'ready_to_eat' } };
+  expect(compatiblePreparation(sauce, 'Spaghetti sauce with meat')).toBe(true);
+  for (const description of ['Meat with tomato-based sauce', 'Spaghetti with meat sauce', 'Spaghetti sauce, meatless', 'Tomato sauce']) {
+    expect(compatiblePreparation(sauce, description)).toBe(false);
+    expect(validateSelections([sauce], [[candidate(123, description)]], { matches: [{ index: 0, fdc_id: 123, confidence: 1 }] }).size).toBe(0);
+  }
+  expect(compatiblePreparation({ food: 'Salsa de tomate' }, 'Sauce, tomato')).toBe(true);
+  expect(compatiblePreparation({ food: 'Carne con salsa de tomate' }, 'Meat with tomato-based sauce')).toBe(true);
+});
+
+test('explicit skin preparation cannot be replaced with peeled or unpeeled food', () => {
+  expect(compatiblePreparation({ food: 'Manzana cruda con piel' }, 'Apples, raw, without skin')).toBe(false);
+  expect(compatiblePreparation({ food: 'Manzana cruda sin piel' }, 'Apples, raw, with skin')).toBe(false);
+  expect(compatiblePreparation({ food: 'Manzana cruda con piel' }, 'Apples, raw, with skin')).toBe(true);
+});
+
+test('meat sauce uses the indexed USDA term without substituting a meat or pasta dish', () => {
+  expect(usdaLookupQueries({ food: 'Salsa de tomate con carne molida', usda_lookup: { query: 'tomato sauce with ground meat', alternative_query: 'tomato meat sauce' } })).toEqual(['spaghetti sauce with meat', 'tomato sauce with ground meat']);
+  expect(usdaLookupQueries({ food: 'Carne con salsa de tomate', usda_lookup: { query: 'meat with tomato sauce' } })).toEqual(['meat with tomato sauce']);
+  expect(usdaLookupQueries({ food: 'Salsa de tomate sin carne', usda_lookup: { query: 'tomato sauce without meat' } })).toEqual(['tomato sauce without meat']);
+  expect(compatiblePreparation({ food: 'Salsa de tomate sin carne' }, 'Spaghetti sauce with meat')).toBe(false);
+  expect(compatiblePreparation({ food: 'Salsa de tomate sin carne' }, 'Spaghetti sauce, meatless')).toBe(true);
 });
 test('scales ml from a weighed USDA portion and never treats a guideline amount as density', () => {
   const milk = {...detail(1,'Milk, whole'),foodPortions:[{gramWeight:2.5,portionDescription:'Guideline amount per fl oz of beverage'},{gramWeight:244,portionDescription:'1 cup'}]};
