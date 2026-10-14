@@ -17,8 +17,10 @@ import {
   Pencil,
   CheckCircle2,
   LockKeyhole,
+  Sparkles,
 } from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
 import { DietaryRestriction, DIETARY_RESTRICTION_LABELS } from "@/types/profile";
 import {
@@ -34,6 +36,7 @@ import { colors, layout } from "@/constants/colors";
 export default function SettingsScreen() {
   const router = useRouter();
   const { user, profile, signOut, updateProfile, loading } = useAuth();
+  const { isPro, scansRemaining, maxFreeScans } = useSubscription();
   const { toggleRestriction, hasRestriction } = useDietaryPreferences();
   const [reminders, setReminders] = useState<MealReminderConfig[]>(
 
@@ -172,6 +175,37 @@ export default function SettingsScreen() {
             <Text style={styles.verifiedText}>Correo verificado</Text>
           </View>
         )}
+      </View>
+
+      {/* Tarjeta de Suscripción NutriIA Pro */}
+      <View style={styles.proCard}>
+        <View style={styles.proCardHeader}>
+          <View style={styles.proCardHeaderLeft}>
+            <View style={styles.proIconBadge}>
+              <Sparkles size={16} color="#4F46E5" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.proCardTitle}>
+                {isPro ? "NutriIA Pro Activo 🌟" : "Plan Básico (Gratuito)"}
+              </Text>
+              <Text style={styles.proCardSub}>
+                {isPro
+                  ? "Escaneos y coach en vivo sin restricciones."
+                  : `${scansRemaining} de ${maxFreeScans} escaneos disponibles hoy`}
+              </Text>
+            </View>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isPro ? "Ver detalles de mi plan Pro" : "Mejorar a NutriIA Pro"}
+            style={[styles.proActionBtn, isPro && styles.proActionBtnActive]}
+            onPress={() => router.push("/paywall")}
+          >
+            <Text style={[styles.proActionBtnText, isPro && styles.proActionBtnTextActive]}>
+              {isPro ? "Ver plan" : "Mejorar"}
+            </Text>
+          </Pressable>
+        </View>
       </View>
       {editing && (
         <View style={styles.editor}>
@@ -383,7 +417,63 @@ const styles = StyleSheet.create({
     backgroundColor: colors.forest,
     padding: 22,
     borderRadius: 24,
+    marginBottom: 16,
+  },
+  proCard: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: "#C7D2FE",
     marginBottom: 26,
+  },
+  proCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  proCardHeaderLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  proIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  proCardTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  proCardSub: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  proActionBtn: {
+    backgroundColor: "#4F46E5",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  proActionBtnActive: {
+    backgroundColor: colors.surfaceMuted,
+  },
+  proActionBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  proActionBtnTextActive: {
+    color: colors.textSecondary,
   },
   profileRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   avatar: {

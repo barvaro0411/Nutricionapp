@@ -9,7 +9,12 @@ jest.mock("expo-notifications", () => ({
 }));
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
-import { syncAllScheduledReminders, toggleReminder } from "../notificationService";
+import {
+  syncAllScheduledReminders,
+  toggleReminder,
+  evaluateAdaptiveRisks,
+  syncAdaptiveNotifications,
+} from "../notificationService";
 let mockUser: { id: string } | null = { id: "owner" };
 
 beforeEach(() => {
@@ -59,4 +64,74 @@ test("scheduling failures do not mark the preference as enabled", async () => {
     await expect(toggleReminder("reminder_lunch", true)).rejects.toThrow("No se pudo programar");
     expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
   } finally { warning.mockRestore(); }
+});
+
+describe("Adaptive contextual notifications", () => {
+  test("evaluates streak at risk when user has an active streak and has not logged today", () => {
+    const risk = evaluateAdaptiveRisks({
+      currentStreak: 5,
+      hasLoggedToday: false,
+      waterTotalMl: 1500,
+      waterTargetMl: 2000,
+      currentHour: 19,
+    });
+
+    expect(risk.streakAtRisk).toBe(true);
+    expect(risk.message).toContain("Tu racha de 5 días");
+  });
+
+  test("streak is not at risk if meals have already been logged today", () => {
+    const safe = evaluateAdaptiveRisks({
+      currentStreak: 5,
+      hasLoggedToday: true,
+      waterTotalMl: 1800,
+      waterTargetMl: 2000,
+      currentHour: 20,
+    });
+
+    expect(safe.streakAtRisk).toBe(false);
+  });
+
+  test("evaluates water at risk in the afternoon when progress is below 50%", () => {
+    const risk = evaluateAdaptiveRisks({
+      currentStreak: 0,
+      hasLoggedToday: true,
+      waterTotalMl: 600,
+      waterTargetMl: 2000,
+      currentHour: 16,
+    });
+
+    expect(risk.waterAtRisk).toBe(true);
+    expect(risk.waterPercent).toBe(30);
+  });
+
+  test("syncAdaptiveNotifications schedules streak reminder when at risk and cancels when resolved", async () => {
+    // 1. En riesgo: programa aviso
+    await syncAdaptiveNotifications({
+      userId: "owner",
+      currentStreak: 3,
+      hasLoggedToday: false,
+      waterTotalMl: 1800,
+      waterTargetMl: 2000,
+      currentHour: 19,
+    });
+
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ identifier: "reminder_adaptive_streak" })
+    );
+
+    // 2. Resuelto (ha registrado hoy): cancela aviso
+    await syncAdaptiveNotifications({
+      userId: "owner",
+      currentStreak: 4,
+      hasLoggedToday: true,
+      waterTotalMl: 2000,
+      waterTargetMl: 2000,
+      currentHour: 20,
+    });
+
+    expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith(
+      "reminder_adaptive_streak"
+    );
+  });
 });

@@ -41,7 +41,11 @@ export function StreakBadge({ onPress }: StreakBadgeProps) {
           hasLoggedToday ? styles.labelActive : streak > 0 ? styles.labelPending : styles.labelZero,
         ]}
       >
-        {streak > 0 ? `${streak} ${streak === 1 ? "día" : "días"}` : "0 días"}
+        {streak > 0
+          ? hasLoggedToday
+            ? `${streak} ${streak === 1 ? "día" : "días"}`
+            : `${streak}d · ⚠️ En juego`
+          : "0 días"}
       </Text>
     </TouchableOpacity>
   );

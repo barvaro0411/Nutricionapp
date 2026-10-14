@@ -14,6 +14,8 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
   const safeTarget = targetMl || 2000;
   const progressPct = Math.min(100, Math.round((totalMl / safeTarget) * 100));
 
+  const isAfternoonRisk = new Date().getHours() >= 15 && progressPct < 50;
+
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
@@ -30,8 +32,8 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
           </View>
         </View>
 
-        <View style={styles.pctBadge}>
-          <Text style={styles.pctText}>{progressPct}%</Text>
+        <View style={[styles.pctBadge, isAfternoonRisk && styles.pctBadgeWarning]}>
+          <Text style={[styles.pctText, isAfternoonRisk && styles.pctTextWarning]}>{progressPct}%</Text>
         </View>
       </View>
 
@@ -43,8 +45,8 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
           <View style={[styles.glassFill, { height: `${progressPct}%` }]} />
           <View style={styles.glassIcon}><Droplets size={23} color={colors.water} /></View>
         </View>
-        <View style={styles.waterCopy}><Text style={styles.waterMessage}>{totalMl >= safeTarget ? "Meta de agua alcanzada" : "Un vaso a la vez"}</Text>
-          <Text style={styles.waterDescription}>{totalMl >= safeTarget ? "Tu registro de agua está al día." : `${Math.max(0, safeTarget - totalMl).toLocaleString("es-CL")} ml para tu meta`}</Text>
+        <View style={styles.waterCopy}><Text style={[styles.waterMessage, isAfternoonRisk && styles.waterMessageWarning]}>{totalMl >= safeTarget ? "Meta de agua alcanzada" : isAfternoonRisk ? "⚠️ Hidratación baja esta tarde" : "Un vaso a la vez"}</Text>
+          <Text style={styles.waterDescription}>{totalMl >= safeTarget ? "Tu registro de agua está al día." : isAfternoonRisk ? `Llevas solo ${progressPct}%. Toma un vaso ahora.` : `${Math.max(0, safeTarget - totalMl).toLocaleString("es-CL")} ml para tu meta`}</Text>
           <View style={styles.track}><View style={[styles.fill, { width: `${progressPct}%` }]} /></View>
         </View>
       </View>
@@ -200,5 +202,8 @@ const styles = StyleSheet.create({
   glassIcon: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, alignItems: "center", justifyContent: "center" },
   waterCopy: { flex: 1, minWidth: 0 },
   waterMessage: { color: colors.text, fontSize: 13, fontWeight: "700" },
+  waterMessageWarning: { color: "#B45309" },
   waterDescription: { fontSize: 11, color: colors.textSecondary, marginTop: 5, lineHeight: 17 },
+  pctBadgeWarning: { backgroundColor: "#FEF3C7" },
+  pctTextWarning: { color: "#92400E" },
 });

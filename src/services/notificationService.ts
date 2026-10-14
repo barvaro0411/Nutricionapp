@@ -220,3 +220,131 @@ export function syncAllScheduledReminders(userId: string | null = useAuthStore.g
   });
   return reminderSync;
 }
+
+export const ADAPTIVE_STREAK_REMINDER_ID = "reminder_adaptive_streak";
+export const ADAPTIVE_WATER_REMINDER_ID = "reminder_adaptive_water";
+
+export interface AdaptiveRiskState {
+  streakAtRisk: boolean;
+  waterAtRisk: boolean;
+  streakDays: number;
+  waterPercent: number;
+  message?: string;
+}
+
+export function evaluateAdaptiveRisks(params: {
+  currentStreak: number;
+  hasLoggedToday: boolean;
+  waterTotalMl: number;
+  waterTargetMl: number;
+  currentHour?: number;
+}): AdaptiveRiskState {
+  const hour = params.currentHour ?? new Date().getHours();
+  // Racha en riesgo: si tiene racha activa (> 0) y aún no ha registrado comida hoy
+  const streakAtRisk = !params.hasLoggedToday && params.currentStreak > 0;
+
+  // Hidratación en riesgo: si ya es por la tarde (>= 15:00) y lleva menos del 50% de la meta
+  const safeTarget = params.waterTargetMl > 0 ? params.waterTargetMl : 2000;
+  const waterPct = Math.round((params.waterTotalMl / safeTarget) * 100);
+  const waterAtRisk = hour >= 15 && waterPct < 50;
+
+  let message: string | undefined;
+  if (streakAtRisk && hour >= 18) {
+    message = `🔥 ¡Tu racha de ${params.currentStreak} días está en juego! Registra tu once/cena para mantenerla.`;
+  } else if (waterAtRisk) {
+    message = `💧 Tu hidratación va en ${waterPct}%. Toma un vaso ahora para alcanzar tu meta.`;
+  }
+
+  return {
+    streakAtRisk,
+    waterAtRisk,
+    streakDays: params.currentStreak,
+    waterPercent: waterPct,
+    message,
+  };
+}
+
+/**
+ * Sincroniza notificaciones contextuales y adaptativas:
+ * Cancela avisos si el objetivo ya se cumplió para no molestar al usuario,
+ * o programa un aviso preventivo al final de la tarde si la racha o el agua están en riesgo.
+ */
+export async function syncAdaptiveNotifications(params: {
+  userId?: string;
+  currentStreak: number;
+  hasLoggedToday: boolean;
+  waterTotalMl: number;
+  waterTargetMl: number;
+  currentHour?: number;
+}): Promise<AdaptiveRiskState> {
+  const risks = evaluateAdaptiveRisks(params);
+  const hour = params.currentHour ?? new Date().getHours();
+
+  if (Platform.OS === "web") {
+    // En Web, si la racha está en riesgo al final de la tarde y hay permiso, emitir aviso
+    if (risks.streakAtRisk && hour >= 19 && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification("🔥 ¡Protege tu racha de hábitos!", {
+          body: `Llevas ${risks.streakDays} días consecutivos. Registra una comida antes de que termine el día.`,
+          icon: "/favicon.ico",
+        });
+      } catch {}
+    }
+    return risks;
+  }
+
+  try {
+    const permission = await Notifications.getPermissionsAsync();
+    if (!permission.granted) return risks;
+
+    // 1. Manejo de Racha
+    if (params.hasLoggedToday) {
+      // Racha ya protegida hoy -> cancelar recordatorio preventivo
+      await Notifications.cancelScheduledNotificationAsync(ADAPTIVE_STREAK_REMINDER_ID);
+    } else if (risks.streakAtRisk) {
+      // Racha en riesgo -> programar aviso a las 19:45
+      await Notifications.cancelScheduledNotificationAsync(ADAPTIVE_STREAK_REMINDER_ID);
+      await Notifications.scheduleNotificationAsync({
+        identifier: ADAPTIVE_STREAK_REMINDER_ID,
+        content: {
+          title: "🔥 ¡Tu racha está en riesgo!",
+          body: `Llevas ${risks.streakDays} ${risks.streakDays === 1 ? "día" : "días"} seguidos. Registra tu comida para mantener el fuego encendido.`,
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: 19,
+          minute: 45,
+          channelId: "meal-reminders",
+        },
+      });
+    }
+
+    // 2. Manejo de Hidratación
+    if (params.waterTotalMl >= (params.waterTargetMl || 2000) * 0.8) {
+      // Meta de agua casi completa o superada -> cancelar aviso
+      await Notifications.cancelScheduledNotificationAsync(ADAPTIVE_WATER_REMINDER_ID);
+    } else if (risks.waterAtRisk) {
+      // Hidratación baja -> programar aviso a las 16:30
+      await Notifications.cancelScheduledNotificationAsync(ADAPTIVE_WATER_REMINDER_ID);
+      await Notifications.scheduleNotificationAsync({
+        identifier: ADAPTIVE_WATER_REMINDER_ID,
+        content: {
+          title: "💧 Tu cuerpo necesita agua",
+          body: `Llevas solo el ${risks.waterPercent}% de tu meta (${params.waterTotalMl} ml). Bebe un vaso ahora para sentirte con energía.`,
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: 16,
+          minute: 30,
+          channelId: "meal-reminders",
+        },
+      });
+    }
+  } catch (err) {
+    console.warn("Error sincronizando notificaciones adaptativas:", err);
+  }
+
+  return risks;
+}

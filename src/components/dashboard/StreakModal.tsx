@@ -173,6 +173,16 @@ export function StreakModal({
             </Text>
           </View>
 
+          {/* Alerta adaptativa si la racha está en juego */}
+          {!hasLoggedToday && currentStreak > 0 && (
+            <View style={styles.atRiskCard}>
+              <Text style={styles.atRiskTitle}>⚠️ ¡Tu racha está en juego!</Text>
+              <Text style={styles.atRiskDesc}>
+                Aún no has registrado tus comidas de hoy. Haz una foto rápida o carga un combo frecuente para mantener tus {currentStreak} {currentStreak === 1 ? "día" : "días"} de constancia.
+              </Text>
+            </View>
+          )}
+
           {/* Acciones */}
           <View style={styles.actionsRow}>
             {!hasLoggedToday && (
@@ -444,5 +454,24 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     fontWeight: "600",
+  },
+  atRiskCard: {
+    backgroundColor: "#FFFBEB",
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    marginBottom: 16,
+  },
+  atRiskTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#B45309",
+    marginBottom: 4,
+  },
+  atRiskDesc: {
+    fontSize: 12,
+    color: "#92400E",
+    lineHeight: 16,
   },
 });

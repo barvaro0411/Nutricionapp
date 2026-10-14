@@ -41,6 +41,7 @@ import {
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useWaterTracker } from "@/hooks/useWaterTracker";
 import { useActivitySync } from "@/hooks/useActivitySync";
+import { useAdaptiveReminders } from "@/hooks/useAdaptiveReminders";
 import { DailySummary } from "@/components/dashboard/DailySummary";
 import { DayStrip } from "@/components/dashboard/DayStrip";
 import { MealCard } from "@/components/dashboard/MealCard";
@@ -93,6 +94,7 @@ export default function DashboardScreen() {
   const { totalMl, targetMl, addWater, isAdding } =
     useWaterTracker(selectedDate);
   const { burnedCalories, steps, logActivity } = useActivitySync(selectedDate);
+  useAdaptiveReminders();
 
   const adjustedGoals = useMemo(() => {
     return adjustGoalsForActivity(
