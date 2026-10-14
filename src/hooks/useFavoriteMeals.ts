@@ -182,6 +182,24 @@ export function useFavoriteMeals() {
     },
   });
 
+  // 4. Eliminar comida favorita
+  const deleteFavoriteMutation = useMutation({
+    mutationFn: async (favoriteId: string) => {
+      if (!user) throw new Error("No hay sesión de usuario");
+      const { error } = await supabase
+        .from("favorite_meals")
+        .delete()
+        .eq("id", favoriteId)
+        .eq("user_id", user.id);
+
+      if (error) throw new Error(error.message || "No se pudo eliminar la favorita.");
+      return favoriteId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["favoriteMeals"] });
+    },
+  });
+
   return {
     favorites: favoritesQuery.data || [],
     isLoading: favoritesQuery.isLoading,
@@ -190,5 +208,7 @@ export function useFavoriteMeals() {
     isSavingFavorite: saveFavoriteMutation.isPending,
     logFavoriteMeal: logFavoriteMealMutation.mutateAsync,
     isLoggingFavorite: logFavoriteMealMutation.isPending,
+    deleteFavorite: deleteFavoriteMutation.mutateAsync,
+    isDeletingFavorite: deleteFavoriteMutation.isPending,
   };
 }

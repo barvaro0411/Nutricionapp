@@ -35,3 +35,55 @@ test('replacing an estimate with a manually selected reference rebuilds ratios a
   useMealReviewStore.getState().updateItemGrams(0, 100);
   expect(useMealReviewStore.getState().items[0]).toMatchObject({id: previousId, calories: 158, grams: 100, nutrition_reference: selected.nutrition_reference});
 });
+
+test('loadFavoriteCombo replaces items with combo items and configures review state', () => {
+  const breakfastCombo = {
+    title: 'Desayuno Campeón',
+    meal_type: 'desayuno' as const,
+    items: [
+      { food_name: 'Marraqueta chilena', grams: 100, unit: 'g' as const, calories: 270, protein: 8.5, carbs: 56, fat: 1 },
+      { food_name: 'Café con leche', grams: 200, unit: 'ml' as const, calories: 96, protein: 5.2, carbs: 7.6, fat: 5 },
+    ],
+  };
+
+  useMealReviewStore.getState().loadFavoriteCombo(breakfastCombo);
+  const state = useMealReviewStore.getState();
+  expect(state.items.length).toBe(2);
+  expect(state.mealType).toBe('desayuno');
+  expect(state.userNotes).toContain('Desayuno Campeón');
+  expect(state.items[0].food).toBe('Marraqueta chilena');
+  expect(state.items[1].unit).toBe('ml');
+
+  const totals = state.getTotals();
+  expect(totals.calories).toBe(366);
+});
+
+test('addComboItems appends items to current meal review', () => {
+  const initialItemsCount = useMealReviewStore.getState().items.length;
+  const sideCombo = {
+    title: 'Postre y café',
+    items: [
+      { food_name: 'Café expreso', grams: 60, unit: 'ml' as const, calories: 2, protein: 0.1, carbs: 0.3, fat: 0 },
+    ],
+  };
+
+  useMealReviewStore.getState().addComboItems(sideCombo);
+  expect(useMealReviewStore.getState().items.length).toBe(initialItemsCount + 1);
+});
+
+test('updateItemVariant with preset grams updates food, grams, and calculates calories', () => {
+  useMealReviewStore.getState().updateItemVariant(0, {
+    food: 'Pechuga a la plancha',
+    caloriesPer100g: 165,
+    proteinPer100g: 31,
+    carbsPer100g: 0,
+    fatPer100g: 3.6,
+    grams: 200,
+  });
+
+  const item = useMealReviewStore.getState().items[0];
+  expect(item.food).toBe('Pechuga a la plancha');
+  expect(item.grams).toBe(200);
+  expect(item.calories).toBe(330);
+  expect(item.protein).toBe(62);
+});

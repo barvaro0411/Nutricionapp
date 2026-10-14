@@ -18,6 +18,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useFavoriteMeals } from "@/hooks/useFavoriteMeals";
 import { saveMealToDatabase } from "@/services/mealService";
 import { VariantModal } from "@/components/meal/VariantModal";
+import { FavoritesModal } from "@/components/meal/FavoritesModal";
 import { UsdaSearchModal } from "@/components/meal/UsdaSearchModal";
 import { findFamilyForFood } from "@/constants/chileanPresets";
 import { colors, shadows, layout } from "@/constants/colors";
@@ -59,6 +60,8 @@ export default function MealReviewScreen() {
     removeItem,
     addItem,
     replaceItem,
+    loadFavoriteCombo,
+    addComboItems,
     getTotals,
     reset,
   } = useMealReviewStore();
@@ -66,6 +69,7 @@ export default function MealReviewScreen() {
   const [saving, setSaving] = useState(false);
   const [activeVariantIndex, setActiveVariantIndex] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState(params.manual === "1");
+  const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [usdaTarget, setUsdaTarget] = useState<string | "new" | null>(null);
   const [showFavModal, setShowFavModal] = useState(false);
   const [favTitle, setFavTitle] = useState("");
@@ -245,6 +249,7 @@ export default function MealReviewScreen() {
         {/* Modal simple de agregado manual */}
         <View style={styles.addActions}>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir otro alimento desde USDA" onPress={() => setUsdaTarget("new")} style={styles.addSearchBtn}><Text style={styles.addSearchText}>+ Buscar alimento</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir combo frecuente" onPress={() => setShowFavoritesModal(true)} style={styles.addComboBtn}><Text style={styles.addComboBtnText}>⭐ Combo frecuente</Text></TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir alimento manualmente" onPress={() => setShowAddModal(true)} style={styles.addManualBtn}><Text style={styles.addFoodLink}>Ingreso manual</Text></TouchableOpacity>
         </View>
         {showAddModal && (
@@ -657,10 +662,32 @@ export default function MealReviewScreen() {
           onClose={() => setActiveVariantIndex(null)}
           onSelectVariant={(variant) => {
             updateItemVariant(activeVariantIndex, variant);
+            if (variant.grams) {
+              setInputValues((prev) => ({
+                ...prev,
+                [activeVariantIndex]: String(Math.round(variant.grams!)),
+              }));
+              setInputErrors((prev) => ({ ...prev, [activeVariantIndex]: "" }));
+            }
             setActiveVariantIndex(null);
           }}
         />
       )}
+
+      {/* Modal de Combos y Comidas Frecuentes */}
+      <FavoritesModal
+        visible={showFavoritesModal}
+        onClose={() => setShowFavoritesModal(false)}
+        mealType={mealType}
+        onSelectCombo={(fav) => {
+          if (items.length === 0) {
+            loadFavoriteCombo(fav, mealType);
+          } else {
+            addComboItems(fav);
+          }
+          setShowFavoritesModal(false);
+        }}
+      />
 
       {/* Modal para guardar como comida favorita */}
       <Modal visible={showFavModal} transparent animationType="fade" onRequestClose={() => setShowFavModal(false)}>
@@ -744,6 +771,20 @@ const styles = StyleSheet.create({
   addActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 18 },
   addSearchBtn: { minHeight: 44, paddingHorizontal: 14, justifyContent: "center", borderRadius: 12, backgroundColor: colors.primaryLight },
   addSearchText: { color: colors.primaryDark, fontSize: 13, fontWeight: "700" },
+  addComboBtn: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+  },
+  addComboBtnText: {
+    color: "#3730A3",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   addManualBtn: { minHeight: 44, justifyContent: "center", paddingHorizontal: 12 },
   manualHelp: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 14 },
   topSummaryCard: {

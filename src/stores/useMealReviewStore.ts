@@ -1,8 +1,24 @@
 import { create } from "zustand";
 import { randomUUID } from "expo-crypto";
 import { DetectedFoodItem, DetectedFoodItemInput, FoodUnit, MealTotals, MealType } from "@/types/meal";
-import { resolveItemUnit } from "@/utils/liquidUnits";
+import { resolveItemUnit, isLiquidFood } from "@/utils/liquidUnits";
 import { DrinkVariantData } from "@/utils/drinkVariants";
+
+export interface FavoriteComboInput {
+  id?: string;
+  title: string;
+  meal_type?: MealType;
+  items: Array<{
+    food_name: string;
+    grams: number;
+    unit?: FoodUnit;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    nutrition_reference?: any;
+  }>;
+}
 
 interface MealReviewState {
   imagePath: string | null;
@@ -21,6 +37,8 @@ interface MealReviewState {
     mealType: MealType;
     items: DetectedFoodItemInput[];
   }) => void;
+  loadFavoriteCombo: (combo: FavoriteComboInput, targetMealType?: MealType) => void;
+  addComboItems: (combo: FavoriteComboInput) => void;
   setMealType: (type: MealType) => void;
   setUserNotes: (notes: string) => void;
   updateItemGrams: (index: number, newGrams: number) => void;
@@ -35,6 +53,8 @@ interface MealReviewState {
       proteinPer100g: number;
       carbsPer100g: number;
       fatPer100g: number;
+      grams?: number;
+      unit?: FoodUnit;
     }
   ) => void;
   removeItem: (index: number) => void;
@@ -79,6 +99,66 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
       userNotes: "",
       clientRequestId: randomUUID(),
     });
+  },
+
+  loadFavoriteCombo: (combo, targetMealType) => {
+    const enrichedItems: DetectedFoodItem[] = combo.items.map((item, idx) => {
+      const g = item.grams > 0 ? item.grams : 100;
+      const effectiveUnit: FoodUnit = item.unit || (isLiquidFood(item.food_name) ? "ml" : "g");
+      return {
+        id: `combo_item_${idx}_${Date.now()}`,
+        food: item.food_name,
+        grams: item.grams,
+        unit: effectiveUnit,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fat: item.fat,
+        confidence: 1.0,
+        nutrition_reference: item.nutrition_reference,
+        ratioCalories: item.calories / g,
+        ratioProtein: item.protein / g,
+        ratioCarbs: item.carbs / g,
+        ratioFat: item.fat / g,
+      };
+    });
+
+    set({
+      imagePath: null,
+      localImageUri: null,
+      mealType: targetMealType || combo.meal_type || "almuerzo",
+      items: enrichedItems,
+      userNotes: `Plantilla / Combo: ${combo.title}`,
+      clientRequestId: randomUUID(),
+    });
+  },
+
+  addComboItems: (combo) => {
+    const enrichedItems: DetectedFoodItem[] = combo.items.map((item, idx) => {
+      const g = item.grams > 0 ? item.grams : 100;
+      const effectiveUnit: FoodUnit = item.unit || (isLiquidFood(item.food_name) ? "ml" : "g");
+      return {
+        id: `combo_item_${idx}_${Date.now()}`,
+        food: item.food_name,
+        grams: item.grams,
+        unit: effectiveUnit,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fat: item.fat,
+        confidence: 1.0,
+        nutrition_reference: item.nutrition_reference,
+        ratioCalories: item.calories / g,
+        ratioProtein: item.protein / g,
+        ratioCarbs: item.carbs / g,
+        ratioFat: item.fat / g,
+      };
+    });
+
+    set((state) => ({
+      items: [...state.items, ...enrichedItems],
+      userNotes: state.userNotes ? `${state.userNotes} + ${combo.title}` : `Combo: ${combo.title}`,
+    }));
   },
 
   setMealType: (mealType) => set({ mealType }),
@@ -170,18 +250,23 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
       const rCarbs = variant.carbsPer100g / 100;
       const rFat = variant.fatPer100g / 100;
 
+      const effectiveGrams = variant.grams && variant.grams > 0 ? variant.grams : item.grams;
+      const effectiveUnit = variant.unit || item.unit;
+
       updated[index] = {
         ...item,
         food: variant.food,
+        grams: effectiveGrams,
+        unit: effectiveUnit,
         nutrition_reference: undefined,
         ratioCalories: rCals,
         ratioProtein: rProt,
         ratioCarbs: rCarbs,
         ratioFat: rFat,
-        calories: Math.round(item.grams * rCals * 10) / 10,
-        protein: Math.round(item.grams * rProt * 10) / 10,
-        carbs: Math.round(item.grams * rCarbs * 10) / 10,
-        fat: Math.round(item.grams * rFat * 10) / 10,
+        calories: Math.round(effectiveGrams * rCals * 10) / 10,
+        protein: Math.round(effectiveGrams * rProt * 10) / 10,
+        carbs: Math.round(effectiveGrams * rCarbs * 10) / 10,
+        fat: Math.round(effectiveGrams * rFat * 10) / 10,
       };
       return { items: updated };
     });
