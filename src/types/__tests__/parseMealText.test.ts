@@ -29,4 +29,18 @@ describe("ParseMealTextRequestSchema", () => {
     const parsed = ParseMealTextRequestSchema.safeParse(input);
     expect(parsed.success).toBe(false);
   });
+
+  test("validates audio input with transcribe_only mode", () => {
+    const input = {
+      audio_base64: "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=",
+      audio_mime_type: "audio/webm",
+      transcribe_only: true,
+    };
+
+    const parsed = ParseMealTextRequestSchema.safeParse(input);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.transcribe_only).toBe(true);
+    }
+  });
 });

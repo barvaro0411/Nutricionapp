@@ -16,7 +16,7 @@ export async function handleRequest(req: Request) {
     const { client, user } = await authenticate(req);
     const parsed = ParseMealTextRequestSchema.safeParse(await readBody(req));
     if (!parsed.success) throw new ApiError(400, "INVALID_REQUEST", "Describe los alimentos o proporciona una grabación válida.");
-    const { text, audio_base64, audio_mime_type, client_time_iso } = parsed.data;
+    const { text, audio_base64, audio_mime_type, client_time_iso, transcribe_only } = parsed.data;
     const key = await optionalGeminiKey(client);
     await reserveAiRequest(client, user.id);
     const prompt = CHILEAN_MEAL_TEXT_PROMPT + (client_time_iso ? "\nFecha de referencia: " + client_time_iso : "");
@@ -34,6 +34,30 @@ export async function handleRequest(req: Request) {
         description = transcription.text;
         transcriptionProvider = transcription.model;
       } catch (error) { if (!key) throw error; }
+    }
+    if (transcribe_only) {
+      if (audio_base64 && !description && key) {
+        const audioResp = await callGemini(key, {
+          contents: [{ role: "user", parts: [
+            { text: "Transcribe textualmente el siguiente audio en español. Devuelve únicamente las palabras habladas sin añadidos ni comillas." },
+            { inline_data: { mime_type: audio_mime_type, data: audio_base64 } }
+          ] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+        }, { timeoutMs: 15000 });
+        description = audioResp.text.trim();
+        transcriptionProvider = "gemini-3.5-flash-lite";
+      }
+      if (!description || !description.trim()) {
+        throw new ApiError(422, "NO_SPEECH_DETECTED", "No se detectó voz clara en el audio. Intenta hablar más cerca del micrófono.");
+      }
+      return json({
+        success: true,
+        data: { transcript: description.trim() },
+        meta: {
+          provider_used: transcriptionProvider || "transcriber",
+          latency_ms: Date.now() - start,
+        },
+      }, 200, req);
     }
     const result = audio_base64 && !transcriptionProvider
       ? await withAiFallback([{ id: Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite", managedHealth: true, run: async timeoutMs => {
@@ -58,7 +82,7 @@ export async function handleRequest(req: Request) {
     }));
     const items = await enrichWithUsda(normalizedItems, key);
     const totals = sumNutrition(items);
-    return json({ success: true, data: { ...output.data, items, totals }, meta: { provider_used: result.model,
+    return json({ success: true, data: { ...output.data, items, totals, transcript: description }, meta: { provider_used: result.model,
       ...(transcriptionProvider ? { transcription_provider: transcriptionProvider } : {}), latency_ms: Date.now() - start } }, 200, req);
   } catch (error) { return errorResponse(error, req); }
 }

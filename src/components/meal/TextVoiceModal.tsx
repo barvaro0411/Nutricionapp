@@ -13,7 +13,7 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { PencilLine, Mic, X } from "lucide-react-native";
+import { PencilLine, Mic, X, Sparkles, RotateCcw } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTextAudioMeal } from "@/hooks/useTextAudioMeal";
 import { colors } from "@/constants/colors";
@@ -30,6 +30,7 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
   const [mode, setMode] = useState<"text" | "voice">("text");
   const [inputText, setInputText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [transcribedPreview, setTranscribedPreview] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const recording = useRef<Audio.Recording | null>(null);
   const busy = useRef(false);
@@ -38,24 +39,27 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
     const pending = recording.current;
     recording.current = null;
     setIsRecording(false);
+    setTranscribedPreview(false);
+    setCaptureError(null);
     if (pending) void pending.stopAndUnloadAsync().catch(() => undefined);
     if (Platform.OS !== "web") void Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => undefined);
   }, [visible]);
   useEffect(() => () => { void recording.current?.stopAndUnloadAsync().catch(() => undefined); }, []);
 
-  const { parseTextMeal, parseAudioMeal, processing, error } = useTextAudioMeal();
+  const { parseTextMeal, transcribeAudioMeal, processing, isTranscribing, error } = useTextAudioMeal();
 
   const handleSendText = async () => {
     if (!inputText.trim()) return;
     const res = await parseTextMeal(inputText, mealType);
     if (res.success) {
       setInputText("");
+      setTranscribedPreview(false);
       onClose();
     }
   };
 
   const handleVoiceCapture = async () => {
-    if (busy.current || processing) return;
+    if (busy.current || processing || isTranscribing) return;
     busy.current = true;
     setCaptureError(null);
     try {
@@ -91,8 +95,13 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
           await FileSystem.deleteAsync(uri, { idempotent: true });
         }
         if (base64.length > 6000000) throw new Error("El audio es demasiado largo. Graba una descripción más breve.");
-        const res = await parseAudioMeal(base64, mime, mealType);
-        if (res.success) onClose();
+
+        // Transcribir el audio para que el usuario pueda revisarlo y editarlo antes de analizar con IA
+        const res = await transcribeAudioMeal(base64, mime);
+        if (res.success && res.transcript) {
+          setInputText(res.transcript);
+          setTranscribedPreview(true);
+        }
       }
     } catch (e) {
       setIsRecording(false);
@@ -107,7 +116,7 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={() => { if (!processing) onClose(); }}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={() => { if (!processing && !isTranscribing) onClose(); }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.overlay}
@@ -118,25 +127,25 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
             <View style={styles.tabsRow}>
               <TouchableOpacity
                 accessibilityRole="button" accessibilityLabel="Escribir comida" aria-pressed={mode === "text"}
-                disabled={isRecording || processing}
+                disabled={isRecording || processing || isTranscribing}
                 style={[styles.tabBtn, mode === "text" && styles.tabBtnActive]}
-                onPress={() => { if (!isRecording && !processing) setMode("text"); }}
+                onPress={() => { if (!isRecording && !processing && !isTranscribing) setMode("text"); }}
               >
                 <PencilLine size={17} color={mode === "text" ? colors.primary : colors.textSecondary} />
                 <Text style={[styles.tabBtnText, mode === "text" && styles.tabBtnTextActive]}>Escribir</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityRole="button" accessibilityLabel="Dictar comida por voz" aria-pressed={mode === "voice"}
-                disabled={isRecording || processing}
+                disabled={isRecording || processing || isTranscribing}
                 style={[styles.tabBtn, mode === "voice" && styles.tabBtnActive]}
-                onPress={() => setMode("voice")}
+                onPress={() => { if (!isRecording && !processing && !isTranscribing) setMode("voice"); }}
               >
                 <Mic size={17} color={mode === "voice" ? colors.primary : colors.textSecondary} />
                 <Text style={[styles.tabBtnText, mode === "voice" && styles.tabBtnTextActive]}>Dictar</Text>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar registro por texto o voz" disabled={processing} style={styles.closeBtn} onPress={() => { if (!processing) onClose(); }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar registro por texto o voz" disabled={processing || isTranscribing} style={styles.closeBtn} onPress={() => { if (!processing && !isTranscribing) onClose(); }}>
               <X size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -197,27 +206,90 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
             </View>
           ) : (
             <View style={styles.voiceBody}>
-              <Text style={styles.instruction}>
-                Toca para grabar y vuelve a tocar para enviar. Usa una descripción breve.
-              </Text>
+              {transcribedPreview ? (
+                <View style={styles.previewBox}>
+                  <View style={styles.previewBadge}>
+                    <Sparkles size={16} color={colors.primaryDark} />
+                    <Text style={styles.previewBadgeText}>Voz transcrita lista para confirmar</Text>
+                  </View>
+                  <Text style={styles.previewInstruction}>
+                    Revisa o edita lo que interpretamos antes de calcular los nutrientes con IA:
+                  </Text>
+                  <TextInput
+                    style={styles.textInput}
+                    multiline
+                    numberOfLines={4}
+                    value={inputText}
+                    onChangeText={setInputText}
+                    placeholder="Edita la comida si es necesario..."
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={styles.previewTip}>
+                    💡 Puedes corregir porciones, marcas o ingredientes adicionales antes de enviar.
+                  </Text>
 
-              <TouchableOpacity
-                style={[styles.micButton, isRecording && styles.micButtonRecording]}
-                onPress={handleVoiceCapture}
-                disabled={processing}
-              >
-                <Text style={styles.micIcon}>{isRecording ? "⏹️" : "🎙️"}</Text>
-              </TouchableOpacity>
+                  <View style={styles.previewActionsRow}>
+                    <TouchableOpacity
+                      style={styles.retryBtn}
+                      onPress={() => {
+                        setTranscribedPreview(false);
+                        setInputText("");
+                      }}
+                      disabled={processing}
+                    >
+                      <RotateCcw size={16} color={colors.textSecondary} />
+                      <Text style={styles.retryBtnText}>Re-grabar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, (!inputText.trim() || processing) && styles.btnDisabled, { flex: 1 }]}
+                      onPress={handleSendText}
+                      disabled={!inputText.trim() || processing}
+                    >
+                      {processing ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.actionBtnText}>Confirmar y procesar ⚡</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.instruction}>
+                    Toca para grabar y vuelve a tocar para transcribir. Usa una descripción breve.
+                  </Text>
 
-              <Text style={styles.voiceStatusText}>
-                {isRecording
-                  ? "Escuchando... Di lo que comiste (ej: 'una empanada de pino')"
-                  : processing
-                  ? "Interpretando alimentos y porciones..."
-                  : "Toca el micrófono para comenzar"}
-              </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.micButton,
+                      isRecording && styles.micButtonRecording,
+                      (isTranscribing || processing) && styles.btnDisabled,
+                    ]}
+                    onPress={handleVoiceCapture}
+                    disabled={processing || isTranscribing}
+                  >
+                    {isTranscribing ? (
+                      <ActivityIndicator size="large" color={colors.primary} />
+                    ) : (
+                      <Text style={styles.micIcon}>{isRecording ? "⏹️" : "🎙️"}</Text>
+                    )}
+                  </TouchableOpacity>
 
-              {processing && <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} />}
+                  <Text style={styles.voiceStatusText}>
+                    {isRecording
+                      ? "Escuchando... Di lo que comiste (ej: 'una empanada de pino')"
+                      : isTranscribing
+                      ? "Transcribiendo tu voz con IA..."
+                      : processing
+                      ? "Interpretando alimentos y porciones..."
+                      : "Toca el micrófono para comenzar"}
+                  </Text>
+
+                  {(processing || isTranscribing) && (
+                    <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} />
+                  )}
+                </>
+              )}
             </View>
           )}
         </ScrollView>
@@ -390,5 +462,58 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: "center",
     paddingHorizontal: 20,
+  },
+  previewBox: {
+    width: "100%",
+    marginTop: 4,
+  },
+  previewBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.primaryLight,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    alignSelf: "flex-start",
+    marginBottom: 10,
+  },
+  previewBadgeText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.primaryDark,
+  },
+  previewInstruction: {
+    fontSize: 13.5,
+    color: colors.textSecondary,
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  previewTip: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: -6,
+    marginBottom: 14,
+  },
+  previewActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
+  retryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+  },
+  retryBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.textSecondary,
   },
 });

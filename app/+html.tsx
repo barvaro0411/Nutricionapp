@@ -16,10 +16,24 @@ export default function Root({ children }: PropsWithChildren) {
           content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover, maximum-scale=1, user-scalable=no"
         />
 
+        {/* Preconexión y Precarga de Recursos Críticos */}
+        {process.env.EXPO_PUBLIC_SUPABASE_URL && (
+          <>
+            <link rel="preconnect" href={process.env.EXPO_PUBLIC_SUPABASE_URL} crossOrigin="anonymous" />
+            <link rel="dns-prefetch" href={process.env.EXPO_PUBLIC_SUPABASE_URL} />
+          </>
+        )}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preload" href="/manifest.json" as="fetch" crossOrigin="anonymous" />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+
         {/* PWA & Mobile Web Capabilities */}
         <title>Nutrición IA Chile</title>
         <meta name="description" content="Seguimiento nutricional inteligente con IA para Chile" />
-        <meta name="theme-color" content="#10B981" />
+        <meta name="color-scheme" content="light dark" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#10B981" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#064E3B" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
