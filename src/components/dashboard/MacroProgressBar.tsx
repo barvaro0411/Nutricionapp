@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { colors, shadows } from "@/constants/colors";
+import { adjustGoalsForActivity } from "@/utils/nutritionCalculator";
 
 interface MacroCardProps {
   label: string;
@@ -66,6 +67,7 @@ interface MacroProgressBarProps {
   carbsGoal: number;
   fatConsumed: number;
   fatGoal: number;
+  burnedCalories?: number;
 }
 
 export function MacroProgressBar({
@@ -75,32 +77,50 @@ export function MacroProgressBar({
   carbsGoal,
   fatConsumed,
   fatGoal,
+  burnedCalories = 0,
 }: MacroProgressBarProps) {
+  const adjusted = useMemo(() => {
+    return adjustGoalsForActivity(
+      {
+        calories: 0,
+        proteinG: proteinGoal,
+        carbsG: carbsGoal,
+        fatG: fatGoal,
+      },
+      burnedCalories
+    );
+  }, [proteinGoal, carbsGoal, fatGoal, burnedCalories]);
+
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text accessibilityRole="header" style={styles.sectionOverline}>Tus nutrientes</Text>
+        {burnedCalories > 0 && (
+          <Text style={styles.activityBadge}>
+            +{Math.round((burnedCalories * 0.75) / 4)}g carbos por actividad
+          </Text>
+        )}
       </View>
 
       <View style={styles.grid}>
         <MacroCard
           label="Proteína"
           consumed={proteinConsumed}
-          goal={proteinGoal}
+          goal={adjusted.proteinG}
           color={colors.protein}
           lightBg={colors.proteinLight}
         />
         <MacroCard
           label="Carbos"
           consumed={carbsConsumed}
-          goal={carbsGoal}
+          goal={adjusted.carbsG}
           color={colors.carbs}
           lightBg={colors.carbsLight}
         />
         <MacroCard
           label="Grasas"
           consumed={fatConsumed}
-          goal={fatGoal}
+          goal={adjusted.fatG}
           color={colors.fat}
           lightBg={colors.fatLight}
         />
@@ -119,6 +139,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     paddingHorizontal: 2,
+    flexWrap: "wrap",
+    gap: 6,
   },
   sectionOverline: {
     fontSize: 15,
@@ -126,8 +148,19 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     color: colors.text,
   },
+  activityBadge: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "700",
+    color: colors.primaryDark,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
   grid: {
     flexDirection: "row",
+
     gap: 10,
   },
   macroCard: {

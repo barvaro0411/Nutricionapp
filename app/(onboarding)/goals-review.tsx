@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { ArrowLeft } from "lucide-react-native";
 import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useQueryClient } from "@tanstack/react-query";
@@ -31,7 +32,9 @@ export default function GoalsReviewScreen() {
     proteinG: string;
     carbsG: string;
     fatG: string;
+    fromSettings?: string;
   }>();
+  const isFromSettings = params.fromSettings === "true";
 
   const [calories, setCalories] = useState(params.calories || "2000");
   const [proteinG, setProteinG] = useState(params.proteinG || "150");
@@ -78,8 +81,13 @@ export default function GoalsReviewScreen() {
       if (error) throw new Error(error.message);
       setProfile(updatedProfile);
       await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
-      // Redirigir al inicio
-      router.replace("/(tabs)");
+      await queryClient.invalidateQueries({ queryKey: ["personalPlan"] });
+      // Redirigir a ajustes o al inicio según origen
+      if (isFromSettings) {
+        router.replace("/(tabs)/settings");
+      } else {
+        router.replace("/(tabs)");
+      }
     } catch (err: any) {
       setError(err?.message || "Ocurrió un error al guardar tus objetivos.");
     } finally {
@@ -98,13 +106,31 @@ export default function GoalsReviewScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {isFromSettings && (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Volver a modificar medidas"
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <ArrowLeft size={18} color={colors.text} />
+          <Text style={styles.backButtonText}>Modificar datos</Text>
+        </TouchableOpacity>
+      )}
       <View style={styles.header}>
-        <Text style={styles.stepIndicator}>Paso 2 de 2</Text>
-        <Text style={styles.title}>Tus Objetivos Diarios</Text>
+        <Text style={styles.stepIndicator}>
+          {isFromSettings ? "Reajuste de Metas" : "Paso 2 de 2"}
+        </Text>
+        <Text style={styles.title}>
+          {isFromSettings ? "Tus Nuevas Metas" : "Tus Objetivos Diarios"}
+        </Text>
         <Text style={styles.subtitle}>
-          Hemos calculado tus metas nutricionales personalizadas. Puedes ajustarlas según tus preferencias.
+          {isFromSettings
+            ? "Hemos recalculado tus objetivos calóricos y de macronutrientes. Puedes afinarlos antes de guardar."
+            : "Hemos calculado tus metas nutricionales personalizadas. Puedes ajustarlas según tus preferencias."}
         </Text>
       </View>
+
 
       {error && (
         <View style={styles.errorBox}>
@@ -262,7 +288,9 @@ export default function GoalsReviewScreen() {
         {saving ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.saveButtonText}>Guardar y Comenzar</Text>
+          <Text style={styles.saveButtonText}>
+            {isFromSettings ? "Guardar y Aplicar Metas" : "Guardar y Comenzar"}
+          </Text>
         )}
       </TouchableOpacity>
     </ScrollView>
@@ -278,8 +306,22 @@ const styles = StyleSheet.create({
     ...layout.narrowPage,
     paddingBottom: 48,
   },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 20,
+    marginBottom: 8,
+    paddingVertical: 6,
+    alignSelf: "flex-start",
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.text,
+  },
   header: {
-    marginTop: 40,
+    marginTop: 16,
     marginBottom: 24,
   },
   stepIndicator: {

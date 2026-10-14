@@ -86,3 +86,48 @@ export function calculateNutritionGoals(profile: OnboardingProfile): Goals {
     fatG: targetFatG,
   };
 }
+
+/**
+ * Ajusta dinámicamente las metas nutricionales diarias sumando el gasto por actividad física.
+ * Las calorías de actividad se añaden al presupuesto calórico diario.
+ * Se prioriza la reposición de glucógeno aumentando principalmente los carbohidratos
+ * (75% de las calorías activas a 4 kcal/g) y una porción moderada para recuperación muscular
+ * en proteínas (15% a 4 kcal/g) y grasas (10% a 9 kcal/g).
+ */
+export function adjustGoalsForActivity(
+  baseGoals: Goals,
+  burnedCalories: number = 0
+): Goals {
+  const burned = Number.isFinite(burnedCalories) ? Math.max(0, Math.round(burnedCalories)) : 0;
+  if (burned === 0) {
+    return { ...baseGoals };
+  }
+
+  const adjustedCalories = Math.round(baseGoals.calories + burned);
+  const extraCarbsG = Math.round((burned * 0.75) / 4);
+  const extraProteinG = Math.round((burned * 0.15) / 4);
+  const extraFatG = Math.round((burned * 0.10) / 9);
+
+  return {
+    calories: adjustedCalories,
+    proteinG: baseGoals.proteinG + extraProteinG,
+    carbsG: baseGoals.carbsG + extraCarbsG,
+    fatG: baseGoals.fatG + extraFatG,
+  };
+}
+
+/**
+ * Recalcula metas nutricionales completas a partir del perfil y posibles actualizaciones
+ * de peso o nivel de actividad.
+ */
+export function recalculateGoalsFromProfile(
+  profile: OnboardingProfile,
+  updates?: Partial<Pick<OnboardingProfile, "weightKg" | "activityLevel" | "objective">>
+): Goals {
+  return calculateNutritionGoals({
+    ...profile,
+    weightKg: updates?.weightKg ?? profile.weightKg,
+    activityLevel: updates?.activityLevel ?? profile.activityLevel,
+    objective: updates?.objective ?? profile.objective,
+  });
+}

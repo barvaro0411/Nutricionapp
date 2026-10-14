@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
 import { Flame } from "lucide-react-native";
 import { colors, shadows } from "@/constants/colors";
+import { adjustGoalsForActivity } from "@/utils/nutritionCalculator";
 
 interface DailySummaryProps {
   calories: number;
@@ -45,7 +46,20 @@ export function DailySummary(props: DailySummaryProps) {
   const { width } = useWindowDimensions();
   const compact = width < 380;
   const wide = width >= 820;
-  const budget = Math.max(0, calorieGoal + burnedCalories);
+
+  const adjustedGoals = useMemo(() => {
+    return adjustGoalsForActivity(
+      {
+        calories: calorieGoal,
+        proteinG: props.proteinGoal,
+        carbsG: props.carbsGoal,
+        fatG: props.fatGoal,
+      },
+      burnedCalories
+    );
+  }, [calorieGoal, props.proteinGoal, props.carbsGoal, props.fatGoal, burnedCalories]);
+
+  const budget = Math.max(0, adjustedGoals.calories);
   const progress = budget > 0 ? Math.min(1, Math.max(0, calories / budget)) : 0;
   const percent = budget > 0 ? Math.round((calories / budget) * 100) : 0;
   const over = Math.max(0, calories - budget);
@@ -53,6 +67,7 @@ export function DailySummary(props: DailySummaryProps) {
   const radius = size / 2 - 8;
   const circumference = 2 * Math.PI * radius;
   const valueText = `${number(calories)} de ${number(budget)} kilocalorías`;
+
   return (
     <View testID="daily-summary" style={styles.card}>
       <View style={styles.header}>
@@ -94,11 +109,18 @@ export function DailySummary(props: DailySummaryProps) {
           </View>
         </View>
         <View style={[styles.nutrients, wide && styles.nutrientsWide]}>
-          <Text accessibilityRole="header" style={styles.nutrientsTitle}>Tus nutrientes</Text>
+          <View style={styles.nutrientsHeaderRow}>
+            <Text accessibilityRole="header" style={styles.nutrientsTitle}>Tus nutrientes</Text>
+            {burnedCalories > 0 && (
+              <Text style={styles.activityBadge}>
+                +{Math.round((burnedCalories * 0.75) / 4)}g carbos por actividad
+              </Text>
+            )}
+          </View>
           <View style={styles.nutrientRow}>
-            <Nutrient label="Proteína" consumed={props.protein} goal={props.proteinGoal} color={colors.protein} />
-            <Nutrient label="Carbos" consumed={props.carbs} goal={props.carbsGoal} color={colors.carbs} />
-            <Nutrient label="Grasas" consumed={props.fat} goal={props.fatGoal} color={colors.fat} />
+            <Nutrient label="Proteína" consumed={props.protein} goal={adjustedGoals.proteinG} color={colors.protein} />
+            <Nutrient label="Carbos" consumed={props.carbs} goal={adjustedGoals.carbsG} color={colors.carbs} />
+            <Nutrient label="Grasas" consumed={props.fat} goal={adjustedGoals.fatG} color={colors.fat} />
           </View>
         </View>
       </View>
@@ -130,7 +152,9 @@ const styles = StyleSheet.create({
   fill: { height: "100%", borderRadius: 3 },
   nutrients: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.cardBorder },
   nutrientsWide: { flex: 1, minWidth: 0, marginTop: 0, paddingTop: 0, borderTopWidth: 0, paddingLeft: 24, borderLeftWidth: 1, borderLeftColor: colors.cardBorder },
-  nutrientsTitle: { fontSize: 11, lineHeight: 14, color: colors.textSecondary, fontWeight: "600", marginBottom: 10 },
+  nutrientsHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6, marginBottom: 10 },
+  nutrientsTitle: { fontSize: 11, lineHeight: 14, color: colors.textSecondary, fontWeight: "600" },
+  activityBadge: { fontSize: 10, lineHeight: 14, fontWeight: "700", color: colors.primaryDark, backgroundColor: colors.primaryLight, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
   nutrientRow: { flexDirection: "row", gap: 14 },
   nutrient: { flex: 1, minWidth: 0 },
   nutrientLabel: { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" },
@@ -138,6 +162,7 @@ const styles = StyleSheet.create({
   nutrientName: { fontSize: 11, lineHeight: 14, fontWeight: "600", color: colors.textSecondary },
   nutrientValue: { fontSize: 18, lineHeight: 24, fontWeight: "800", color: colors.text, marginTop: 5 },
   nutrientGoal: { fontSize: 10, fontWeight: "500", color: colors.textSecondary },
+
   exercise: { minHeight: 44, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.primaryLight, borderRadius: 12 },
   exerciseText: { fontSize: 11, lineHeight: 17, color: colors.primaryDark, fontWeight: "600" },
 });

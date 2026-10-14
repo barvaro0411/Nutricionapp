@@ -33,3 +33,10 @@ export const GoalsSchema = z.object({
   fatG: z.number().min(15).max(300),
 });
 export type Goals = z.infer<typeof GoalsSchema>;
+
+export const RecalculateGoalsInputSchema = z.object({
+  weightKg: z.number().min(30, "Peso mínimo 30 kg").max(300, "Peso máximo 300 kg"),
+  activityLevel: ActivityLevelSchema,
+  objective: ObjectiveSchema.optional(),
+});
+export type RecalculateGoalsInput = z.infer<typeof RecalculateGoalsInputSchema>;

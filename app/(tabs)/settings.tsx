@@ -205,17 +205,33 @@ export default function SettingsScreen() {
       <Text style={styles.sectionTitle}>Tu punto de partida</Text>
       <View style={styles.metrics}>
         {metrics.map((metric) => (
-          <View key={metric.label} style={styles.metric}>
+          <Pressable
+            key={metric.label}
+            style={({ pressed }) => [styles.metric, pressed && { opacity: 0.75 }]}
+            onPress={() =>
+              router.push({
+                pathname: "/(onboarding)/profile-setup",
+                params: { fromSettings: "true" },
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel={`Editar ${metric.label}: ${metric.value}`}
+          >
             <Text style={styles.metricLabel}>{metric.label}</Text>
             <Text style={styles.metricValue}>{metric.value}</Text>
-          </View>
+          </Pressable>
         ))}
       </View>
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Actualizar mis metas"
-          onPress={() => router.push("/(onboarding)/profile-setup")}
+          onPress={() =>
+            router.push({
+              pathname: "/(onboarding)/profile-setup",
+              params: { fromSettings: "true" },
+            })
+          }
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}
         >
           <View style={styles.actionIcon}>
@@ -224,11 +240,12 @@ export default function SettingsScreen() {
           <View style={styles.actionCopy}>
             <Text style={styles.actionTitle}>Actualizar mis metas</Text>
             <Text style={styles.actionDescription}>
-              Revisa tus medidas y tu objetivo nutricional.
+              Revisa tus medidas y recalcula automáticamente tus objetivos diarios.
             </Text>
           </View>
           <ChevronRight size={18} color={colors.textMuted} />
         </Pressable>
+
         <View style={styles.divider} />
         <Pressable
           accessibilityRole="button"

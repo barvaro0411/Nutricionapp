@@ -8,7 +8,8 @@ import {
   APP_TIME_ZONE,
 } from "@/utils/dates";
 import { showAlert } from "@/utils/alerts";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { adjustGoalsForActivity } from "@/utils/nutritionCalculator";
 import {
   View,
   Text,
@@ -92,6 +93,18 @@ export default function DashboardScreen() {
   const { totalMl, targetMl, addWater, isAdding } =
     useWaterTracker(selectedDate);
   const { burnedCalories, steps, logActivity } = useActivitySync(selectedDate);
+
+  const adjustedGoals = useMemo(() => {
+    return adjustGoalsForActivity(
+      {
+        calories: data?.goal.calories ?? 2000,
+        proteinG: data?.goal.protein_g ?? 140,
+        carbsG: data?.goal.carbs_g ?? 220,
+        fatG: data?.goal.fat_g ?? 65,
+      },
+      burnedCalories
+    );
+  }, [data?.goal, burnedCalories]);
 
   const isToday = getDateKey(selectedDate) === getDateKey(new Date());
 
@@ -382,11 +395,11 @@ export default function DashboardScreen() {
                     {/* Smart Coach Proactivo (Fase 3) */}
                     <SmartCoachCard
                       consumedCalories={data?.consumed.calories || 0}
-                      goalCalories={data?.goal.calories || 2000}
-                      remainingCalories={data?.remaining.calories || 0}
+                      goalCalories={adjustedGoals.calories}
+                      remainingCalories={Math.max(0, adjustedGoals.calories - (data?.consumed.calories || 0))}
                       consumedProtein={data?.consumed.protein || 0}
-                      goalProtein={data?.goal.protein_g || 140}
-                      remainingProtein={data?.remaining.protein || 0}
+                      goalProtein={adjustedGoals.proteinG}
+                      remainingProtein={Math.max(0, adjustedGoals.proteinG - (data?.consumed.protein || 0))}
                       waterMl={totalMl}
                       targetWaterMl={targetMl}
                       mealCount={data?.meals.length || 0}

@@ -8,7 +8,8 @@ import {
   ScrollView,
   Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { ArrowLeft } from "lucide-react-native";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { colors, layout } from "@/constants/colors";
 import { Gender, ActivityLevel, Objective } from "@/types/profile";
@@ -17,6 +18,8 @@ import { calculateNutritionGoals } from "@/utils/nutritionCalculator";
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ fromSettings?: string }>();
+  const isFromSettings = params.fromSettings === "true";
   const { profile } = useAuthStore();
 
   const [gender, setGender] = useState<Gender>(profile?.gender || "male");
@@ -73,17 +76,35 @@ export default function ProfileSetupScreen() {
         proteinG: calculatedGoals.proteinG.toString(),
         carbsG: calculatedGoals.carbsG.toString(),
         fatG: calculatedGoals.fatG.toString(),
+        fromSettings: isFromSettings ? "true" : undefined,
       },
     });
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {isFromSettings && (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Volver a ajustes"
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <ArrowLeft size={18} color={colors.text} />
+          <Text style={styles.backButtonText}>Volver a Ajustes</Text>
+        </TouchableOpacity>
+      )}
       <View style={styles.header}>
-        <Text style={styles.stepIndicator}>Paso 1 de 2</Text>
-        <Text style={styles.title}>Cuéntanos sobre ti</Text>
+        <Text style={styles.stepIndicator}>
+          {isFromSettings ? "Ajustes de Perfil" : "Paso 1 de 2"}
+        </Text>
+        <Text style={styles.title}>
+          {isFromSettings ? "Actualizar medidas y metas" : "Cuéntanos sobre ti"}
+        </Text>
         <Text style={styles.subtitle}>
-          Usaremos tus datos para estimar una meta inicial. Podrás ajustarla cuando lo necesites.
+          {isFromSettings
+            ? "Modifica tu peso o nivel de actividad para recalcular tus metas automáticamente."
+            : "Usaremos tus datos para estimar una meta inicial. Podrás ajustarla cuando lo necesites."}
         </Text>
       </View>
 
@@ -212,7 +233,9 @@ export default function ProfileSetupScreen() {
       </View>
 
       <TouchableOpacity accessibilityRole="button" style={styles.continueButton} onPress={handleCalculateGoals}>
-        <Text style={styles.continueButtonText}>Calcular mis Objetivos</Text>
+        <Text style={styles.continueButtonText}>
+          {isFromSettings ? "Recalcular mis metas →" : "Calcular mis Objetivos"}
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -227,8 +250,22 @@ const styles = StyleSheet.create({
     ...layout.narrowPage,
     paddingBottom: 48,
   },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: Platform.OS === "ios" ? 20 : 12,
+    marginBottom: 8,
+    paddingVertical: 6,
+    alignSelf: "flex-start",
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.text,
+  },
   header: {
-    marginTop: Platform.OS === "ios" ? 40 : 20,
+    marginTop: Platform.OS === "ios" ? 16 : 8,
     marginBottom: 24,
   },
   stepIndicator: {
