@@ -30,6 +30,8 @@ import {
   resolveItemUnit,
 } from "@/utils/liquidUnits";
 import { getVariant } from "@/utils/drinkVariants";
+import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
+import { evaluateFoodAlerts } from "@/utils/foodAlerts";
 
 export default function MealReviewScreen() {
   const router = useRouter();
@@ -37,6 +39,8 @@ export default function MealReviewScreen() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { saveFavorite, isSavingFavorite } = useFavoriteMeals();
+  const { restrictions } = useDietaryPreferences();
+
 
   const {
     items,
@@ -419,6 +423,7 @@ export default function MealReviewScreen() {
           const isMl = itemUnit === "ml";
           const drinkVariant = getVariant(item.food);
           const standardPortions = getStandardPortions(itemUnit);
+          const { stamps, alerts } = evaluateFoodAlerts(item, restrictions);
 
           return (
             <View key={item.id || index} style={styles.itemCard}>
@@ -436,6 +441,33 @@ export default function MealReviewScreen() {
                   {isLowConfidence && (
                     <View style={styles.warningPill}>
                       <Text style={styles.warningPillText}>⚠️ Revisa este alimento</Text>
+                    </View>
+                  )}
+                  {(stamps.length > 0 || alerts.length > 0) && (
+                    <View style={styles.foodAlertsRow}>
+                      {stamps.map((stamp) => (
+                        <View key={stamp.stamp} style={styles.stampBadge}>
+                          <Text style={styles.stampText}>{stamp.label}</Text>
+                        </View>
+                      ))}
+                      {alerts.map((alert, aIdx) => (
+                        <View
+                          key={aIdx}
+                          style={[
+                            styles.dietAlertPill,
+                            alert.severity === "danger" && styles.dietAlertPillDanger,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.dietAlertText,
+                              alert.severity === "danger" && styles.dietAlertTextDanger,
+                            ]}
+                          >
+                            ⚠️ {alert.label}
+                          </Text>
+                        </View>
+                      ))}
                     </View>
                   )}
                 </View>
@@ -942,6 +974,47 @@ const styles = StyleSheet.create({
     color: "#92400E",
     fontWeight: "700",
   },
+  foodAlertsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 6,
+  },
+  stampBadge: {
+    backgroundColor: "#111827",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    alignSelf: "flex-start",
+  },
+  stampText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  dietAlertPill: {
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+  },
+  dietAlertPillDanger: {
+    backgroundColor: "#FEE2E2",
+    borderColor: "#FECACA",
+  },
+  dietAlertText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#92400E",
+  },
+  dietAlertTextDanger: {
+    color: "#991B1B",
+  },
+
   removeBtn: {
     width: 44,
     height: 44,

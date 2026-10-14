@@ -40,3 +40,61 @@ export const RecalculateGoalsInputSchema = z.object({
   objective: ObjectiveSchema.optional(),
 });
 export type RecalculateGoalsInput = z.infer<typeof RecalculateGoalsInputSchema>;
+
+export const DietaryRestrictionSchema = z.enum([
+  "lactose_intolerance",
+  "celiac_gluten",
+  "vegan",
+  "vegetarian",
+  "low_sodium",
+  "low_sugar",
+  "nut_allergy",
+  "seafood_allergy",
+]);
+export type DietaryRestriction = z.infer<typeof DietaryRestrictionSchema>;
+
+export const DIETARY_RESTRICTION_LABELS: Record<
+  DietaryRestriction,
+  { label: string; icon: string; description: string }
+> = {
+  lactose_intolerance: {
+    label: "Sin Lactosa",
+    icon: "🥛",
+    description: "Evitar lácteos y derivados con lactosa",
+  },
+  celiac_gluten: {
+    label: "Sin Gluten",
+    icon: "🌾",
+    description: "Evitar trigo, avena no certificada, cebada y centeno",
+  },
+  vegan: {
+    label: "Vegano",
+    icon: "🌱",
+    description: "Sin carne, lácteos, huevos ni productos animales",
+  },
+  vegetarian: {
+    label: "Vegetariano",
+    icon: "🥗",
+    description: "Sin carnes ni pescados",
+  },
+  low_sodium: {
+    label: "Bajo en Sodio",
+    icon: "🧂",
+    description: "Alerta ante alimentos altos en sodio",
+  },
+  low_sugar: {
+    label: "Bajo en Azúcar",
+    icon: "🍬",
+    description: "Alerta ante alimentos altos en azúcares",
+  },
+  nut_allergy: {
+    label: "Frutos Secos",
+    icon: "🥜",
+    description: "Alerta ante maní, nueces o almendras",
+  },
+  seafood_allergy: {
+    label: "Mariscos y Pescados",
+    icon: "🦐",
+    description: "Alerta ante mariscos, crustáceos o pescados",
+  },
+};

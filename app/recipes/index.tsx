@@ -12,6 +12,8 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft, ArrowUpRight, ChefHat, Clock3 } from "lucide-react-native";
 import { useRecipes } from "@/hooks/useRecipes";
+import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
+import { isRecipeCompatible } from "@/utils/foodAlerts";
 import {
   PageHeading,
   FormField,
@@ -37,13 +39,23 @@ export default function RecipesCatalogScreen() {
   const insets = useSafeAreaInsets();
   const wide = useWindowDimensions().width >= 760;
   const [selectedType, setSelectedType] = useState<MealType | undefined>();
+  const [filterCompatibleOnly, setFilterCompatibleOnly] = useState(false);
   const [search, setSearch] = useState("");
+  const { restrictions } = useDietaryPreferences();
   const { data: recipes, isLoading, error, refetch } = useRecipes(selectedType);
-  const filtered = (recipes || []).filter((recipe) =>
-    normalize(recipe.title + " " + recipe.description).includes(
-      normalize(search.trim()),
-    ),
-  );
+
+  const filtered = (recipes || []).filter((recipe) => {
+    const matchesSearch = normalize(recipe.title + " " + recipe.description).includes(
+      normalize(search.trim())
+    );
+    if (!matchesSearch) return false;
+    if (filterCompatibleOnly && restrictions.length > 0) {
+      const { compatible } = isRecipeCompatible(recipe, restrictions);
+      if (!compatible) return false;
+    }
+    return true;
+  });
+
   return (
     <ScrollView
       style={styles.root}
@@ -106,6 +118,24 @@ export default function RecipesCatalogScreen() {
             </Text>
           </Pressable>
         ))}
+        {restrictions.length > 0 && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Filtrar solo recetas compatibles con mis restricciones"
+            accessibilityState={{ selected: filterCompatibleOnly }}
+            onPress={() => setFilterCompatibleOnly((v) => !v)}
+            style={[styles.chip, filterCompatibleOnly && styles.activeChip]}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                filterCompatibleOnly && styles.activeText,
+              ]}
+            >
+              🌱 Para mi dieta ({restrictions.length})
+            </Text>
+          </Pressable>
+        )}
       </ScrollView>
       {isLoading ? (
         <ActivityIndicator
@@ -123,22 +153,23 @@ export default function RecipesCatalogScreen() {
         <>
           <StateCard
             title={
-              search || selectedType
+              search || selectedType || filterCompatibleOnly
                 ? "No encontramos esa combinación"
                 : "Estamos preparando nuevas ideas"
             }
             message={
-              search || selectedType
-                ? "Prueba otro ingrediente o cambia el filtro de comida."
+              search || selectedType || filterCompatibleOnly
+                ? "Prueba otro ingrediente o cambia los filtros seleccionados."
                 : "Las recetas aparecerán aquí cuando estén disponibles."
             }
           />
-          {(search || selectedType) && (
+          {(search || selectedType || filterCompatibleOnly) && (
             <AppButton
               title="Limpiar filtros"
               onPress={() => {
                 setSearch("");
                 setSelectedType(undefined);
+                setFilterCompatibleOnly(false);
               }}
               secondary
             />
@@ -174,11 +205,33 @@ export default function RecipesCatalogScreen() {
                   <View style={styles.icon}>
                     <ChefHat size={25} color={colors.primary} />
                   </View>
-                  <View style={styles.time}>
-                    <Clock3 size={13} color={colors.textSecondary} />
-                    <Text style={styles.timeText}>
-                      {recipe.prepTimeMinutes} min
-                    </Text>
+                  <View style={styles.cardHeaderRight}>
+                    {restrictions.length > 0 && (() => {
+                      const { compatible, alerts } = isRecipeCompatible(recipe, restrictions);
+                      return (
+                        <View
+                          style={[
+                            styles.recipeBadge,
+                            compatible ? styles.recipeBadgeSuccess : styles.recipeBadgeWarning,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.recipeBadgeText,
+                              compatible ? styles.recipeBadgeTextSuccess : styles.recipeBadgeTextWarning,
+                            ]}
+                          >
+                            {compatible ? "✓ Compatible" : `⚠️ ${alerts[0]?.label || "Alérgeno"}`}
+                          </Text>
+                        </View>
+                      );
+                    })()}
+                    <View style={styles.time}>
+                      <Clock3 size={13} color={colors.textSecondary} />
+                      <Text style={styles.timeText}>
+                        {recipe.prepTimeMinutes} min
+                      </Text>
+                    </View>
                   </View>
                 </View>
                 <Text style={styles.category}>{labels[recipe.mealType]}</Text>
@@ -206,6 +259,7 @@ export default function RecipesCatalogScreen() {
           </View>
         </>
       )}
+
     </ScrollView>
   );
 }
@@ -252,6 +306,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 18,
   },
+  cardHeaderRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  recipeBadge: { paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6 },
+  recipeBadgeSuccess: { backgroundColor: "#DCFCE7" },
+  recipeBadgeWarning: { backgroundColor: "#FEF3C7" },
+  recipeBadgeText: { fontSize: 10, fontWeight: "700" },
+  recipeBadgeTextSuccess: { color: "#166534" },
+  recipeBadgeTextWarning: { color: "#92400E" },
   icon: {
     width: 52,
     height: 52,

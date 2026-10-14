@@ -11,6 +11,8 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRecipeDetail } from "@/hooks/useRecipes";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
+import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
+import { isRecipeCompatible } from "@/utils/foodAlerts";
 import { colors, layout } from "@/constants/colors";
 import { DetectedFoodItem } from "@/types/meal";
 import { isLiquidFood, formatQuantityDisplay } from "@/utils/liquidUnits";
@@ -22,6 +24,12 @@ export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: recipe, isLoading, error } = useRecipeDetail(id || "");
   const { initializeReview } = useMealReviewStore();
+  const { restrictions } = useDietaryPreferences();
+
+  const compatibility = React.useMemo(() => {
+    if (!recipe || restrictions.length === 0) return null;
+    return isRecipeCompatible(recipe, restrictions);
+  }, [recipe, restrictions]);
 
   const handleLogRecipe = () => {
     if (!recipe) return;
@@ -77,6 +85,39 @@ export default function RecipeDetailScreen() {
       <Text accessibilityRole="header" style={styles.title}>{recipe.title}</Text>
       <Text style={styles.prepTime}>⏱️ Tiempo estimado: {recipe.prepTimeMinutes} minutos</Text>
       {recipe.description && <Text style={styles.description}>{recipe.description}</Text>}
+
+      {compatibility && (
+        <View
+          style={[
+            styles.compatibilityBanner,
+            compatibility.compatible
+              ? styles.compatibilityBannerSuccess
+              : styles.compatibilityBannerWarning,
+          ]}
+        >
+          <Text
+            style={[
+              styles.compatibilityBannerTitle,
+              compatibility.compatible
+                ? styles.compatibilityBannerTitleSuccess
+                : styles.compatibilityBannerTitleWarning,
+            ]}
+          >
+            {compatibility.compatible
+              ? "✓ Compatible con tus restricciones dietéticas"
+              : "⚠️ Advertencia de Alérgenos / Restricciones"}
+          </Text>
+          {!compatibility.compatible && (
+            <View style={styles.compatibilityAlertsList}>
+              {compatibility.alerts.map((alert, idx) => (
+                <Text key={idx} style={styles.compatibilityAlertText}>
+                  • {alert.message}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Tarjeta de Macronutrientes por porción */}
       <View style={styles.macrosCard}>
@@ -328,5 +369,38 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "800",
+  },
+  compatibilityBanner: {
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  compatibilityBannerSuccess: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#BBF7D0",
+  },
+  compatibilityBannerWarning: {
+    backgroundColor: "#FEFCE8",
+    borderColor: "#FEF08A",
+  },
+  compatibilityBannerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  compatibilityBannerTitleSuccess: {
+    color: "#166534",
+  },
+  compatibilityBannerTitleWarning: {
+    color: "#854D0E",
+  },
+  compatibilityAlertsList: {
+    marginTop: 6,
+    gap: 4,
+  },
+  compatibilityAlertText: {
+    fontSize: 13,
+    color: "#A16207",
+    lineHeight: 18,
   },
 });

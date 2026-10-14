@@ -19,6 +19,8 @@ import {
   LockKeyhole,
 } from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
+import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
+import { DietaryRestriction, DIETARY_RESTRICTION_LABELS } from "@/types/profile";
 import {
   getReminderPreferences,
   toggleReminder,
@@ -32,7 +34,9 @@ import { colors, layout } from "@/constants/colors";
 export default function SettingsScreen() {
   const router = useRouter();
   const { user, profile, signOut, updateProfile, loading } = useAuth();
+  const { toggleRestriction, hasRestriction } = useDietaryPreferences();
   const [reminders, setReminders] = useState<MealReminderConfig[]>(
+
     DEFAULT_CHILEAN_REMINDERS,
   );
   const [busyReminder, setBusyReminder] = useState<string | null>(null);
@@ -265,10 +269,44 @@ export default function SettingsScreen() {
           <ChevronRight size={18} color={colors.textMuted} />
         </Pressable>
       </View>
+
+      <Text style={styles.sectionTitle}>Preferencias y Alérgenos</Text>
+      <Text style={styles.sectionDescription}>
+        Te alertaremos en el diario de comidas y filtraremos automáticamente recetas compatibles.
+      </Text>
+      <View style={styles.dietaryGrid}>
+        {(Object.keys(DIETARY_RESTRICTION_LABELS) as DietaryRestriction[]).map((key) => {
+          const item = DIETARY_RESTRICTION_LABELS[key];
+          const active = hasRestriction(key);
+          return (
+            <Pressable
+              key={key}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.label}: ${active ? "activo" : "inactivo"}`}
+              accessibilityState={{ selected: active }}
+              style={[styles.dietaryCard, active && styles.dietaryCardActive]}
+              onPress={() => void toggleRestriction(key)}
+            >
+              <View style={styles.dietaryTop}>
+                <Text style={styles.dietaryIcon}>{item.icon}</Text>
+                <View style={[styles.dietaryRadio, active && styles.dietaryRadioActive]}>
+                  {active && <CheckCircle2 size={16} color={colors.primary} />}
+                </View>
+              </View>
+              <Text style={[styles.dietaryLabel, active && styles.dietaryLabelActive]}>
+                {item.label}
+              </Text>
+              <Text style={styles.dietaryDesc}>{item.description}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <Text style={styles.sectionTitle}>Un recordatorio a tiempo</Text>
       <Text style={styles.sectionDescription}>
         Horarios de comidas e hidratación para tu rutina en Chile.
       </Text>
+
       <View style={styles.reminders}>
         {Platform.OS === "web" && (
           <View style={styles.webReminderNotice}>
@@ -507,6 +545,63 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   logoutText: { fontSize: 14, fontWeight: "600", color: colors.danger },
+  dietaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 24,
+  },
+  dietaryCard: {
+    flexGrow: 1,
+    flexBasis: "47%",
+    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    borderRadius: 16,
+    padding: 12,
+    minWidth: 0,
+  },
+  dietaryCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: "#F0FDF4",
+  },
+  dietaryTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  dietaryIcon: {
+    fontSize: 20,
+  },
+  dietaryRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.card,
+  },
+  dietaryRadioActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  dietaryLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: 2,
+  },
+  dietaryLabelActive: {
+    color: colors.primaryDark,
+  },
+  dietaryDesc: {
+    fontSize: 10,
+    lineHeight: 14,
+    color: colors.textSecondary,
+  },
   footer: {
     fontSize: 11,
     color: colors.textSecondary,

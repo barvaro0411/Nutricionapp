@@ -44,6 +44,9 @@ import {
 } from "@/utils/liquidUnits";
 import { colors, shadows, layout } from "@/constants/colors";
 import { nutritionPer100 } from "@/utils/productNutrition";
+import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
+
+import { evaluateFoodAlerts } from "@/utils/foodAlerts";
 import { PageBackHeader } from "@/components/common/AppUI";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -53,6 +56,8 @@ export default function BarcodeScreen() {
   const { user } = useAuthStore();
   const { addItem } = useMealReviewStore();
   const { analyzeProductPhoto } = useMealAnalysis();
+  const { restrictions } = useDietaryPreferences();
+
 
   const [activeTab, setActiveTab] = useState<"camera" | "manual">("camera");
   const [scanned, setScanned] = useState(false);
@@ -478,7 +483,50 @@ export default function BarcodeScreen() {
             <Text style={styles.productName}>{product.productName}</Text>
             {product.brand && <Text style={styles.productBrand}>{product.brand}</Text>}
             <Text style={styles.productCode}>Código: {product.barcode}</Text>
+            {(() => {
+              const productAlerts = evaluateFoodAlerts(
+                {
+                  food: `${product.productName} ${product.brand || ""}`,
+                  calories: product.caloriesPer100g,
+                  protein: product.proteinPer100g,
+                  carbs: product.carbsPer100g,
+                  fat: product.fatPer100g,
+                  grams: 100,
+                  unit: product.unit,
+                },
+                restrictions
+              );
+              if (productAlerts.stamps.length === 0 && productAlerts.alerts.length === 0) return null;
+              return (
+                <View style={styles.productAlertsRow}>
+                  {productAlerts.stamps.map((stamp) => (
+                    <View key={stamp.stamp} style={styles.stampBadge}>
+                      <Text style={styles.stampText}>{stamp.label}</Text>
+                    </View>
+                  ))}
+                  {productAlerts.alerts.map((alert, aIdx) => (
+                    <View
+                      key={aIdx}
+                      style={[
+                        styles.dietAlertPill,
+                        alert.severity === "danger" && styles.dietAlertPillDanger,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.dietAlertText,
+                          alert.severity === "danger" && styles.dietAlertTextDanger,
+                        ]}
+                      >
+                        ⚠️ {alert.label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
           </View>
+
 
           {/* Selector de porción */}
           <View style={styles.portionSection}>
@@ -965,6 +1013,47 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
   },
+  productAlertsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  stampBadge: {
+    backgroundColor: "#111827",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    alignSelf: "flex-start",
+  },
+  stampText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  dietAlertPill: {
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+  },
+  dietAlertPillDanger: {
+    backgroundColor: "#FEE2E2",
+    borderColor: "#FECACA",
+  },
+  dietAlertText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#92400E",
+  },
+  dietAlertTextDanger: {
+    color: "#991B1B",
+  },
+
   portionSection: {
     backgroundColor: "#F8FAFC",
     borderRadius: 16,
