@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
-import { CheckCircle2, RotateCcw, Droplets, Utensils, AlertTriangle } from "lucide-react-native";
+import { CheckCircle2, RotateCcw, Droplets, Utensils, AlertTriangle, Plus } from "lucide-react-native";
 import { colors } from "@/constants/colors";
 import { CoachActionData } from "@/utils/coachActions";
 
@@ -124,11 +124,31 @@ export function CoachActionCard({ action, onConfirm, onUndo }: CoachActionCardPr
                 style={styles.confirmBtn}
                 onPress={() => onConfirm?.(action)}
                 accessibilityRole="button"
-                accessibilityLabel="Confirmar registro"
+                accessibilityLabel={
+                  !isWater
+                    ? `Añadir a mi ${action.mealType}`
+                    : "Confirmar registro de agua"
+                }
                 activeOpacity={0.8}
               >
-                <CheckCircle2 size={14} color="#FFFFFF" />
-                <Text style={styles.confirmBtnText}>Confirmar registro</Text>
+                {!isWater ? (
+                  <Plus size={15} color="#FFFFFF" />
+                ) : (
+                  <CheckCircle2 size={14} color="#FFFFFF" />
+                )}
+                <Text style={styles.confirmBtnText}>
+                  {!isWater
+                    ? `Añadir a mi ${
+                        action.mealType === "desayuno"
+                          ? "Desayuno"
+                          : action.mealType === "almuerzo"
+                          ? "Almuerzo"
+                          : action.mealType === "cena"
+                          ? "Once / Cena"
+                          : "Colación"
+                      }`
+                    : "Registrar agua"}
+                </Text>
               </TouchableOpacity>
             )}
 

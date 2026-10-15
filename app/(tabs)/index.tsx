@@ -91,8 +91,15 @@ export default function DashboardScreen() {
 
   const { data, error, isLoading, isRefetching, refetch } =
     useDailyNutrition(selectedDate);
-  const { totalMl, targetMl, addWater, isAdding } =
-    useWaterTracker(selectedDate);
+  const {
+    totalMl,
+    targetMl,
+    addWater,
+    isAdding,
+    removeWater,
+    isRemoving,
+    canRemoveWater,
+  } = useWaterTracker(selectedDate);
   const { burnedCalories, steps, logActivity } = useActivitySync(selectedDate);
   useAdaptiveReminders();
 
@@ -126,6 +133,45 @@ export default function DashboardScreen() {
       params: { mealType, date: getDateKey(selectedDate) },
     });
   };
+
+  const handleSuggestMeal = (mealType: MealType) => {
+    const mealLabel =
+      mealType === "desayuno"
+        ? "Desayuno"
+        : mealType === "almuerzo"
+        ? "Almuerzo"
+        : mealType === "cena"
+        ? "Once / Cena"
+        : "Colación";
+    const remainingCal = Math.max(
+      0,
+      adjustedGoals.calories - (data?.consumed.calories || 0)
+    );
+    const remainingProt = Math.max(
+      0,
+      adjustedGoals.proteinG - (data?.consumed.protein || 0)
+    );
+    const calText = Math.round(remainingCal).toLocaleString("es-CL");
+    const protText = Math.round(remainingProt).toLocaleString("es-CL");
+
+    router.push({
+      pathname: "/coach",
+      params: {
+        initialPrompt: `Hola Coach, sugiéreme 2 opciones rápidas de ${mealLabel}. Me quedan ${calText} kcal disponibles y ${protText} g de proteína por cubrir hoy.`,
+      },
+    });
+  };
+
+  const distinctMoments = useMemo(() => {
+    return new Set((data?.meals || []).map((m) => m.meal_type)).size;
+  }, [data?.meals]);
+
+  const totalFoodsCount = useMemo(() => {
+    return (data?.meals || []).reduce(
+      (acc, m) => acc + (m.items?.length || 0),
+      0
+    );
+  }, [data?.meals]);
 
   const formattedDate = selectedDate.toLocaleDateString("es-CL", {
     timeZone: APP_TIME_ZONE,
@@ -162,6 +208,22 @@ export default function DashboardScreen() {
             <Text style={styles.greetingSubtitle}>
               Un día a la vez, a tu ritmo.
             </Text>
+            {personalPlan && (
+              <TouchableOpacity
+                onPress={() => setShowMasterPlanModal(true)}
+                activeOpacity={0.7}
+                style={styles.headerPlanPill}
+                accessibilityRole="button"
+                accessibilityLabel={`Plan Maestro activo: ${personalPlan.user.objectiveTitle}`}
+              >
+                <View style={styles.headerPlanDot} />
+                <Target size={13} color={colors.primaryDark} />
+                <Text style={styles.headerPlanPillText} numberOfLines={1}>
+                  {personalPlan.user.objectiveTitle}
+                </Text>
+                <ChevronRight size={13} color={colors.primaryDark} />
+              </TouchableOpacity>
+            )}
           </View>
           <View style={styles.headerRightActions}>
             <TouchableOpacity
@@ -239,7 +301,21 @@ export default function DashboardScreen() {
           />
         ) : (
           <>
-            {/* Widget de Agua */}
+            {/* Resumen Diario: Calorías y Macronutrientes primero */}
+            <DailySummary
+              calorieGoal={data?.goal.calories ?? 2000}
+              calories={data?.consumed.calories ?? 0}
+              protein={data?.consumed.protein ?? 0}
+              proteinGoal={data?.goal.protein_g ?? 140}
+              carbs={data?.consumed.carbs ?? 0}
+              carbsGoal={data?.goal.carbs_g ?? 220}
+              fat={data?.consumed.fat ?? 0}
+              fatGoal={data?.goal.fat_g ?? 65}
+              burnedCalories={burnedCalories}
+              onExercisePress={() => setShowActivityModal(true)}
+            />
+
+            {/* Widget de Hidratación compacto con acción de deshacer */}
             <WaterCard
               totalMl={totalMl}
               targetMl={targetMl}
@@ -253,25 +329,40 @@ export default function DashboardScreen() {
                   );
                 }
               }}
-              loading={isAdding}
-            />
-
-            <DailySummary
-              calorieGoal={data?.goal.calories ?? 2000}
-              calories={data?.consumed.calories ?? 0}
-              protein={data?.consumed.protein ?? 0}
-              proteinGoal={data?.goal.protein_g ?? 140}
-              carbs={data?.consumed.carbs ?? 0}
-              carbsGoal={data?.goal.carbs_g ?? 220}
-              fat={data?.consumed.fat ?? 0}
-              fatGoal={data?.goal.fat_g ?? 65}
-              burnedCalories={burnedCalories}
-              onExercisePress={() => setShowActivityModal(true)}
+              onRemoveWater={async () => {
+                try {
+                  await removeWater(250);
+                } catch {
+                  showAlert(
+                    "Agua",
+                    "No se pudo actualizar el registro.",
+                  );
+                }
+              }}
+              canRemoveWater={canRemoveWater}
+              loading={isAdding || isRemoving}
             />
             {/* Comidas del Día */}
             <View style={styles.mealsHeading}>
-              <View><Text accessibilityRole="header" style={styles.mealsHeaderTitle}>Tus comidas</Text><Text style={styles.mealsDescription}>{data?.meals.length || 0} {(data?.meals.length || 0) === 1 ? "comida registrada" : "comidas registradas"} en este día</Text></View>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tendencias de alimentación" onPress={() => router.push("/(tabs)/history")} style={styles.progressLink}><Text style={styles.progressLinkText}>Ver progreso</Text><ArrowUpRight size={16} color={colors.primary} /></TouchableOpacity>
+              <View>
+                <Text accessibilityRole="header" style={styles.mealsHeaderTitle}>
+                  Tus comidas
+                </Text>
+                <Text style={styles.mealsDescription}>
+                  {distinctMoments > 0
+                    ? `${distinctMoments} de 4 momentos · ${totalFoodsCount} ${totalFoodsCount === 1 ? "alimento" : "alimentos"}`
+                    : "Sin registros aún en este día"}
+                </Text>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Ver tendencias de alimentación"
+                onPress={() => router.push("/(tabs)/history")}
+                style={styles.progressLink}
+              >
+                <Text style={styles.progressLinkText}>Ver progreso</Text>
+                <ArrowUpRight size={16} color={colors.primary} />
+              </TouchableOpacity>
             </View>
 
             <View style={styles.mealGrid}>
@@ -288,6 +379,7 @@ export default function DashboardScreen() {
                       mealType={type}
                       meals={data?.meals || []}
                       onAddPress={handleAddMeal}
+                      onSuggestMeal={handleSuggestMeal}
                     />
                   </View>
                 ),
@@ -563,7 +655,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  content: { ...layout.page },
+  content: { ...layout.page, maxWidth: 820, alignSelf: "center" },
   summaryLayout: { gap: 0 },
   summaryWide: { flexDirection: "row", gap: 24, alignItems: "flex-start" },
   summaryMain: { flex: 1, minWidth: 0, width: "100%" },
@@ -618,6 +710,31 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: "500",
   },
+  headerPlanPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#DCFCE7",
+  },
+  headerPlanDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
+  headerPlanPillText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: colors.primaryDark,
+    maxWidth: 240,
+  },
   dateSelector: {
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
@@ -627,6 +744,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.cardBorder,
     ...shadows.card,
+    maxWidth: 500,
+    width: "100%",
+    alignSelf: "center",
   },
   dateRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   addMealAction: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, backgroundColor: colors.primaryLight, borderRadius: 18, marginBottom: 20, borderWidth: 1, borderColor: "#D3EADB" },

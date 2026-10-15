@@ -56,20 +56,145 @@ export function embedCoachAction(text: string, action: CoachActionData): string 
   return `${text.trim()}\n\n<!--coach-action:${JSON.stringify(action)}-->`;
 }
 
+/**
+ * Detecta si un mensaje del Coach describe una comida o receta estructurada con viñetas y macros,
+ * generando una acción pendiente para que el usuario pueda registrarla directamente en 1 clic.
+ */
+export function detectMealSuggestionFromText(text: string): CoachMealActionData | null {
+  if (!text || text.length < 35) return null;
+
+  // Extraer calorías totales del mensaje (ej: "🔥 340 kcal", "340 kcal", "340 calorías")
+  const calMatch = text.match(/(?:🔥\s*)?(\d{2,4})\s*(?:kcal|calorías|cal)/i);
+  if (!calMatch) return null;
+
+  const totalCalories = parseInt(calMatch[1], 10);
+  if (totalCalories < 50 || totalCalories > 2500) return null;
+
+  const protMatch = text.match(/(?:🥩\s*)?(\d{1,3})\s*(?:g\s*P|g\s*(?:de\s*)?proteína)/i);
+  const carbsMatch = text.match(/(?:🍞\s*)?(\d{1,3})\s*(?:g\s*C|g\s*(?:de\s*)?carbos)/i);
+  const fatMatch = text.match(/(?:🥑\s*)?(\d{1,3})\s*(?:g\s*G|g\s*(?:de\s*)?grasas)/i);
+
+  const totalProtein = protMatch ? parseInt(protMatch[1], 10) : 0;
+  const totalCarbs = carbsMatch ? parseInt(carbsMatch[1], 10) : 0;
+  const totalFat = fatMatch ? parseInt(fatMatch[1], 10) : 0;
+
+  // Extraer líneas con viñetas que representan ingredientes
+  const lines = text.split("\n");
+  const items: CoachMealItemData[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const bulletMatch = trimmed.match(/^(?:[•\-*]|\d+\.)\s+(.+)$/);
+    if (!bulletMatch) continue;
+
+    const itemText = bulletMatch[1].trim();
+    if (/^(🔥|🥩|🍞|🥑|total|aporte|nota)/i.test(itemText)) continue;
+
+    let grams = 50;
+    let unit: "g" | "ml" = "g";
+    let food = itemText;
+
+    const parenMatch = itemText.match(/\((\d+)\s*(g|ml)\)/i);
+    if (parenMatch) {
+      grams = parseInt(parenMatch[1], 10);
+      unit = parenMatch[2].toLowerCase() as "g" | "ml";
+      food = itemText.replace(/\s*\(\d+\s*(?:g|ml)\)/i, "").trim();
+    } else {
+      const directMatch = itemText.match(/^(\d+(?:[.,]\d+)?)\s*(g|ml)\s+(?:de\s+)?(.+)$/i);
+      if (directMatch) {
+        grams = Math.round(parseFloat(directMatch[1].replace(",", ".")));
+        unit = directMatch[2].toLowerCase() as "g" | "ml";
+        food = directMatch[3].trim();
+      }
+    }
+
+    food = food.replace(/[:\-–—].*$/, "").trim();
+    if (food.length >= 2 && food.length <= 60) {
+      items.push({
+        food,
+        grams,
+        unit,
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+      });
+    }
+  }
+
+  if (items.length < 2) return null;
+
+  // Distribuir calorías y macros equitativamente entre los ingredientes detectados
+  const perItemCal = Math.round(totalCalories / items.length);
+  const perItemProt = Math.round(totalProtein / items.length);
+  const perItemCarbs = Math.round(totalCarbs / items.length);
+  const perItemFat = Math.round(totalFat / items.length);
+
+  items.forEach((it) => {
+    it.calories = perItemCal;
+    it.protein = perItemProt;
+    it.carbs = perItemCarbs;
+    it.fat = perItemFat;
+  });
+
+  const lower = text.toLowerCase();
+  let mealType: MealType = "desayuno";
+  if (lower.includes("almuerzo")) mealType = "almuerzo";
+  else if (lower.includes("cena") || lower.includes("once")) mealType = "cena";
+  else if (lower.includes("colacion") || lower.includes("colación") || lower.includes("snack")) mealType = "snack";
+  else if (lower.includes("desayuno")) mealType = "desayuno";
+  else mealType = mealTypeForTime(new Date());
+
+  const titleMatch = text.match(/\*\*(.+?)\*\*/);
+  const description =
+    titleMatch && titleMatch[1].length < 45 && !titleMatch[1].includes(":")
+      ? titleMatch[1].trim()
+      : `Opción de ${mealType}`;
+
+  const idHash = items
+    .map((i) => i.food)
+    .join("-")
+    .toLowerCase()
+    .slice(0, 32);
+
+  return {
+    id: `auto-meal-${idHash}`,
+    type: "meal",
+    description,
+    mealType,
+    status: "pending",
+    items,
+    totals: {
+      calories: totalCalories,
+      protein: totalProtein,
+      carbs: totalCarbs,
+      fat: totalFat,
+    },
+  };
+}
+
 /** Extrae la acción estructurada y limpia el contenido visible del mensaje */
 export function extractCoachAction(content: string): {
   cleanContent: string;
   action: CoachActionData | null;
 } {
   const match = content.match(ACTION_TAG_REGEX);
-  if (!match) return { cleanContent: content, action: null };
-  try {
-    const action = JSON.parse(match[1]) as CoachActionData;
-    const cleanContent = content.replace(ACTION_TAG_REGEX, "").trim();
-    return { cleanContent, action };
-  } catch {
-    return { cleanContent: content, action: null };
+  if (match) {
+    try {
+      const action = JSON.parse(match[1]) as CoachActionData;
+      const cleanContent = content.replace(ACTION_TAG_REGEX, "").trim();
+      return { cleanContent, action };
+    } catch {
+      // Continuar con detección heurística
+    }
   }
+
+  const detected = detectMealSuggestionFromText(content);
+  if (detected) {
+    return { cleanContent: content, action: detected };
+  }
+
+  return { cleanContent: content, action: null };
 }
 
 const GLASS_ML = 250;

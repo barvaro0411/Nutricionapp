@@ -1,16 +1,25 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
-import { Droplets, Plus, GlassWater } from "lucide-react-native";
+import { Droplets, Plus, GlassWater, RotateCcw } from "lucide-react-native";
 import { colors, shadows } from "@/constants/colors";
 
 interface WaterCardProps {
   totalMl: number;
   targetMl: number;
   onAddWater: (amount: number) => void;
+  onRemoveWater?: () => void;
+  canRemoveWater?: boolean;
   loading?: boolean;
 }
 
-export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardProps) {
+export function WaterCard({
+  totalMl,
+  targetMl,
+  onAddWater,
+  onRemoveWater,
+  canRemoveWater,
+  loading,
+}: WaterCardProps) {
   const safeTarget = targetMl || 2000;
   const progressPct = Math.min(100, Math.round((totalMl / safeTarget) * 100));
 
@@ -32,22 +41,61 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
           </View>
         </View>
 
-        <View style={[styles.pctBadge, isAfternoonRisk && styles.pctBadgeWarning]}>
-          <Text style={[styles.pctText, isAfternoonRisk && styles.pctTextWarning]}>{progressPct}%</Text>
+        <View style={styles.headerRight}>
+          {canRemoveWater && onRemoveWater && (
+            <TouchableOpacity
+              style={styles.undoBtn}
+              onPress={onRemoveWater}
+              disabled={loading}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Restar 250 ml de agua"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <RotateCcw size={12} color={colors.textSecondary} />
+              <Text style={styles.undoText}>-250 ml</Text>
+            </TouchableOpacity>
+          )}
+          <View style={[styles.pctBadge, isAfternoonRisk && styles.pctBadgeWarning]}>
+            <Text style={[styles.pctText, isAfternoonRisk && styles.pctTextWarning]}>{progressPct}%</Text>
+          </View>
         </View>
       </View>
 
-      {/* Barra de progreso de agua */}
-      <View style={styles.waterVisual}>
-        <View style={styles.glass} accessible accessibilityRole="progressbar" accessibilityLabel="Agua registrada"
-          accessibilityValue={{ min: 0, max: safeTarget, now: Math.min(totalMl, safeTarget), text: totalMl + " de " + safeTarget + " mililitros" }}
-          aria-valuemin={0} aria-valuemax={safeTarget} aria-valuenow={Math.min(totalMl, safeTarget)}>
-          <View style={[styles.glassFill, { height: `${progressPct}%` }]} />
-          <View style={styles.glassIcon}><Droplets size={23} color={colors.water} /></View>
+      {/* Barra de progreso de agua compacta y sin redundancias */}
+      <View style={styles.statusSection}>
+        <View style={styles.statusRow}>
+          <Text style={[styles.waterMessage, isAfternoonRisk && styles.waterMessageWarning]}>
+            {totalMl >= safeTarget
+              ? "Meta de agua alcanzada"
+              : isAfternoonRisk
+              ? "⚠️ Hidratación baja esta tarde"
+              : "Un vaso a la vez"}
+          </Text>
+          <Text style={styles.waterDescription}>
+            {totalMl >= safeTarget
+              ? "Registro al día"
+              : isAfternoonRisk
+              ? `Llevas solo ${progressPct}%. Toma un vaso ahora.`
+              : `${Math.max(0, safeTarget - totalMl).toLocaleString("es-CL")} ml restantes`}
+          </Text>
         </View>
-        <View style={styles.waterCopy}><Text style={[styles.waterMessage, isAfternoonRisk && styles.waterMessageWarning]}>{totalMl >= safeTarget ? "Meta de agua alcanzada" : isAfternoonRisk ? "⚠️ Hidratación baja esta tarde" : "Un vaso a la vez"}</Text>
-          <Text style={styles.waterDescription}>{totalMl >= safeTarget ? "Tu registro de agua está al día." : isAfternoonRisk ? `Llevas solo ${progressPct}%. Toma un vaso ahora.` : `${Math.max(0, safeTarget - totalMl).toLocaleString("es-CL")} ml para tu meta`}</Text>
-          <View style={styles.track}><View style={[styles.fill, { width: `${progressPct}%` }]} /></View>
+        <View
+          style={styles.track}
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel="Agua registrada"
+          accessibilityValue={{
+            min: 0,
+            max: safeTarget,
+            now: Math.min(totalMl, safeTarget),
+            text: `${totalMl} de ${safeTarget} mililitros`,
+          }}
+          aria-valuemin={0}
+          aria-valuemax={safeTarget}
+          aria-valuenow={Math.min(totalMl, safeTarget)}
+        >
+          <View style={[styles.fill, { width: `${progressPct}%` }]} />
         </View>
       </View>
 
@@ -62,7 +110,10 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
           accessibilityLabel="Añadir 250 ml de agua"
         >
           <GlassWater size={16} color={colors.water} />
-          <View><Text style={styles.pillText}>250 ml</Text><Text style={styles.pillSubtext}>Añadir un vaso</Text></View>
+          <View>
+            <Text style={styles.pillText}>250 ml</Text>
+            <Text style={styles.pillSubtext}>Añadir un vaso</Text>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -74,7 +125,10 @@ export function WaterCard({ totalMl, targetMl, onAddWater, loading }: WaterCardP
           accessibilityLabel="Añadir 500 ml de agua"
         >
           <Plus size={16} color={colors.water} />
-          <View><Text style={styles.pillText}>500 ml</Text><Text style={styles.pillSubtext}>Añadir botella</Text></View>
+          <View>
+            <Text style={styles.pillText}>500 ml</Text>
+            <Text style={styles.pillSubtext}>Añadir botella</Text>
+          </View>
         </TouchableOpacity>
 
         {loading && (
@@ -91,7 +145,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 22,
-    padding: 18,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     ...shadows.card,
@@ -101,7 +155,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 12,
   },
   headerLeft: {
     flexDirection: "row",
@@ -109,6 +163,27 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
     minWidth: 0,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  undoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  undoText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.textSecondary,
   },
   iconWrap: {
     width: 38,
@@ -128,14 +203,14 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   valueText: {
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: "900",
     color: colors.text,
     letterSpacing: -0.6,
     marginTop: 1,
   },
   targetText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: "600",
     color: colors.textMuted,
   },
@@ -152,17 +227,40 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: colors.water,
   },
+  statusSection: {
+    marginBottom: 14,
+  },
+  statusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: 4,
+    marginBottom: 6,
+  },
+  waterMessage: {
+    color: colors.text,
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
+  waterMessageWarning: {
+    color: "#B45309",
+  },
+  waterDescription: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: "500",
+  },
   track: {
-    height: 5,
-    backgroundColor: "#E0F2FE",
-    borderRadius: 4,
+    height: 6,
+    backgroundColor: colors.waterTrack,
+    borderRadius: 3,
     overflow: "hidden",
-    marginTop: 12,
   },
   fill: {
     height: "100%",
     backgroundColor: colors.water,
-    borderRadius: 4,
+    borderRadius: 3,
   },
   actionsRow: {
     flexDirection: "row",
@@ -174,9 +272,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 11,
+    paddingVertical: 10,
     paddingHorizontal: 10,
-    minHeight: 52,
+    minHeight: 48,
     borderRadius: 12,
     backgroundColor: colors.waterLight,
     borderWidth: 1,
@@ -189,21 +287,17 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   pillSubtext: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: "500",
     color: colors.textSecondary,
   },
   loadingWrap: {
     marginLeft: 6,
   },
-  waterVisual: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 18 },
-  glass: { width: 52, height: 68, borderRadius: 14, borderWidth: 2, borderColor: "#BAE6FD", backgroundColor: colors.waterLight, overflow: "hidden", justifyContent: "flex-end" },
-  glassFill: { width: "100%", backgroundColor: "#BAE6FD", borderTopLeftRadius: 8, borderTopRightRadius: 8 },
-  glassIcon: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, alignItems: "center", justifyContent: "center" },
-  waterCopy: { flex: 1, minWidth: 0 },
-  waterMessage: { color: colors.text, fontSize: 13, fontWeight: "700" },
-  waterMessageWarning: { color: "#B45309" },
-  waterDescription: { fontSize: 11, color: colors.textSecondary, marginTop: 5, lineHeight: 17 },
-  pctBadgeWarning: { backgroundColor: "#FEF3C7" },
-  pctTextWarning: { color: "#92400E" },
+  pctBadgeWarning: {
+    backgroundColor: "#FEF3C7",
+  },
+  pctTextWarning: {
+    color: "#92400E",
+  },
 });

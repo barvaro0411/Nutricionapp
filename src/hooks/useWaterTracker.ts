@@ -127,6 +127,33 @@ export function useWaterTracker(selectedDate: Date = new Date()) {
     },
   });
 
+  const removeWaterMutation = useMutation({
+    mutationFn: async (amountMl: number = 250) => {
+      if (!user) throw new Error("No hay usuario autenticado");
+      const currentLogs = waterQuery.data?.logs || [];
+      if (!currentLogs.length) return null;
+
+      const latestLog = currentLogs[0];
+      if (latestLog.amount_ml <= amountMl) {
+        const { error } = await supabase
+          .from("water_logs")
+          .delete()
+          .eq("id", latestLog.id);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await supabase
+          .from("water_logs")
+          .update({ amount_ml: latestLog.amount_ml - amountMl })
+          .eq("id", latestLog.id);
+        if (error) throw new Error(error.message);
+      }
+      return latestLog;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["waterLogs", user?.id, dateKey] });
+    },
+  });
+
   return {
     totalMl: waterQuery.data?.totalMl || 0,
     targetMl: waterQuery.data?.targetMl || 2000,
@@ -135,5 +162,8 @@ export function useWaterTracker(selectedDate: Date = new Date()) {
     error: waterQuery.error,
     addWater: addWaterMutation.mutateAsync,
     isAdding: addWaterMutation.isPending,
+    removeWater: removeWaterMutation.mutateAsync,
+    isRemoving: removeWaterMutation.isPending,
+    canRemoveWater: (waterQuery.data?.totalMl || 0) > 0,
   };
 }

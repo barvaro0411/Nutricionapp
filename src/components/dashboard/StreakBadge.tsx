@@ -30,7 +30,7 @@ export function StreakBadge({ onPress }: StreakBadgeProps) {
         ]}
       >
         <Flame
-          size={15}
+          size={16}
           color={hasLoggedToday ? "#EA580C" : streak > 0 ? "#F97316" : "#9CA3AF"}
           fill={hasLoggedToday ? "#EA580C" : streak > 0 ? "#FDBA74" : "none"}
         />
@@ -53,13 +53,19 @@ export function StreakBadge({ onPress }: StreakBadgeProps) {
 
 const styles = StyleSheet.create({
   container: {
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    gap: 7,
+    shadowColor: "#EA580C",
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 2,
   },
   containerActive: {
     backgroundColor: "#FFF7ED", // orange-50
@@ -74,9 +80,9 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB", // gray-200
   },
   iconWrap: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -90,9 +96,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#E5E7EB",
   },
   label: {
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: -0.2,
+    fontSize: 12.5,
+    fontWeight: "800",
+    letterSpacing: -0.3,
   },
   labelActive: {
     color: "#C2410C", // orange-700

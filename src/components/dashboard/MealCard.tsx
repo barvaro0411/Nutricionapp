@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, Pressable, Image } from "react-native";
-import { Sunrise, Sun, Moon, Apple, Plus, ChevronDown, ChevronUp, Utensils, LucideIcon } from "lucide-react-native";
+import { Sunrise, Sun, Moon, Apple, Plus, ChevronDown, ChevronUp, Utensils, Check, Sparkles, LucideIcon } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { MealWithItems, MealType } from "@/types/meal";
 import { colors, shadows } from "@/constants/colors";
@@ -46,14 +46,15 @@ interface MealCardProps {
   meals: MealWithItems[];
   onAddPress: (type: MealType) => void;
   onMealPress?: (meal: MealWithItems) => void;
+  onSuggestMeal?: (type: MealType) => void;
 }
 
-export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardProps) {
+export function MealCard({ mealType, meals, onAddPress, onMealPress, onSuggestMeal }: MealCardProps) {
   const meta = MEAL_META[mealType];
   const { Icon } = meta;
-  const [expanded, setExpanded] = useState(mealType === "desayuno" || mealType === "almuerzo");
   const filteredMeals = meals.filter((meal) => meal.meal_type === mealType);
   const hasMeals = filteredMeals.length > 0;
+  const [expanded, setExpanded] = useState(hasMeals);
   const totals = filteredMeals.reduce((sum, meal) => ({
     calories: sum.calories + meal.total_calories,
     protein: sum.protein + meal.total_protein,
@@ -100,7 +101,12 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardP
                       <Text style={styles.itemName}>{item.food_name}</Text>
                       <View style={styles.itemBottom}>
                         <View style={styles.quantityTag}><Text style={styles.itemGrams}>{formatQuantityDisplay(item.grams, resolveItemUnit(item))}</Text></View>
-                        {item.nutrition_reference && <View style={styles.sourceBadge}><Text style={styles.sourceText}>USDA</Text></View>}
+                        {item.nutrition_reference && (
+                          <View style={styles.verifiedBadge}>
+                            <Check size={9} color={colors.primaryDark} />
+                            <Text style={styles.verifiedText}>Verificado</Text>
+                          </View>
+                        )}
                         <Text style={styles.itemCalories}>{Math.round(item.calories).toLocaleString("es-CL")} kcal</Text>
                       </View>
                     </View>
@@ -112,10 +118,38 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress }: MealCardP
         </View>
       )}
 
-      {(!hasMeals || expanded) && <Pressable accessibilityRole="button" accessibilityLabel={`Añadir alimento a ${meta.title}`}
-        onPress={() => onAddPress(mealType)} style={({ pressed }) => [styles.addButton, pressed && { opacity: 0.75 }]}>
-        <Plus size={18} color={colors.primaryDark} /><Text style={styles.addText}>Añadir alimento</Text>
-      </Pressable>}
+      {!hasMeals && onSuggestMeal ? (
+        <View style={styles.emptyActionsRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Sugerir ${meta.title} con IA`}
+            onPress={() => onSuggestMeal(mealType)}
+            style={({ pressed }) => [styles.suggestButton, pressed && { opacity: 0.75 }]}
+          >
+            <Sparkles size={14} color="#D97706" />
+            <Text style={styles.suggestText}>Sugerir con IA</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Añadir alimento a ${meta.title}`}
+            onPress={() => onAddPress(mealType)}
+            style={({ pressed }) => [styles.addButtonCompact, pressed && { opacity: 0.75 }]}
+          >
+            <Plus size={16} color={colors.primaryDark} />
+            <Text style={styles.addText}>Añadir</Text>
+          </Pressable>
+        </View>
+      ) : (!hasMeals || expanded) ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Añadir alimento a ${meta.title}`}
+          onPress={() => onAddPress(mealType)}
+          style={({ pressed }) => [styles.addButton, pressed && { opacity: 0.75 }]}
+        >
+          <Plus size={18} color={colors.primaryDark} />
+          <Text style={styles.addText}>Añadir alimento</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -147,8 +181,54 @@ const styles = StyleSheet.create({
   itemCalories: { fontSize: 12, fontWeight: "700", color: colors.text, marginLeft: "auto" },
   addButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, minHeight: 48, backgroundColor: colors.primaryLight, borderRadius: 14, marginTop: 12 },
   addText: { fontSize: 13, color: colors.primaryDark, fontWeight: "700" },
-  sourceBadge: { backgroundColor: colors.primaryLight, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 3 },
-  sourceText: { color: colors.primaryDark, fontSize: 8, fontWeight: "800" },
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: "#DCFCE7",
+  },
+  verifiedText: {
+    color: colors.primaryDark,
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  emptyActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  suggestButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 44,
+    backgroundColor: "#FFFBEB",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#FEF3C7",
+  },
+  suggestText: {
+    fontSize: 12,
+    color: "#B45309",
+    fontWeight: "700",
+  },
+  addButtonCompact: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 44,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 14,
+  },
   photoRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 },
   photo: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.surfaceMuted },
   photoLabel: { fontSize: 11, color: colors.textSecondary, flex: 1 },

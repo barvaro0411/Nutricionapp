@@ -3,7 +3,7 @@ import { Platform, StyleSheet, Text, useWindowDimensions, View } from "react-nat
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { PlatformPressable } from "@react-navigation/elements";
 import { useLinkBuilder } from "@react-navigation/native";
-import { colors } from "@/constants/colors";
+import { colors, shadows } from "@/constants/colors";
 
 export function appTabBarHeight(bottom: number, wide: boolean) {
   return 64 + (wide ? 8 : 7) + (wide ? Math.max(bottom, 12) : Math.max(bottom, Platform.OS === "ios" ? 20 : 8));
@@ -51,12 +51,26 @@ const styles = StyleSheet.create({
   wrapper: { width: "100%", alignItems: "center", paddingTop: 6, backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.cardBorder },
   wideWrapper: { paddingTop: 8, paddingHorizontal: 20, borderTopWidth: 0, backgroundColor: colors.background },
   bar: { width: "100%", maxWidth: 1000, height: 64, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 6 },
-  wideBar: { backgroundColor: colors.card, paddingHorizontal: 8, borderRadius: 22, borderWidth: 1, borderColor: colors.cardBorder },
+  wideBar: {
+    maxWidth: 520,
+    backgroundColor: colors.card,
+    paddingHorizontal: 8,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    ...shadows.cardHover,
+  },
   item: { flex: 1, minWidth: 0, minHeight: 60, alignItems: "center", justifyContent: "center", borderRadius: 16, gap: 4, paddingVertical: 4 },
   wideItem: { flexDirection: "row", gap: 8 },
   activeItem: { backgroundColor: colors.primaryLight },
   icon: { width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 9 },
-  registerIcon: { backgroundColor: colors.primary, borderRadius: 16 },
+  registerIcon: {
+    backgroundColor: colors.primary,
+    borderRadius: 18,
+    width: 36,
+    height: 36,
+    ...shadows.glow,
+  },
   label: { fontSize: 11, lineHeight: 14, fontWeight: "600", maxWidth: "100%" },
   wideLabel: { fontSize: 12 },
   activeLabel: { fontWeight: "800" },

@@ -32,6 +32,7 @@ import {
   Apple,
   ShoppingBasket,
   ArrowUpRight,
+  Trash2,
 } from "lucide-react-native";
 import { StateCard } from "@/components/common/AppUI";
 import { colors } from "@/constants/colors";
@@ -46,7 +47,7 @@ import {
   CoachActionData,
 } from "@/utils/coachActions";
 import { AnalyzeMealResponse } from "@/types/meal";
-import { showAlert } from "@/utils/alerts";
+import { showAlert, showToast } from "@/utils/alerts";
 
 export default function CoachChatScreen() {
   const router = useRouter();
@@ -60,6 +61,7 @@ export default function CoachChatScreen() {
     error,
     refetch,
     sendMessage,
+    clearHistory,
     appendLocalMessages,
     isSending,
     sendError,
@@ -73,6 +75,7 @@ export default function CoachChatScreen() {
   const [actionOverrides, setActionOverrides] = useState<Record<string, CoachActionData>>({});
   const [isActionProcessing, setIsActionProcessing] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const hasAutoSentRef = useRef(false);
   const speech = useCoachSpeech();
   const live = useCoachLive();
 
@@ -92,11 +95,6 @@ export default function CoachChatScreen() {
     ? "Estoy contigo. Te escucho"
     : "Un paso a la vez, juntos";
 
-  useEffect(() => {
-    if (initialPrompt && typeof initialPrompt === "string") {
-      setInputText(initialPrompt);
-    }
-  }, [initialPrompt]);
 
   useEffect(() => {
     if (messages.length || isBusy || live.draft.user || live.draft.assistant)
@@ -117,6 +115,11 @@ export default function CoachChatScreen() {
           ...prev,
           [action.id]: { ...action, status: "confirmed", logId: (log as any)?.id },
         }));
+        showToast({
+          type: "success",
+          title: "¡Agua registrada!",
+          message: `Se sumaron ${action.amountMl} ml a tu hidratación de hoy.`,
+        });
       } else {
         if (!user) throw new Error("No hay usuario autenticado");
         const saved = await saveMealToDatabase({
@@ -141,6 +144,11 @@ export default function CoachChatScreen() {
         }));
         await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
         await queryClient.invalidateQueries({ queryKey: ["recentMeals"] });
+        showToast({
+          type: "success",
+          title: "¡Comida registrada!",
+          message: `${Math.round(action.totals.calories)} kcal añadidas a tu ${action.mealType}.`,
+        });
       }
     } catch (err: any) {
       setActionOverrides((prev) => ({
@@ -173,6 +181,11 @@ export default function CoachChatScreen() {
         ...prev,
         [action.id]: { ...action, status: "undone" },
       }));
+      showToast({
+        type: "info",
+        title: "Registro deshecho",
+        message: "Se eliminó el registro de tu diario.",
+      });
     } catch (err: any) {
       setActionOverrides((prev) => ({
         ...prev,
@@ -291,6 +304,38 @@ export default function CoachChatScreen() {
     }
   };
 
+  // Auto-envío inmediato si se redirigió con una sugerencia desde el Dashboard
+  useEffect(() => {
+    if (initialPrompt && typeof initialPrompt === "string" && !hasAutoSentRef.current) {
+      hasAutoSentRef.current = true;
+      router.replace("/coach");
+      void handleSend(initialPrompt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo se ejecuta una vez al montar con initialPrompt
+  }, [initialPrompt]);
+
+  const handleClearHistory = () => {
+    showAlert(
+      "Limpiar conversación",
+      "¿Deseas vaciar el historial de mensajes del Coach?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Limpiar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              speech.stop();
+              await clearHistory();
+            } catch {
+              showAlert("Error", "No se pudo limpiar la conversación.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const quickPrompts = [
     { title: "Ideas para cenar", description: "Según tus registros", prompt: "¿Qué puedo cenar con las calorías que me faltan hoy?", Icon: Utensils },
     { title: "Mi proteína", description: "Revisa tu meta de hoy", prompt: "¿Cómo voy con mi meta de proteína de hoy?", Icon: Target },
@@ -321,7 +366,21 @@ export default function CoachChatScreen() {
             Ideas para tu rutina, por texto y voz
           </Text>
         </View>
-        <View style={styles.headerIcon}><Sparkles size={20} color={colors.primary} /></View>
+        {messages.length > 0 ? (
+          <TouchableOpacity
+            style={styles.clearBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Limpiar conversación"
+            onPress={handleClearHistory}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Trash2 size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerIcon}>
+            <Sparkles size={20} color={colors.primary} />
+          </View>
+        )}
       </View>
 
       {live.supported && (
@@ -428,28 +487,31 @@ export default function CoachChatScreen() {
                       onActionUndo={handleActionUndo}
                     />
                     {speech.supported && (
-                      <TouchableOpacity
-                        accessibilityRole="button"
-                        accessibilityLabel={
-                          speech.speakingId === msg.id
-                            ? "Detener lectura"
-                            : "Escuchar respuesta"
-                        }
-                        style={styles.listenButton}
-                        onPress={() => {
-                          live.stop();
-                          speech.toggle(msg.id, msg.content);
-                        }}
-                      >
-                        {speech.speakingId === msg.id ? (
-                          <Square size={15} color={colors.primary} />
-                        ) : (
-                          <Volume2 size={15} color={colors.primary} />
-                        )}
-                        <Text style={styles.voiceButtonText}>
-                          {speech.speakingId === msg.id ? "Detener" : "Escuchar"}
-                        </Text>
-                      </TouchableOpacity>
+                      <View style={styles.msgFooter}>
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel={
+                            speech.speakingId === msg.id
+                              ? "Detener lectura de voz"
+                              : "Escuchar respuesta en voz alta"
+                          }
+                          style={[
+                            styles.miniListenBtn,
+                            speech.speakingId === msg.id && styles.miniListenBtnActive,
+                          ]}
+                          onPress={() => {
+                            live.stop();
+                            speech.toggle(msg.id, msg.content);
+                          }}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          {speech.speakingId === msg.id ? (
+                            <Square size={13} color={colors.danger} />
+                          ) : (
+                            <Volume2 size={15} color={colors.primary} />
+                          )}
+                        </TouchableOpacity>
+                      </View>
                     )}
                   </>
                 )}
@@ -515,7 +577,7 @@ export default function CoachChatScreen() {
         </View>
       )}
 
-      {/* Input inferior */}
+      {/* Input inferior unificado */}
       <View
         testID="coach-composer"
         style={[
@@ -523,30 +585,32 @@ export default function CoachChatScreen() {
           { paddingBottom: withinTabs ? 12 : Math.max(insets.bottom, 12) },
         ]}
       >
-        <TextInput
-          style={styles.textInput}
-          accessibilityLabel="Mensaje para el asistente"
-          placeholder="¿Qué te gustaría saber?"
-          editable={!isBusy && !live.active && !error}
-          placeholderTextColor={colors.textMuted}
-          value={inputText}
-          onChangeText={setInputText}
-          multiline
-          maxLength={2000}
-        />
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Enviar mensaje"
-          style={[
-            styles.sendButton,
-            (!inputText.trim() || isBusy || live.active || !!error) &&
-              styles.sendButtonDisabled,
-          ]}
-          onPress={() => handleSend()}
-          disabled={!inputText.trim() || isBusy || live.active || !!error}
-        >
-          <Send size={18} color="#FFFFFF" />
-        </TouchableOpacity>
+        <View style={styles.unifiedComposer}>
+          <TextInput
+            style={styles.textInput}
+            accessibilityLabel="Mensaje para el asistente"
+            placeholder="Pregúntale a tu Coach..."
+            editable={!isBusy && !live.active && !error}
+            placeholderTextColor={colors.textMuted}
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+            maxLength={2000}
+          />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Enviar mensaje"
+            style={[
+              styles.sendButtonInline,
+              (!inputText.trim() || isBusy || live.active || !!error) &&
+                styles.sendButtonDisabled,
+            ]}
+            onPress={() => handleSend()}
+            disabled={!inputText.trim() || isBusy || live.active || !!error}
+          >
+            <Send size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -579,11 +643,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
     borderRadius: 14,
   },
-  headerIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center" },
-  backBtnText: {
-    fontSize: 16,
-    color: colors.primary,
-    fontWeight: "700",
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clearBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerCenter: {
     flex: 1,
@@ -704,6 +778,23 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontStyle: "italic",
   },
+  msgFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  miniListenBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  miniListenBtnActive: {
+    backgroundColor: colors.dangerLight,
+  },
   promptsContainer: {
     marginTop: 16,
     marginBottom: 22,
@@ -734,43 +825,46 @@ const styles = StyleSheet.create({
   },
   promptDescription: { fontSize: 11, lineHeight: 16, color: colors.textSecondary, marginTop: 4 },
   inputContainer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingTop: 10,
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.cardBorder,
-    gap: 10,
+  },
+  unifiedComposer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    backgroundColor: colors.background,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    borderRadius: 24,
+    paddingLeft: 16,
+    paddingRight: 6,
+    paddingVertical: 6,
+    minHeight: 48,
   },
   textInput: {
     flex: 1,
     minWidth: 0,
-    minHeight: 48,
-    backgroundColor: colors.background,
-    borderWidth: 1.5,
-    borderColor: colors.cardBorder,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
     fontSize: 14,
     color: colors.text,
     maxHeight: 120,
+    paddingTop: Platform.OS === "ios" ? 6 : 8,
+    paddingBottom: Platform.OS === "ios" ? 6 : 8,
+    paddingHorizontal: 0,
   },
-  sendButton: {
-    width: 48,
-    height: 48,
+  sendButtonInline: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.primary,
-    borderRadius: 16,
+    marginLeft: 8,
+    marginBottom: 2,
   },
   sendButtonDisabled: {
-    opacity: 0.5,
-  },
-  sendButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 14,
+    opacity: 0.4,
   },
   voiceBar: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderColor: colors.cardBorder },
   voiceButton: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 64, padding: 12, backgroundColor: colors.primaryLight, borderRadius: 18, borderWidth: 1, borderColor: "#D3EADB" },
@@ -781,7 +875,6 @@ const styles = StyleSheet.create({
   voiceButtonText: { color: colors.primaryDark, fontWeight: "700", fontSize: 13, flexShrink: 1 },
   voiceHint: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 3 },
   voiceError: { color: colors.textSecondary, paddingHorizontal: 16, paddingVertical: 8, fontSize: 13 },
-  listenButton: { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start", minHeight: 44, paddingHorizontal: 12, marginTop: 12, backgroundColor: colors.primaryLight, borderRadius: 12 },
   liveDraft: { borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 16, backgroundColor: colors.primaryLight, padding: 14, gap: 6, marginBottom: 12 },
   draftText: { color: colors.text, fontSize: 14, lineHeight: 21 },
   retryCard: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#FFF7E8", borderTopWidth: 1, borderColor: "#F1DFC1" },

@@ -39,12 +39,15 @@ export function useCoachChat() {
         throw new Error("No se pudo cargar la conversación. Reintenta.");
       }
 
-      return (data || []).reverse().map((m: any) => ({
-        id: m.id,
-        role: m.role as "user" | "assistant",
-        content: m.content,
-        created_at: m.created_at,
-      }));
+      return (data || [])
+        .filter((m: any) => m.content && m.content.trim().length > 0)
+        .reverse()
+        .map((m: any) => ({
+          id: m.id,
+          role: m.role as "user" | "assistant",
+          content: m.content,
+          created_at: m.created_at,
+        }));
     },
   });
 
@@ -131,12 +134,23 @@ export function useCoachChat() {
     );
   }, [queryClient, user]);
 
+  const clearHistory = useCallback(async () => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("coach_messages")
+      .delete()
+      .eq("user_id", user.id);
+    if (error) throw error;
+    queryClient.setQueryData<CoachMessage[]>(["coachMessages", user.id], []);
+  }, [queryClient, user]);
+
   return {
     messages: messagesQuery.data || [],
     isLoading: messagesQuery.isLoading,
     error: messagesQuery.error,
     refetch: messagesQuery.refetch,
     sendMessage,
+    clearHistory,
     appendLocalMessages,
     updateMessageContent,
     sendError: sendMessageMutation.error,

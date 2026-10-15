@@ -38,6 +38,8 @@ export function SmartCoachCard({
   onAskCoach,
 }: SmartCoachCardProps) {
   const currentHour = new Date().getHours();
+  const calPct = goalCalories > 0 ? (consumedCalories / goalCalories) * 100 : 0;
+  const proteinPct = goalProtein > 0 ? (consumedProtein / goalProtein) * 100 : 0;
 
   // Determinamos el insight más valioso de forma proactiva
   let insight: CoachInsight;
@@ -60,6 +62,16 @@ export function SmartCoachCard({
       title: "Superaste tu presupuesto calórico",
       message: `Te pasaste por ${Math.round(Math.abs(remainingCalories))} kcal. No te preocupes: la consistencia semanal manda. Bebe agua, haz una caminata ligera y mantén la calma.`,
       prompt: "¿Cómo balancear mis siguientes comidas tras superar las calorías?",
+    };
+  } else if (calPct >= 60 && proteinPct <= 45) {
+    const diff = Math.max(0, Math.round(remainingProtein));
+    insight = {
+      tag: "Desbalance de Macros",
+      tagColor: "#B45309",
+      tagBg: "#FEF3C7",
+      title: "Pocas calorías y proteína pendiente",
+      message: `Llevas el ${Math.round(calPct)}% de tus calorías pero solo el ${Math.round(proteinPct)}% de tu proteína (faltan ${diff}g). Prioriza fuentes proteicas magras como pechuga de pollo, claras, atún o yogur proteico.`,
+      prompt: `Llevo el ${Math.round(calPct)}% de mis calorías pero me faltan ${diff}g de proteína. ¿Qué alimentos magros y saciantes me recomiendas para el resto del día?`,
     };
   } else if (remainingCalories <= 350 && remainingCalories >= 0 && mealCount < 4) {
     insight = {
