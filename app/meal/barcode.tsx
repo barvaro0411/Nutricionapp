@@ -11,11 +11,6 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import {
-  BrowserMultiFormatReader,
-  BarcodeFormat,
-  DecodeHintType,
-} from "@zxing/library";
 import { Camera, Keyboard } from "lucide-react-native";
 import {
   lookupBarcode,
@@ -120,6 +115,8 @@ export default function BarcodeScreen() {
         let codeFound: string | null = null;
 
         try {
+          const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } =
+            await import("@zxing/library");
           const hints = new Map();
           hints.set(DecodeHintType.POSSIBLE_FORMATS, [
             BarcodeFormat.EAN_13,

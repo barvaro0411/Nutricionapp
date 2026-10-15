@@ -27,9 +27,25 @@ const pwaHeadTags = `
         window.addEventListener('load', function() {
           navigator.serviceWorker.register('/sw.js').then(function(reg) {
             console.log('PWA Service Worker registered:', reg.scope);
+            try { reg.update(); } catch (_) {}
+            reg.addEventListener('updatefound', function() {
+              var newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', function() {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    window.dispatchEvent(new CustomEvent('pwa-update-available'));
+                  }
+                });
+              }
+            });
           }).catch(function(err) {
             console.log('SW registration error:', err.message);
           });
+        });
+        navigator.serviceWorker.addEventListener('message', function(event) {
+          if (event.data && event.data.type === 'SW_UPDATE_AVAILABLE') {
+            window.dispatchEvent(new CustomEvent('pwa-update-available'));
+          }
         });
       }
     </script>

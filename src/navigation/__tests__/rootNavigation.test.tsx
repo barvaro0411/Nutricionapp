@@ -39,6 +39,7 @@ jest.mock("@/stores/useAuthStore", () => ({ useAuthStore: () => mockAuth }));
 jest.mock("@/stores/useMealReviewStore", () => ({}));
 jest.mock("@/services/notificationService", () => ({}));
 jest.mock("@/components/common/ToastContainer", () => ({ ToastContainer: "ToastContainer" }));
+jest.mock("@/components/common/PwaUpdateBanner", () => ({ PwaUpdateBanner: "PwaUpdateBanner" }));
 
 function renderNavigation() {
   const root = RootLayout();

@@ -7,10 +7,7 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { BrowserCodeReader } from "@zxing/library/esm/browser/BrowserCodeReader";
-import MultiFormatOneDReader from "@zxing/library/esm/core/oned/MultiFormatOneDReader";
-import BarcodeFormat from "@zxing/library/esm/core/BarcodeFormat";
-import DecodeHintType from "@zxing/library/esm/core/DecodeHintType";
+import type { BrowserCodeReader } from "@zxing/library";
 import {
   Flashlight,
   FlashlightOff,
@@ -70,6 +67,13 @@ export function BarcodeScannerView({
     setTorchAvailable(false);
 
     try {
+      const {
+        BrowserCodeReader,
+        MultiFormatOneDReader,
+        BarcodeFormat,
+        DecodeHintType,
+      } = await import("@zxing/library");
+
       // Configurar formatos de códigos de barras (EAN-13 chileno, UPC, Code 128, etc.)
       const hints = new Map();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [

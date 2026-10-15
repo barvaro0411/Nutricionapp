@@ -10,6 +10,7 @@ import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { syncAllScheduledReminders } from "@/services/notificationService";
 import { colors } from "@/constants/colors";
 import { ToastContainer } from "@/components/common/ToastContainer";
+import { PwaUpdateBanner } from "@/components/common/PwaUpdateBanner";
 
 // Supabase already retries transient failures on idempotent reads. Avoid
 // repeating that entire retry cycle before showing a recoverable error.
@@ -112,6 +113,7 @@ function RootNavigationLayout() {
   return <>
     <StatusBar style="auto" />
     <ToastContainer />
+    <PwaUpdateBanner />
     <Stack initialRouteName="(tabs)" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="meal/review" options={{ presentation: "modal", title: "Confirmar comida", headerShown: true }} />

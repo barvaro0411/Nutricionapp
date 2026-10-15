@@ -22,6 +22,13 @@ self.addEventListener("activate", (event) => {
         )
       )
       .then(() => self.clients.claim())
+      .then(() =>
+        self.clients.matchAll({ type: "window" }).then((clients) => {
+          for (const client of clients) {
+            client.postMessage({ type: "SW_UPDATE_AVAILABLE", version: CACHE_NAME });
+          }
+        })
+      )
   );
 });
 
@@ -158,5 +165,7 @@ self.addEventListener("sync", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "TRIGGER_OFFLINE_SYNC") {
     event.waitUntil(replayOfflineMutations());
+  } else if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
   }
 });
