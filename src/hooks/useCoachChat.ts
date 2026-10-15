@@ -99,12 +99,46 @@ export function useCoachChat() {
     return pending;
   }, [mutateAsync, user]);
 
+  const appendLocalMessages = useCallback((userText: string, assistantText: string): { userMsgId: string; assistantMsgId: string } | null => {
+    if (!user) return null;
+    const now = new Date();
+    const userMsgId = randomUUID();
+    const assistantMsgId = randomUUID();
+    const userMsg: CoachMessage = {
+      id: userMsgId,
+      role: "user",
+      content: userText,
+      created_at: now.toISOString(),
+    };
+    const assistantMsg: CoachMessage = {
+      id: assistantMsgId,
+      role: "assistant",
+      content: assistantText,
+      created_at: new Date(now.getTime() + 1).toISOString(),
+    };
+    queryClient.setQueryData<CoachMessage[]>(["coachMessages", user.id], (old = []) => [
+      ...old,
+      userMsg,
+      assistantMsg,
+    ]);
+    return { userMsgId, assistantMsgId };
+  }, [queryClient, user]);
+
+  const updateMessageContent = useCallback((messageId: string, newContent: string) => {
+    if (!user) return;
+    queryClient.setQueryData<CoachMessage[]>(["coachMessages", user.id], (old = []) =>
+      old.map((m) => (m.id === messageId ? { ...m, content: newContent } : m))
+    );
+  }, [queryClient, user]);
+
   return {
     messages: messagesQuery.data || [],
     isLoading: messagesQuery.isLoading,
     error: messagesQuery.error,
     refetch: messagesQuery.refetch,
     sendMessage,
+    appendLocalMessages,
+    updateMessageContent,
     sendError: sendMessageMutation.error,
     pendingMessage: sendMessageMutation.isPending ? sendMessageMutation.variables?.message : undefined,
     isSending: sendMessageMutation.isPending,

@@ -3,6 +3,13 @@ import { supabase } from "@/services/supabase";
 import { getDateKey, getDayRange, loggedAtForDate } from "@/utils/dates";
 import { usePersonalPlan } from "@/hooks/usePersonalPlan";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { randomUUID } from "expo-crypto";
+import {
+  buildWaterMutation,
+  enqueueMutation,
+  requestBackgroundSync,
+} from "@/services/offlineQueueStore";
+import { useOfflineStore } from "@/services/offlineService";
 
 export function useWaterTracker(selectedDate: Date = new Date()) {
   const user = useAuthStore((state) => state.user);
@@ -41,19 +48,79 @@ export function useWaterTracker(selectedDate: Date = new Date()) {
     mutationFn: async (amountMl: number) => {
       if (!user) throw new Error("No hay usuario autenticado");
 
-      if (!Number.isInteger(amountMl) || amountMl <= 0 || amountMl > 5000) throw new Error("Cantidad de agua inválida.");
-      const { data, error } = await supabase
-        .from("water_logs")
-        .insert({
-          user_id: user.id,
-          amount_ml: amountMl,
-          logged_at: loggedAtForDate(selectedDate),
-        })
-        .select()
-        .single();
+      const isWebOffline =
+        typeof navigator !== "undefined" && navigator.onLine === false;
 
-      if (error) throw new Error(error.message);
-      return data;
+      if (isWebOffline) {
+        const sessionRes = await supabase.auth.getSession();
+        const token = sessionRes.data.session?.access_token;
+        if (token) {
+          const reqId = randomUUID();
+          const mutation = buildWaterMutation({
+            id: reqId,
+            accessToken: token,
+            userId: user.id,
+            amountMl,
+            loggedAt: selectedDate,
+          });
+          await enqueueMutation(mutation);
+          await requestBackgroundSync();
+          useOfflineStore.getState().incrementPendingSync();
+          return {
+            id: reqId,
+            amount_ml: amountMl,
+            user_id: user.id,
+            logged_at: loggedAtForDate(selectedDate),
+          };
+        }
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("water_logs")
+          .insert({
+            user_id: user.id,
+            amount_ml: amountMl,
+            logged_at: loggedAtForDate(selectedDate),
+          })
+          .select()
+          .single();
+
+        if (error) throw new Error(error.message);
+        return data;
+      } catch (err: any) {
+        const isNetworkError =
+          !err?.status &&
+          (err?.message?.includes("network") ||
+            err?.message?.includes("fetch") ||
+            err?.message?.includes("Failed") ||
+            err?.message?.includes("aborted"));
+
+        if (isNetworkError) {
+          const sessionRes = await supabase.auth.getSession();
+          const token = sessionRes.data.session?.access_token;
+          if (token) {
+            const reqId = randomUUID();
+            const mutation = buildWaterMutation({
+              id: reqId,
+              accessToken: token,
+              userId: user.id,
+              amountMl,
+              loggedAt: selectedDate,
+            });
+            await enqueueMutation(mutation);
+            await requestBackgroundSync();
+            useOfflineStore.getState().incrementPendingSync();
+            return {
+              id: reqId,
+              amount_ml: amountMl,
+              user_id: user.id,
+              logged_at: loggedAtForDate(selectedDate),
+            };
+          }
+        }
+        throw err;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["waterLogs", user?.id, dateKey] });

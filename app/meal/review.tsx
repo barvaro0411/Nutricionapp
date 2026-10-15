@@ -20,19 +20,18 @@ import { saveMealToDatabase } from "@/services/mealService";
 import { VariantModal } from "@/components/meal/VariantModal";
 import { FavoritesModal } from "@/components/meal/FavoritesModal";
 import { UsdaSearchModal } from "@/components/meal/UsdaSearchModal";
-import { findFamilyForFood } from "@/constants/chileanPresets";
-import { colors, shadows, layout } from "@/constants/colors";
-import { FoodUnit, MealType, DetectedFoodItemSchema } from "@/types/meal";
-import { parseDecimal, getDateKey, APP_TIME_ZONE } from "@/utils/dates";
+import { MealReviewItemCard } from "@/components/meal/MealReviewItemCard";
+import { ReviewPortionGuide } from "@/components/meal/ReviewPortionGuide";
 import {
-  getStandardPortions,
-  isLiquidFood,
-  parseQuantityInput,
-  resolveItemUnit,
-} from "@/utils/liquidUnits";
-import { getVariant } from "@/utils/drinkVariants";
+  ManualAddFoodForm,
+  ManualFoodDraft,
+  EMPTY_MANUAL_FOOD_DRAFT,
+} from "@/components/meal/ManualAddFoodForm";
+import { colors, shadows, layout } from "@/constants/colors";
+import { MealType, DetectedFoodItemSchema } from "@/types/meal";
+import { parseDecimal, getDateKey, APP_TIME_ZONE } from "@/utils/dates";
+import { parseQuantityInput, resolveItemUnit } from "@/utils/liquidUnits";
 import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
-import { evaluateFoodAlerts } from "@/utils/foodAlerts";
 
 export default function MealReviewScreen() {
   const router = useRouter();
@@ -73,13 +72,7 @@ export default function MealReviewScreen() {
   const [usdaTarget, setUsdaTarget] = useState<string | "new" | null>(null);
   const [showFavModal, setShowFavModal] = useState(false);
   const [favTitle, setFavTitle] = useState("");
-  const [newFoodName, setNewFoodName] = useState("");
-  const [newFoodUnit, setNewFoodUnit] = useState<FoodUnit>("g");
-  const [newFoodGrams, setNewFoodGrams] = useState("100");
-  const [newFoodCals, setNewFoodCals] = useState("");
-  const [newFoodProt, setNewFoodProt] = useState("");
-  const [newFoodCarbs, setNewFoodCarbs] = useState("");
-  const [newFoodFat, setNewFoodFat] = useState("");
+  const [manualDraft, setManualDraft] = useState<ManualFoodDraft>(EMPTY_MANUAL_FOOD_DRAFT);
   const [inputValues, setInputValues] = useState<Record<number, string>>({});
   const [inputErrors, setInputErrors] = useState<Record<number, string>>({});
 
@@ -126,7 +119,7 @@ export default function MealReviewScreen() {
 
     setSaving(true);
     try {
-      await saveMealToDatabase({
+      const result = await saveMealToDatabase({
         userId: user.id,
         mealType,
         imagePath,
@@ -144,11 +137,19 @@ export default function MealReviewScreen() {
         queryClient.invalidateQueries({ queryKey: ["userStreak"] }),
       ]);
 
-      showToast({
-        type: "success",
-        title: "¡Comida registrada!",
-        message: `${Math.round(totals.calories)} kcal agregadas a tu día.`,
-      });
+      if ((result as any)?.offline) {
+        showToast({
+          type: "info",
+          title: "Guardado sin conexión",
+          message: "Se sincronizará automáticamente en segundo plano al volver internet.",
+        });
+      } else {
+        showToast({
+          type: "success",
+          title: "¡Comida registrada!",
+          message: `${Math.round(totals.calories)} kcal agregadas a tu día.`,
+        });
+      }
       const date = loggedAt ? getDateKey(new Date(loggedAt)) : getDateKey();
       reset();
       router.replace({ pathname: "/(tabs)", params: { date } });
@@ -160,18 +161,18 @@ export default function MealReviewScreen() {
   };
 
   const handleAddNewItem = () => {
-    if (!newFoodName.trim()) return;
-    const parseRes = parseQuantityInput(newFoodGrams, newFoodUnit);
+    if (!manualDraft.name.trim()) return;
+    const parseRes = parseQuantityInput(manualDraft.grams, manualDraft.unit);
     if (!parseRes.ok || parseRes.value <= 0) {
       showAlert("Cantidad inválida", parseRes.ok ? "Ingresa una cantidad mayor que cero." : parseRes.error);
       return;
     }
-    const calories = parseDecimal(newFoodCals);
-    const protein = parseDecimal(newFoodProt);
-    const carbs = parseDecimal(newFoodCarbs);
-    const fat = parseDecimal(newFoodFat);
+    const calories = parseDecimal(manualDraft.calories);
+    const protein = parseDecimal(manualDraft.protein);
+    const carbs = parseDecimal(manualDraft.carbs);
+    const fat = parseDecimal(manualDraft.fat);
     const validation = DetectedFoodItemSchema.safeParse({
-      food: newFoodName.trim(),
+      food: manualDraft.name.trim(),
       grams: parseRes.value,
       unit: parseRes.unit,
       calories,
@@ -185,7 +186,7 @@ export default function MealReviewScreen() {
     }
 
     addItem({
-      food: newFoodName.trim(),
+      food: manualDraft.name.trim(),
       grams: parseRes.value,
       unit: parseRes.unit,
       calories,
@@ -195,9 +196,7 @@ export default function MealReviewScreen() {
       confidence: 1.0,
     });
 
-    setNewFoodName("");
-    setNewFoodGrams(newFoodUnit === "ml" ? "250" : "100");
-    setNewFoodCals(""); setNewFoodProt(""); setNewFoodCarbs(""); setNewFoodFat("");
+    setManualDraft(EMPTY_MANUAL_FOOD_DRAFT);
     setShowAddModal(false);
   };
 
@@ -253,125 +252,12 @@ export default function MealReviewScreen() {
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir alimento manualmente" onPress={() => setShowAddModal(true)} style={styles.addManualBtn}><Text style={styles.addFoodLink}>Ingreso manual</Text></TouchableOpacity>
         </View>
         {showAddModal && (
-          <View style={styles.manualAddCard}>
-            <Text style={styles.manualAddTitle}>Datos de tu etiqueta</Text>
-            <Text style={styles.manualHelp}>Ingresa los nutrientes de la porción indicada abajo, no los del envase completo. Si la etiqueta indica valores por 100 g o ml, añade esa cantidad y luego ajusta la porción.</Text>
-            <TextInput
-              accessibilityLabel="Nombre del alimento manual"
-              style={styles.manualInput}
-              placeholder="Nombre (ej: Palta Hass o Gatorade)"
-              placeholderTextColor={colors.textMuted}
-              value={newFoodName}
-              onChangeText={(val) => {
-                setNewFoodName(val);
-                if (isLiquidFood(val) && newFoodUnit !== "ml") {
-                  setNewFoodUnit("ml");
-                  setNewFoodGrams("250");
-                }
-              }}
-            />
-            {/* Selector de unidad [ g | ml ] */}
-            <View style={styles.manualUnitRow}>
-              <Text style={styles.manualColLabel}>Tipo de alimento:</Text>
-              <View style={styles.unitToggleGroup}>
-                <TouchableOpacity
-                  style={[styles.unitToggleBtn, newFoodUnit === "g" && styles.unitToggleBtnActive]}
-                  onPress={() => {
-                    setNewFoodUnit("g");
-                    setNewFoodGrams("100");
-                  }}
-                  accessibilityLabel="Unidad gramos"
-                  accessibilityState={{ selected: newFoodUnit === "g" }}
-                >
-                  <Text style={[styles.unitToggleText, newFoodUnit === "g" && styles.unitToggleTextActive]}>
-                    g (Sólido)
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.unitToggleBtn, newFoodUnit === "ml" && styles.unitToggleBtnActive]}
-                  onPress={() => {
-                    setNewFoodUnit("ml");
-                    setNewFoodGrams("250");
-                  }}
-                  accessibilityLabel="Unidad mililitros"
-                  accessibilityState={{ selected: newFoodUnit === "ml" }}
-                >
-                  <Text style={[styles.unitToggleText, newFoodUnit === "ml" && styles.unitToggleTextActive]}>
-                    ml (Bebida)
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.manualRow}>
-              <View style={styles.manualCol}>
-                <Text style={styles.manualColLabel}>
-                  {newFoodUnit === "ml" ? "Volumen (ml / L)" : "Gramos (g)"}
-                </Text>
-                <TextInput
-                  accessibilityLabel="Cantidad del alimento manual"
-                  style={styles.manualInput}
-                  value={newFoodGrams}
-                  onChangeText={setNewFoodGrams}
-                  placeholder={newFoodUnit === "ml" ? "ej: 250 o 1L" : "ej: 100"}
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-              <View style={styles.manualCol}>
-                <Text style={styles.manualColLabel}>Calorías</Text>
-                <TextInput
-                  accessibilityLabel="Calorías de la porción manual"
-                  style={styles.manualInput}
-                  keyboardType="numeric"
-                  value={newFoodCals}
-                  onChangeText={setNewFoodCals}
-                />
-              </View>
-            </View>
-            <View style={styles.manualRow}>
-              <View style={styles.manualCol}>
-                <Text style={styles.manualColLabel}>Prot (g)</Text>
-                <TextInput
-                  accessibilityLabel="Proteína de la porción manual"
-                  style={styles.manualInput}
-                  keyboardType="numeric"
-                  value={newFoodProt}
-                  onChangeText={setNewFoodProt}
-                />
-              </View>
-              <View style={styles.manualCol}>
-                <Text style={styles.manualColLabel}>Carbs (g)</Text>
-                <TextInput
-                  accessibilityLabel="Carbohidratos de la porción manual"
-                  style={styles.manualInput}
-                  keyboardType="numeric"
-                  value={newFoodCarbs}
-                  onChangeText={setNewFoodCarbs}
-                />
-              </View>
-              <View style={styles.manualCol}>
-                <Text style={styles.manualColLabel}>Grasas (g)</Text>
-                <TextInput
-                  accessibilityLabel="Grasas de la porción manual"
-                  style={styles.manualInput}
-                  keyboardType="numeric"
-                  value={newFoodFat}
-                  onChangeText={setNewFoodFat}
-                />
-              </View>
-            </View>
-            <View style={styles.manualActions}>
-              <TouchableOpacity
-                style={styles.cancelManualBtn}
-                onPress={() => setShowAddModal(false)}
-              >
-                <Text style={styles.cancelManualText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir alimento manual" style={styles.saveManualBtn} onPress={handleAddNewItem}>
-                <Text style={styles.saveManualText}>Añadir alimento</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <ManualAddFoodForm
+            draft={manualDraft}
+            onChangeDraft={(patch) => setManualDraft((prev) => ({ ...prev, ...patch }))}
+            onCancel={() => setShowAddModal(false)}
+            onSubmit={handleAddNewItem}
+          />
         )}
 
         {/* Estado vacío cuando no hay alimentos detectados */}
@@ -400,247 +286,65 @@ export default function MealReviewScreen() {
         )}
 
         {/* Guía visual de calibración de porciones chilenas */}
-        {items.length > 0 && (
-          <View style={styles.portionGuideCard}>
-            <Text style={styles.portionGuideTitle}>💡 Calibra tus porciones con facilidad</Text>
-            <Text style={styles.portionGuideSubtitle}>
-              Estas medidas son aproximadas. Si puedes, pesa tu porción para registrarla con mayor precisión:
-            </Text>
-            <View style={styles.portionPillsRow}>
-              <View style={styles.portionPill}>
-                <Text style={styles.portionPillText}>✋ Palma: ~120-150g (carnes)</Text>
-              </View>
-              <View style={styles.portionPill}>
-                <Text style={styles.portionPillText}>✊ Puño: ~1 taza (arroz/fideos)</Text>
-              </View>
-              <View style={styles.portionPill}>
-                <Text style={styles.portionPillText}>🥄 Cuchara: ~15g (aceite/aderezo)</Text>
-              </View>
-            </View>
-          </View>
-        )}
+        {items.length > 0 && <ReviewPortionGuide />}
 
         {/* Lista de alimentos interactiva */}
-        {items.map((item, index) => {
-          const hasVariants = !!findFamilyForFood(item.food);
-          const isLowConfidence = item.confidence && item.confidence < 0.75;
-          const itemUnit = resolveItemUnit(item);
-          const isMl = itemUnit === "ml";
-          const drinkVariant = getVariant(item.food);
-          const standardPortions = getStandardPortions(itemUnit);
-          const { stamps, alerts } = evaluateFoodAlerts(item, restrictions);
-
-          return (
-            <View key={item.id || index} style={styles.itemCard}>
-              {/* Encabezado del ítem */}
-              <View style={styles.itemHeader}>
-                <View style={styles.itemTitleBlock}>
-                  <Text style={styles.itemNameText}>{item.food}</Text>
-                  {item.nutrition_reference && (
-                    <View>
-                      <Text style={styles.nutritionSourceText}>Nutrientes: USDA · Revisa la porción</Text>
-                      <Text style={styles.nutritionSourceText}>{item.nutrition_reference.description}</Text>
-                    </View>
-                  )}
-                  {!item.nutrition_reference && <Text style={styles.nutritionSourceText}>Sin referencia USDA · Revisa los nutrientes</Text>}
-                  {isLowConfidence && (
-                    <View style={styles.warningPill}>
-                      <Text style={styles.warningPillText}>⚠️ Revisa este alimento</Text>
-                    </View>
-                  )}
-                  {(stamps.length > 0 || alerts.length > 0) && (
-                    <View style={styles.foodAlertsRow}>
-                      {stamps.map((stamp) => (
-                        <View key={stamp.stamp} style={styles.stampBadge}>
-                          <Text style={styles.stampText}>{stamp.label}</Text>
-                        </View>
-                      ))}
-                      {alerts.map((alert, aIdx) => (
-                        <View
-                          key={aIdx}
-                          style={[
-                            styles.dietAlertPill,
-                            alert.severity === "danger" && styles.dietAlertPillDanger,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.dietAlertText,
-                              alert.severity === "danger" && styles.dietAlertTextDanger,
-                            ]}
-                          >
-                            ⚠️ {alert.label}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
-                <TouchableOpacity
-                  style={styles.removeBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel={"Quitar " + item.food}
-                  onPress={() => { removeItem(index); setInputValues({}); setInputErrors({}); setActiveVariantIndex(null); }}
-                >
-                  <Text style={styles.removeBtnText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Botón para cambiar variante culinaria si existe */}
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel={"Buscar referencia USDA para " + item.food} style={styles.variantBtn} onPress={() => setUsdaTarget(item.id || null)}>
-                <Text style={styles.variantBtnText}>{item.nutrition_reference ? "Cambiar referencia USDA" : "Buscar nutrientes en USDA"}</Text>
-              </TouchableOpacity>
-              {hasVariants && (
-                <TouchableOpacity
-                  style={styles.variantBtn}
-                  onPress={() => setActiveVariantIndex(index)}
-                >
-                  <Text style={styles.variantBtnText}>🔄 Cambiar variante / método de cocción</Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Botón de variante Zero / Sin Azúcar si es bebida reconocida */}
-              {drinkVariant && (
-                <TouchableOpacity
-                  style={styles.drinkVariantBtn}
-                  onPress={() => applyDrinkVariant(index, drinkVariant.target)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.drinkVariantBtnText}>{drinkVariant.label}</Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Selector de unidad [ g | ml ] */}
-              <View style={styles.quantityHeaderRow}>
-                <Text style={styles.quantityHeaderLabel}>
-                  {isMl ? "Volumen de bebida:" : "Porción consumida:"}
-                </Text>
-                <View style={styles.unitToggleGroup}>
-                  <TouchableOpacity
-                    style={[styles.unitToggleBtn, !isMl && styles.unitToggleBtnActive]}
-                    onPress={() => {
-                      updateItemUnit(index, "g");
-                      setInputErrors((prev) => ({ ...prev, [index]: "" }));
-                    }}
-                    accessibilityLabel="Cambiar a gramos"
-                    accessibilityState={{ selected: !isMl }}
-                  >
-                    <Text style={[styles.unitToggleText, !isMl && styles.unitToggleTextActive]}>g</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.unitToggleBtn, isMl && styles.unitToggleBtnActive]}
-                    onPress={() => {
-                      updateItemUnit(index, "ml");
-                      setInputErrors((prev) => ({ ...prev, [index]: "" }));
-                    }}
-                    accessibilityLabel="Cambiar a mililitros"
-                    accessibilityState={{ selected: isMl }}
-                  >
-                    <Text style={[styles.unitToggleText, isMl && styles.unitToggleTextActive]}>ml</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Ajuste de Cantidad (Botones [-50ml/-10g] [+50ml/+10g] y Entrada) */}
-              <View style={styles.gramsControlRow}>
-                <TouchableOpacity
-                  style={styles.stepBtn}
-                  onPress={() => { adjustItemGramsDelta(index, isMl ? -50 : -10); clearQuantityInput(index); }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Disminuir porción de ${item.food}`}
-                >
-                  <Text style={styles.stepBtnText}>{isMl ? "-50ml" : "-10g"}</Text>
-                </TouchableOpacity>
-
-                <View style={styles.gramsDisplay}>
-                  <TextInput
-                    style={styles.gramsInput}
-                    keyboardType="default"
-                    accessibilityLabel={`Cantidad de ${item.food}`}
-                    value={
-                      inputValues[index] !== undefined
-                        ? inputValues[index]
-                        : String(Math.round(item.grams))
-                    }
-                    onChangeText={(val) => {
-                      setInputValues((prev) => ({ ...prev, [index]: val }));
-                      const res = parseQuantityInput(val, itemUnit);
-                      if (res.ok) {
-                        updateItemGrams(index, res.value);
-                        if (res.unit !== itemUnit) {
-                          updateItemUnit(index, res.unit);
-                        }
-                        setInputErrors((prev) => ({ ...prev, [index]: "" }));
-                      } else {
-                        setInputErrors((prev) => ({ ...prev, [index]: res.error }));
-                      }
-                    }}
-                    onBlur={() => {
-                      setInputValues((prev) => {
-                        const next = { ...prev };
-                        delete next[index];
-                        return next;
-                      });
-                    }}
-                  />
-                  <Text style={styles.gramsUnit}>{isMl ? "ml" : "g"}</Text>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.stepBtn}
-                  onPress={() => { adjustItemGramsDelta(index, isMl ? 50 : 10); clearQuantityInput(index); }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Aumentar porción de ${item.food}`}
-                >
-                  <Text style={styles.stepBtnText}>{isMl ? "+50ml" : "+10g"}</Text>
-                </TouchableOpacity>
-              </View>
-
-              {inputErrors[index] ? (
-                <Text style={styles.inlineErrorText}>{inputErrors[index]}</Text>
-              ) : null}
-
-              {/* Atajos rápidos por envase / porción */}
-              <View style={styles.shortcutsRow}>
-                {standardPortions.map((shortcut) => (
-                  <TouchableOpacity
-                    key={shortcut.value}
-                    style={[
-                      styles.shortcutChip,
-                      Math.round(item.grams) === shortcut.value && styles.shortcutChipActive,
-                    ]}
-                    onPress={() => {
-                      updateItemGrams(index, shortcut.value);
-                      setInputValues((prev) => {
-                        const next = { ...prev };
-                        delete next[index];
-                        return next;
-                      });
-                      setInputErrors((prev) => ({ ...prev, [index]: "" }));
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.shortcutChipText,
-                        Math.round(item.grams) === shortcut.value && styles.shortcutChipTextActive,
-                      ]}
-                    >
-                      {shortcut.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Totales calculados en tiempo real para este alimento */}
-              <View style={styles.itemTotalsFooter}>
-                <Text style={styles.itemCals}>{Math.round(item.calories)} kcal</Text>
-                <Text style={styles.itemMacrosDetail}>
-                  {Math.round(item.protein)}g Prot • {Math.round(item.carbs)}g Carbos • {Math.round(item.fat)}g Grasas
-                </Text>
-              </View>
-            </View>
-          );
-        })}
+        {items.map((item, index) => (
+          <MealReviewItemCard
+            key={item.id || index}
+            item={item}
+            index={index}
+            restrictions={restrictions}
+            inputValue={inputValues[index]}
+            inputError={inputErrors[index]}
+            onRemove={(idx) => {
+              removeItem(idx);
+              setInputValues({});
+              setInputErrors({});
+              setActiveVariantIndex(null);
+            }}
+            onOpenUsda={(id) => setUsdaTarget(id)}
+            onOpenVariants={(idx) => setActiveVariantIndex(idx)}
+            onApplyDrinkVariant={(idx, target) => applyDrinkVariant(idx, target)}
+            onUpdateUnit={(idx, unit) => {
+              updateItemUnit(idx, unit);
+              setInputErrors((prev) => ({ ...prev, [idx]: "" }));
+            }}
+            onAdjustDelta={(idx, delta) => {
+              adjustItemGramsDelta(idx, delta);
+              clearQuantityInput(idx);
+            }}
+            onChangeQuantity={(idx, val, parsedValue, newUnit, errorMsg) => {
+              setInputValues((prev) => ({ ...prev, [idx]: val }));
+              if (errorMsg) {
+                setInputErrors((prev) => ({ ...prev, [idx]: errorMsg }));
+              } else {
+                updateItemGrams(idx, parsedValue);
+                const currentUnit = resolveItemUnit(item);
+                if (newUnit !== currentUnit) {
+                  updateItemUnit(idx, newUnit);
+                }
+                setInputErrors((prev) => ({ ...prev, [idx]: "" }));
+              }
+            }}
+            onBlurQuantity={(idx) => {
+              setInputValues((prev) => {
+                const next = { ...prev };
+                delete next[idx];
+                return next;
+              });
+            }}
+            onSelectPortion={(idx, portion) => {
+              updateItemGrams(idx, portion);
+              setInputValues((prev) => {
+                const next = { ...prev };
+                delete next[idx];
+                return next;
+              });
+              setInputErrors((prev) => ({ ...prev, [idx]: "" }));
+            }}
+          />
+        ))}
       </ScrollView>
 
       {/* Modal de variantes */}
@@ -829,41 +533,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
-  portionGuideCard: {
-    backgroundColor: "#F0FDF4",
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#DCFCE7",
-    marginBottom: 16,
-  },
-  portionGuideTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#166534",
-    marginBottom: 2,
-  },
-  portionGuideSubtitle: {
-    fontSize: 11,
-    color: "#15803D",
-    marginBottom: 10,
-  },
-  portionPillsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  portionPill: {
-    backgroundColor: "#DCFCE7",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-  },
-  portionPillText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#14532D",
-  },
   typeSelectorRow: {
     flexDirection: "row",
     gap: 8,
@@ -911,283 +580,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: colors.primary,
-  },
-  manualAddCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: colors.primaryLight,
-    marginBottom: 16,
-  },
-  manualAddTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.text,
-    marginBottom: 10,
-  },
-  manualInput: {
-    width: "100%",
-    minWidth: 0,
-    backgroundColor: colors.background,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: colors.text,
-  },
-  manualRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 8,
-  },
-  manualCol: {
-    flex: 1,
-    minWidth: 0,
-  },
-  manualColLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  manualActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 12,
-    marginTop: 14,
-  },
-  cancelManualBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  cancelManualText: {
-    color: colors.textSecondary,
-    fontWeight: "600",
-  },
-  saveManualBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-  },
-  saveManualText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-  },
-  itemCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 22,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    ...shadows.card,
-    marginBottom: 14,
-  },
-  itemHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  itemTitleBlock: {
-    flex: 1,
-    marginRight: 8,
-  },
-  itemNameText: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: colors.text,
-    letterSpacing: -0.3,
-  },
-  warningPill: {
-    backgroundColor: colors.warningLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    alignSelf: "flex-start",
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: "#FDE68A",
-  },
-  warningPillText: {
-    fontSize: 11,
-    color: "#92400E",
-    fontWeight: "700",
-  },
-  foodAlertsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 6,
-  },
-  stampBadge: {
-    backgroundColor: "#111827",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    alignSelf: "flex-start",
-  },
-  stampText: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 0.3,
-  },
-  dietAlertPill: {
-    backgroundColor: "#FEF3C7",
-    borderWidth: 1,
-    borderColor: "#FDE68A",
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    alignSelf: "flex-start",
-  },
-  dietAlertPillDanger: {
-    backgroundColor: "#FEE2E2",
-    borderColor: "#FECACA",
-  },
-  dietAlertText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#92400E",
-  },
-  dietAlertTextDanger: {
-    color: "#991B1B",
-  },
-
-  removeBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.surfaceMuted,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  removeBtnText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: "700",
-  },
-  variantBtn: {
-    backgroundColor: colors.surfaceMuted,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    alignSelf: "flex-start",
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  variantBtnText: {
-    fontSize: 12,
-    color: colors.primaryDark,
-    fontWeight: "700",
-  },
-  nutritionSourceText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  gramsControlRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginVertical: 14,
-    backgroundColor: "#F8FAFC",
-    padding: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#F1F5F9",
-  },
-  stepBtn: {
-    minHeight: 44,
-    justifyContent: "center",
-    flexShrink: 0,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    ...shadows.sm,
-  },
-  stepBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  gramsDisplay: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  gramsInput: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: colors.text,
-    textAlign: "right",
-    width: 70,
-    flexShrink: 1,
-    minWidth: 0,
-    padding: 0,
-  },
-  gramsUnit: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.textSecondary,
-    marginLeft: 4,
-  },
-  shortcutsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 12,
-  },
-  shortcutChip: {
-    minHeight: 44,
-    justifyContent: "center",
-    flex: 1,
-    paddingVertical: 7,
-    backgroundColor: "#F8FAFC",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    alignItems: "center",
-  },
-  shortcutChipActive: {
-    borderColor: "#86EFAC",
-    backgroundColor: colors.primaryLight,
-  },
-  shortcutChipText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  shortcutChipTextActive: {
-    color: colors.primaryDark,
-    fontWeight: "800",
-  },
-  itemTotalsFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-  },
-  itemCals: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: colors.text,
-  },
-  itemMacrosDetail: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
   },
   bottomBar: {
     position: "absolute",
@@ -1358,71 +750,5 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
     fontWeight: "700",
     fontSize: 15,
-  },
-  drinkVariantBtn: {
-    backgroundColor: "#F0FDF4",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignSelf: "flex-start",
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: "#86EFAC",
-  },
-  drinkVariantBtnText: {
-    fontSize: 12,
-    color: "#166534",
-    fontWeight: "700",
-  },
-  quantityHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  quantityHeaderLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  unitToggleGroup: {
-    flexDirection: "row",
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    padding: 2,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  unitToggleBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-  },
-  unitToggleBtnActive: {
-    backgroundColor: colors.primary,
-  },
-  unitToggleText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  unitToggleTextActive: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-  },
-  inlineErrorText: {
-    fontSize: 11,
-    color: colors.danger,
-    marginTop: -6,
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  manualUnitRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 10,
-    marginBottom: 4,
   },
 });

@@ -12,15 +12,41 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useRouter, useLocalSearchParams, useSegments } from "expo-router";
+import { randomUUID } from "expo-crypto";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCoachChat } from "@/hooks/useCoachChat";
+import { useWaterTracker } from "@/hooks/useWaterTracker";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { saveMealToDatabase } from "@/services/mealService";
+import { supabase } from "@/services/supabase";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Sparkles, ArrowLeft, Send, Volume2, Square, Mic, Utensils, Target, Apple, ShoppingBasket, ArrowUpRight } from "lucide-react-native";
+import {
+  Sparkles,
+  ArrowLeft,
+  Send,
+  Volume2,
+  Square,
+  Mic,
+  Utensils,
+  Target,
+  Apple,
+  ShoppingBasket,
+  ArrowUpRight,
+} from "lucide-react-native";
 import { StateCard } from "@/components/common/AppUI";
 import { colors } from "@/constants/colors";
 import { CoachMessageContent } from "@/components/coach/CoachMessageContent";
 import { useCoachSpeech } from "@/hooks/useCoachSpeech";
 import { useCoachLive } from "@/hooks/useCoachLive";
 import { CoachBuddy, BuddyMood } from "@/components/coach/CoachBuddy";
+import {
+  detectCoachAction,
+  embedCoachAction,
+  extractCoachAction,
+  CoachActionData,
+} from "@/utils/coachActions";
+import { AnalyzeMealResponse } from "@/types/meal";
+import { showAlert } from "@/utils/alerts";
 
 export default function CoachChatScreen() {
   const router = useRouter();
@@ -28,16 +54,43 @@ export default function CoachChatScreen() {
   const withinTabs = useSegments()[0] === "(tabs)";
   const wide = useWindowDimensions().width >= 760;
   const { initialPrompt } = useLocalSearchParams<{ initialPrompt?: string }>();
-  const { messages, isLoading, error, refetch, sendMessage, isSending, sendError, pendingMessage } =
-    useCoachChat();
+  const {
+    messages,
+    isLoading,
+    error,
+    refetch,
+    sendMessage,
+    appendLocalMessages,
+    isSending,
+    sendError,
+    pendingMessage,
+  } = useCoachChat();
+  const { user } = useAuthStore();
+  const queryClient = useQueryClient();
+  const { addWater } = useWaterTracker();
+
   const [inputText, setInputText] = useState("");
+  const [actionOverrides, setActionOverrides] = useState<Record<string, CoachActionData>>({});
+  const [isActionProcessing, setIsActionProcessing] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const speech = useCoachSpeech();
   const live = useCoachLive();
-  const buddyMood: BuddyMood = isSending ? "thinking" : live.status === "speaking" || speech.speakingId
-    ? "speaking" : live.active ? "listening" : "ready";
-  const buddyStatus = isSending ? "Preparando ideas para ti…" : buddyMood === "speaking"
-    ? "Tengo algo para contarte" : live.active ? "Estoy contigo. Te escucho" : "Un paso a la vez, juntos";
+
+  const isBusy = isSending || isActionProcessing;
+  const buddyMood: BuddyMood = isBusy
+    ? "thinking"
+    : live.status === "speaking" || speech.speakingId
+    ? "speaking"
+    : live.active
+    ? "listening"
+    : "ready";
+  const buddyStatus = isBusy
+    ? "Preparando ideas y registros para ti…"
+    : buddyMood === "speaking"
+    ? "Tengo algo para contarte"
+    : live.active
+    ? "Estoy contigo. Te escucho"
+    : "Un paso a la vez, juntos";
 
   useEffect(() => {
     if (initialPrompt && typeof initialPrompt === "string") {
@@ -46,18 +99,195 @@ export default function CoachChatScreen() {
   }, [initialPrompt]);
 
   useEffect(() => {
-    if (messages.length || isSending || live.draft.user || live.draft.assistant) scrollViewRef.current?.scrollToEnd({ animated: true });
-  }, [messages, isSending, live.draft]);
+    if (messages.length || isBusy || live.draft.user || live.draft.assistant)
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages, isBusy, live.draft]);
+
+  const handleActionConfirm = async (action: CoachActionData) => {
+    if (action.status === "confirmed" || isBusy) return;
+    setActionOverrides((prev) => ({
+      ...prev,
+      [action.id]: { ...action, status: "executing" },
+    }));
+
+    try {
+      if (action.type === "water") {
+        const log = await addWater(action.amountMl);
+        setActionOverrides((prev) => ({
+          ...prev,
+          [action.id]: { ...action, status: "confirmed", logId: (log as any)?.id },
+        }));
+      } else {
+        if (!user) throw new Error("No hay usuario autenticado");
+        const saved = await saveMealToDatabase({
+          userId: user.id,
+          mealType: action.mealType,
+          imagePath: null,
+          items: action.items.map((it) => ({
+            food: it.food,
+            grams: it.grams,
+            unit: it.unit,
+            calories: it.calories,
+            protein: it.protein,
+            carbs: it.carbs,
+            fat: it.fat,
+            confidence: 1.0,
+          })),
+          totals: action.totals,
+        });
+        setActionOverrides((prev) => ({
+          ...prev,
+          [action.id]: { ...action, status: "confirmed", mealId: (saved as any)?.id },
+        }));
+        await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
+        await queryClient.invalidateQueries({ queryKey: ["recentMeals"] });
+      }
+    } catch (err: any) {
+      setActionOverrides((prev) => ({
+        ...prev,
+        [action.id]: {
+          ...action,
+          status: "error",
+          error: err?.message || "No se pudo registrar",
+        },
+      }));
+    }
+  };
+
+  const handleActionUndo = async (action: CoachActionData) => {
+    setActionOverrides((prev) => ({
+      ...prev,
+      [action.id]: { ...action, status: "executing" },
+    }));
+
+    try {
+      if (action.type === "water" && action.logId) {
+        await supabase.from("water_logs").delete().eq("id", action.logId);
+        await queryClient.invalidateQueries({ queryKey: ["waterLogs"] });
+      } else if (action.type === "meal" && action.mealId) {
+        await supabase.from("meals").delete().eq("id", action.mealId);
+        await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
+        await queryClient.invalidateQueries({ queryKey: ["recentMeals"] });
+      }
+      setActionOverrides((prev) => ({
+        ...prev,
+        [action.id]: { ...action, status: "undone" },
+      }));
+    } catch (err: any) {
+      setActionOverrides((prev) => ({
+        ...prev,
+        [action.id]: {
+          ...action,
+          status: "error",
+          error: err?.message || "No se pudo deshacer",
+        },
+      }));
+    }
+  };
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
-    if (!text || isSending || live.active) return;
+    if (!text || isBusy || live.active) return;
 
+    const detected = detectCoachAction(text);
+    if (!detected) {
+      setInputText("");
+      try {
+        await sendMessage(text);
+      } catch {
+        setInputText(text);
+      }
+      return;
+    }
+
+    // Acción automática detectada
     setInputText("");
+    setIsActionProcessing(true);
+
     try {
-      await sendMessage(text);
-    } catch {
+      if (detected.type === "water") {
+        const log = await addWater(detected.amountMl);
+        const actionData: CoachActionData = {
+          id: randomUUID(),
+          type: "water",
+          amountMl: detected.amountMl,
+          status: "confirmed",
+          logId: (log as any)?.id,
+        };
+        const assistantText = embedCoachAction(
+          `¡Anotado! He sumado **${detected.amountMl} ml** de agua a tu consumo de hoy.`,
+          actionData
+        );
+        appendLocalMessages(text, assistantText);
+      } else {
+        const { data, error: funcErr } = await supabase.functions.invoke<AnalyzeMealResponse>(
+          "parse-meal-text",
+          {
+            body: {
+              text: detected.description,
+              client_time_iso: new Date().toISOString(),
+            },
+          }
+        );
+
+        if (funcErr || !data?.success || !data.data?.items?.length) {
+          throw new Error(
+            funcErr?.message ||
+              data?.error?.message ||
+              "No pude interpretar los alimentos descritos."
+          );
+        }
+
+        const mealItems = data.data.items.map((it) => ({
+          food: it.food,
+          grams: it.grams,
+          unit: (it.unit as "g" | "ml") || "g",
+          calories: it.calories,
+          protein: it.protein,
+          carbs: it.carbs,
+          fat: it.fat,
+        }));
+
+        const totals = data.data.totals;
+        let savedMealId: string | undefined;
+
+        if (user) {
+          const saved = await saveMealToDatabase({
+            userId: user.id,
+            mealType: detected.mealType,
+            imagePath: null,
+            items: data.data.items,
+            totals,
+          });
+          savedMealId = (saved as any)?.id;
+          await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
+          await queryClient.invalidateQueries({ queryKey: ["recentMeals"] });
+        }
+
+        const actionData: CoachActionData = {
+          id: randomUUID(),
+          type: "meal",
+          description: detected.description,
+          mealType: detected.mealType,
+          status: "confirmed",
+          items: mealItems,
+          totals,
+          mealId: savedMealId,
+        };
+
+        const assistantText = embedCoachAction(
+          `¡Listo! Registré tu **${detected.mealType}** (${Math.round(
+            totals.calories
+          )} kcal) en tu diario de hoy.`,
+          actionData
+        );
+        appendLocalMessages(text, assistantText);
+      }
+    } catch (err: any) {
+      showAlert("Acción del Coach", err?.message || "No se pudo completar el registro.");
       setInputText(text);
+    } finally {
+      setIsActionProcessing(false);
     }
   };
 
@@ -150,8 +380,8 @@ export default function CoachChatScreen() {
             <View style={styles.promptsRow}>
               {quickPrompts.map(({ title, description, prompt, Icon }) => (
                 <TouchableOpacity key={prompt} accessibilityRole="button" accessibilityLabel={prompt}
-                  disabled={isSending || live.active} onPress={() => handleSend(prompt)}
-                  style={[styles.promptChip, wide && styles.promptWide, (isSending || live.active) && styles.sendButtonDisabled]}>
+                  disabled={isBusy || live.active} onPress={() => handleSend(prompt)}
+                  style={[styles.promptChip, wide && styles.promptWide, (isBusy || live.active) && styles.sendButtonDisabled]}>
                   <View style={styles.promptIcon}><Icon size={18} color={colors.primary} /></View>
                   <Text style={styles.promptChipText}>{title}</Text><Text style={styles.promptDescription}>{description}</Text>
                 </TouchableOpacity>
@@ -162,6 +392,10 @@ export default function CoachChatScreen() {
 
         {messages.map((msg) => {
           const isUser = msg.role === "user";
+          const extracted = !isUser ? extractCoachAction(msg.content) : null;
+          const msgAction = extracted?.action;
+          const actionToPass = msgAction ? actionOverrides[msgAction.id] ?? msgAction : undefined;
+
           return (
             <View
               key={msg.id}
@@ -181,15 +415,42 @@ export default function CoachChatScreen() {
                   isUser ? styles.userBubble : styles.assistantBubble,
                 ]}
               >
-                {isUser ? <Text selectable style={[styles.bubbleText, styles.userText]}>{msg.content}</Text> : (
+                {isUser ? (
+                  <Text selectable style={[styles.bubbleText, styles.userText]}>
+                    {msg.content}
+                  </Text>
+                ) : (
                   <>
-                    <CoachMessageContent content={msg.content} />
-                    {speech.supported && <TouchableOpacity accessibilityRole="button"
-                      accessibilityLabel={speech.speakingId === msg.id ? "Detener lectura" : "Escuchar respuesta"}
-                      style={styles.listenButton} onPress={() => { live.stop(); speech.toggle(msg.id, msg.content); }}>
-                      {speech.speakingId === msg.id ? <Square size={15} color={colors.primary} /> : <Volume2 size={15} color={colors.primary} />}
-                      <Text style={styles.voiceButtonText}>{speech.speakingId === msg.id ? "Detener" : "Escuchar"}</Text>
-                    </TouchableOpacity>}
+                    <CoachMessageContent
+                      content={msg.content}
+                      actionOverride={actionToPass}
+                      onActionConfirm={handleActionConfirm}
+                      onActionUndo={handleActionUndo}
+                    />
+                    {speech.supported && (
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          speech.speakingId === msg.id
+                            ? "Detener lectura"
+                            : "Escuchar respuesta"
+                        }
+                        style={styles.listenButton}
+                        onPress={() => {
+                          live.stop();
+                          speech.toggle(msg.id, msg.content);
+                        }}
+                      >
+                        {speech.speakingId === msg.id ? (
+                          <Square size={15} color={colors.primary} />
+                        ) : (
+                          <Volume2 size={15} color={colors.primary} />
+                        )}
+                        <Text style={styles.voiceButtonText}>
+                          {speech.speakingId === msg.id ? "Detener" : "Escuchar"}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </>
                 )}
               </View>
@@ -197,10 +458,12 @@ export default function CoachChatScreen() {
           );
         })}
 
-        {live.active && (live.draft.user || live.draft.assistant) && <View style={styles.liveDraft} accessibilityLiveRegion="polite">
-          {!!live.draft.user && <Text style={styles.draftText}>Tú: {live.draft.user}</Text>}
-          {!!live.draft.assistant && <Text style={styles.draftText}>Coach: {live.draft.assistant}</Text>}
-        </View>}
+        {live.active && (live.draft.user || live.draft.assistant) && (
+          <View style={styles.liveDraft} accessibilityLiveRegion="polite">
+            {!!live.draft.user && <Text style={styles.draftText}>Tú: {live.draft.user}</Text>}
+            {!!live.draft.assistant && <Text style={styles.draftText}>Coach: {live.draft.assistant}</Text>}
+          </View>
+        )}
 
         {isSending && !!pendingMessage && (
           <View style={[styles.messageRow, styles.userRow]}>
@@ -210,7 +473,7 @@ export default function CoachChatScreen() {
           </View>
         )}
 
-        {isSending && (
+        {isBusy && (
           <View style={[styles.messageRow, styles.assistantRow]}>
             <View style={styles.botAvatar}>
               <Sparkles size={16} color={colors.primary} />
@@ -224,28 +487,47 @@ export default function CoachChatScreen() {
             >
               <ActivityIndicator color={colors.primary} size="small" />
               <Text style={styles.typingText}>
-                Revisando tu día y calculando...
+                {isActionProcessing
+                  ? "Procesando alimentos y registrando..."
+                  : "Revisando tu día y calculando..."}
               </Text>
             </View>
           </View>
         )}
       </ScrollView>
 
-      {!!sendError && !isSending && <View style={styles.retryCard} accessibilityRole="alert">
-        <Text style={styles.retryText}>{sendError instanceof Error ? sendError.message : "No pudimos enviar el mensaje. Tu texto sigue aquí."}</Text>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reintentar mensaje"
-          disabled={!inputText.trim() || live.active || !!error} style={styles.retryButton} onPress={() => handleSend()}>
-          <Text style={styles.voiceButtonText}>Reintentar</Text>
-        </TouchableOpacity>
-      </View>}
+      {!!sendError && !isSending && (
+        <View style={styles.retryCard} accessibilityRole="alert">
+          <Text style={styles.retryText}>
+            {sendError instanceof Error
+              ? sendError.message
+              : "No pudimos enviar el mensaje. Tu texto sigue aquí."}
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Reintentar mensaje"
+            disabled={!inputText.trim() || live.active || !!error}
+            style={styles.retryButton}
+            onPress={() => handleSend()}
+          >
+            <Text style={styles.voiceButtonText}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Input inferior */}
-      <View testID="coach-composer" style={[styles.inputContainer, { paddingBottom: withinTabs ? 12 : Math.max(insets.bottom, 12) }]}>
+      <View
+        testID="coach-composer"
+        style={[
+          styles.inputContainer,
+          { paddingBottom: withinTabs ? 12 : Math.max(insets.bottom, 12) },
+        ]}
+      >
         <TextInput
           style={styles.textInput}
           accessibilityLabel="Mensaje para el asistente"
           placeholder="¿Qué te gustaría saber?"
-          editable={!isSending && !live.active && !error}
+          editable={!isBusy && !live.active && !error}
           placeholderTextColor={colors.textMuted}
           value={inputText}
           onChangeText={setInputText}
@@ -257,11 +539,11 @@ export default function CoachChatScreen() {
           accessibilityLabel="Enviar mensaje"
           style={[
             styles.sendButton,
-            (!inputText.trim() || isSending || live.active || !!error) &&
+            (!inputText.trim() || isBusy || live.active || !!error) &&
               styles.sendButtonDisabled,
           ]}
           onPress={() => handleSend()}
-          disabled={!inputText.trim() || isSending || live.active || !!error}
+          disabled={!inputText.trim() || isBusy || live.active || !!error}
         >
           <Send size={18} color="#FFFFFF" />
         </TouchableOpacity>

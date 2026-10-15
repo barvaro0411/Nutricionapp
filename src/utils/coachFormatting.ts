@@ -61,8 +61,9 @@ export function parseCoachInline(text: string): CoachInline[] {
 }
 
 export function coachSpeechText(content: string): string {
+  const clean = content.replace(/<!--coach-action:[\s\S]*?-->/g, "").trim();
   const plain = (text: string) => parseCoachInline(text).map(part => part.text).join("");
-  return parseCoachBlocks(content).flatMap(block => {
+  return parseCoachBlocks(clean).flatMap(block => {
     if (block.type === "divider") return [];
     if (block.type === "list") return block.items.map(plain);
     if (block.type === "table") return block.rows.map(row => row.map((cell, index) => `${plain(block.headers[index])}: ${plain(cell)}`).join(". "));
