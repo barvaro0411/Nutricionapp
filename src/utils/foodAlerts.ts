@@ -61,11 +61,14 @@ export function detectFoodWarningLabels(item: {
   // Azúcares: Sólidos >= 10g/100g. Líquidos >= 5g/100ml.
   // Se evalúa cuando el producto contiene carbohidratos simples o es un snack/dulce/bebida azucarada.
   const sugarThreshold = isLiquid ? 5 : 10;
+  const isSavoryLiquid = /\b(sopa|caldo|consome|aceite|vinagre|salsa de soya)\b/i.test(
+    normalizedFood
+  );
   const isSweetFood =
-    /\b(azucar|miel|manjar|chocolate|galleta|dulce|torta|helado|mermelada|gaseosa|bebida|nestea|jugo|fruta|caramelo)\b/i.test(
+    /\b(azucar|miel|manjar|chocolate|galleta|dulce|torta|helado|mermelada|gaseosa|bebida|nestea|jugo|fruta|caramelo|coca|cola|pepsi|fanta|sprite|bilz|pap|kem|crush|limon soda|canada dry|7up|seven up|red bull|monster|score|gatorade|powerade|aquarius|watts|nectar|refresco|soda|energizante|isotonica|kombucha|batido|yogur|yogurt|milo|nesquik|cereal|barra|queque|pastel|kuchen|alfajor|dona|berlin|flan|postre|gomita|jarabe|syrup)\b/i.test(
       normalizedFood
     );
-  if (carbs100 >= sugarThreshold && isSweetFood) {
+  if (carbs100 >= sugarThreshold && (isSweetFood || (isLiquid && !isSavoryLiquid))) {
     stamps.push({
       stamp: "sugars",
       label: "ALTO EN AZÚCARES",

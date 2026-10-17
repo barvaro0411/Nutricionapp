@@ -43,6 +43,18 @@ const LIQUID_TERMS = [
   "coca cola",
   "coca-cola",
   "fanta",
+  "pepsi",
+  "cola",
+  "bilz",
+  "pap",
+  "kem",
+  "crush",
+  "limon soda",
+  "canada dry",
+  "7up",
+  "seven up",
+  "aquarius",
+  "score",
 ];
 
 /**

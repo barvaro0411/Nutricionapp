@@ -45,7 +45,7 @@ describe("foodAlerts", () => {
       expect(detectFoodWarningLabels(highCalDrink).some((s) => s.stamp === "calories")).toBe(true);
     });
 
-    test("detects Alto en Azúcares in sweet foods", () => {
+    test("detects Alto en Azúcares in sweet foods and scanned soft drinks like Coca-Cola 500ml", () => {
       const cake = {
         food: "Torta de manjar",
         calories: 380,
@@ -57,6 +57,18 @@ describe("foodAlerts", () => {
       };
       const stamps = detectFoodWarningLabels(cake);
       expect(stamps.some((s) => s.stamp === "sugars")).toBe(true);
+
+      const cocaCola500 = {
+        food: "Coca-Cola Original (Coca-Cola)",
+        calories: 210,
+        protein: 0,
+        carbs: 53,
+        fat: 0,
+        grams: 500,
+        unit: "ml",
+      };
+      const cokeStamps = detectFoodWarningLabels(cocaCola500);
+      expect(cokeStamps.some((s) => s.stamp === "sugars")).toBe(true);
     });
 
     test("detects Alto en Grasas and Alto en Sodio in savory snacks", () => {

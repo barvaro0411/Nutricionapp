@@ -54,7 +54,7 @@ export function ScannedProductSheet({
       carbs: product.carbsPer100g,
       fat: product.fatPer100g,
       grams: 100,
-      unit: product.unit,
+      unit: portionUnit || product.unit,
     },
     restrictions
   );
