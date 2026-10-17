@@ -21,6 +21,7 @@ import {
   Check,
 } from "lucide-react-native";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
+import { useFavoriteMeals } from "@/hooks/useFavoriteMeals";
 import { TextVoiceModal } from "@/components/meal/TextVoiceModal";
 import { FavoritesModal } from "@/components/meal/FavoritesModal";
 import { UsdaSearchModal } from "@/components/meal/UsdaSearchModal";
@@ -29,12 +30,21 @@ import { colors, layout } from "@/constants/colors";
 import { PageHeading } from "@/components/common/AppUI";
 import { getDateKey, dateForMealRoute, loggedAtForDate, APP_TIME_ZONE } from "@/utils/dates";
 
+function guessChileanMealTypeByHour(): MealType {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 11) return "desayuno";
+  if (hour >= 11 && hour < 16) return "almuerzo";
+  if (hour >= 16 && hour < 19) return "snack";
+  return "cena";
+}
+
 export default function RecordScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ mealType?: MealType; date?: string }>();
+  const { favorites } = useFavoriteMeals();
 
   const [selectedMealType, setSelectedMealType] = useState<MealType>(
-    params.mealType || "almuerzo"
+    params.mealType || guessChileanMealTypeByHour()
   );
   const [showTextVoiceModal, setShowTextVoiceModal] = useState(false);
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
@@ -46,6 +56,9 @@ export default function RecordScreen() {
 
   const selectedDate = dateForMealRoute(params.date);
   const dateKey = getDateKey(selectedDate);
+
+  const habitualFavorite =
+    favorites.find((f) => f.meal_type === selectedMealType) || favorites[0] || null;
 
   const beginMeal = () => {
     useMealReviewStore.getState().reset();
@@ -101,6 +114,35 @@ export default function RecordScreen() {
             })}
           </View>
         </View>
+
+        {/* Predicción de comida habitual por horario (1 toque sin llamadas a IA) */}
+        {habitualFavorite && (
+          <TouchableOpacity
+            style={styles.habitualBanner}
+            accessibilityRole="button"
+            accessibilityLabel={`Registrar comida habitual ${habitualFavorite.title}`}
+            activeOpacity={0.85}
+            onPress={() => {
+              beginMeal();
+              useMealReviewStore.getState().loadFavoriteCombo(habitualFavorite, selectedMealType);
+              router.push("/meal/review");
+            }}
+          >
+            <View style={styles.habitualIconWrap}>
+              <Star size={18} color="#B45309" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.habitualOverline}>SUGERENCIA HABITUAL · 1 TOQUE</Text>
+              <Text style={styles.habitualTitle}>
+                ¿Repetiste &ldquo;{habitualFavorite.title}&rdquo;?
+              </Text>
+              <Text style={styles.habitualMeta}>
+                {Math.round(habitualFavorite.total_calories)} kcal · {Math.round(habitualFavorite.total_protein)}g Prot · Toca para revisar y guardar
+              </Text>
+            </View>
+            <ChevronRight size={18} color="#B45309" />
+          </TouchableOpacity>
+        )}
 
         {/* Sección de Métodos de Registro */}
         <Text style={styles.sectionTitle}>2. Añade lo que comiste</Text>
@@ -267,6 +309,42 @@ const styles = StyleSheet.create({
   dateText: { flex: 1, color: colors.primaryDark, fontSize: 12, fontWeight: "600" },
   todayButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: 6 },
   todayText: { color: colors.primary, fontWeight: "700", fontSize: 12 },
+  habitualBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1.5,
+    borderColor: "#FDE68A",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 18,
+  },
+  habitualIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  habitualOverline: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    color: "#B45309",
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  habitualTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  habitualMeta: {
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   mealCheck: { position: "absolute", top: 5, right: 5, backgroundColor: colors.primary, width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   searchCard: { backgroundColor: colors.forest, padding: 22, borderRadius: 24, marginBottom: 12 },
   searchTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },

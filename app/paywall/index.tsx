@@ -203,6 +203,33 @@ export default function PaywallScreen() {
             Continuar con Plan Gratuito (3 escaneos al día)
           </Text>
         </TouchableOpacity>
+
+        {/* Bloqueo suave de cuota: métodos gratuitos ilimitados */}
+        <View style={styles.softPaywallBox}>
+          <Text style={styles.softPaywallTitle}>
+            ¿Alcanzaste tus 3 escaneos IA de hoy? Sigue registrando gratis sin límites:
+          </Text>
+          <View style={styles.softPaywallBtnsRow}>
+            <TouchableOpacity
+              style={styles.softAltBtn}
+              onPress={() => router.replace("/(tabs)/record")}
+            >
+              <Text style={styles.softAltBtnText}>🔍 Catálogo Chileno / USDA</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.softAltBtn}
+              onPress={() => router.replace("/meal/barcode")}
+            >
+              <Text style={styles.softAltBtnText}>📦 Código de Barras</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.softAltBtn}
+              onPress={() => router.replace({ pathname: "/meal/review", params: { manual: "1" } })}
+            >
+              <Text style={styles.softAltBtnText}>✏️ Entrada Manual</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {/* Letra chica */}
@@ -414,6 +441,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: colors.textSecondary,
+  },
+  softPaywallBox: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    marginTop: 6,
+  },
+  softPaywallTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  softPaywallBtnsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+  },
+  softAltBtn: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#86EFAC",
+  },
+  softAltBtnText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: colors.primaryDark,
   },
   termsText: {
     fontSize: 11,

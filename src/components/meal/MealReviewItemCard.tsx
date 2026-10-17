@@ -47,7 +47,7 @@ export function MealReviewItemCard({
   const isMl = itemUnit === "ml";
   const drinkVariant = getVariant(item.food);
   const standardPortions = getStandardPortions(itemUnit);
-  const { stamps, alerts } = evaluateFoodAlerts(item, restrictions);
+  const { stamps, alerts, substituteSuggestion } = evaluateFoodAlerts(item, restrictions);
 
   return (
     <View style={styles.itemCard}>
@@ -95,6 +95,9 @@ export function MealReviewItemCard({
                 </View>
               ))}
             </View>
+          )}
+          {substituteSuggestion && !drinkVariant && (
+            <Text style={styles.nutritionSourceText}>{substituteSuggestion}</Text>
           )}
         </View>
         <TouchableOpacity

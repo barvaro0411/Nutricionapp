@@ -14,18 +14,38 @@ export interface CompressedImageResult {
  *   y latencia mínima de procesamiento en el backend.
  */
 export async function compressMealImage(uri: string): Promise<CompressedImageResult> {
-  const manipulatedImage = await ImageManipulator.manipulateAsync(
-    uri,
-    [{ resize: { width: 800 } }],
-    {
-      compress: 0.65,
-      format: ImageManipulator.SaveFormat.JPEG,
-    }
-  );
+  const preferredFormat =
+    ImageManipulator.SaveFormat?.WEBP ?? ImageManipulator.SaveFormat.JPEG;
 
-  return {
-    uri: manipulatedImage.uri,
-    width: manipulatedImage.width,
-    height: manipulatedImage.height,
-  };
+  try {
+    const manipulatedImage = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 800 } }],
+      {
+        compress: 0.65,
+        format: preferredFormat,
+      }
+    );
+
+    return {
+      uri: manipulatedImage.uri,
+      width: manipulatedImage.width,
+      height: manipulatedImage.height,
+    };
+  } catch {
+    const fallbackImage = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 800 } }],
+      {
+        compress: 0.65,
+        format: ImageManipulator.SaveFormat.JPEG,
+      }
+    );
+
+    return {
+      uri: fallbackImage.uri,
+      width: fallbackImage.width,
+      height: fallbackImage.height,
+    };
+  }
 }

@@ -58,11 +58,54 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
     }
   };
 
+  const webSpeechRef = useRef<any>(null);
+
   const handleVoiceCapture = async () => {
     if (busy.current || processing || isTranscribing) return;
     busy.current = true;
     setCaptureError(null);
     try {
+      // En Web/PWA: priorizar Web Speech API en el dispositivo (latencia 0 y sin costo de servidor)
+      const SpeechRecognitionCtor =
+        Platform.OS === "web" && typeof window !== "undefined"
+          ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+          : null;
+
+      if (SpeechRecognitionCtor && !recording.current) {
+        if (webSpeechRef.current) {
+          webSpeechRef.current.stop();
+          webSpeechRef.current = null;
+          setIsRecording(false);
+          return;
+        }
+        const recognition = new SpeechRecognitionCtor();
+        recognition.lang = "es-CL";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        recognition.onresult = (event: any) => {
+          const transcript = event?.results?.[0]?.[0]?.transcript?.trim();
+          if (transcript) {
+            setInputText(transcript);
+            setTranscribedPreview(true);
+          }
+          setIsRecording(false);
+          webSpeechRef.current = null;
+        };
+        recognition.onerror = () => {
+          setIsRecording(false);
+          webSpeechRef.current = null;
+          setCaptureError("No se pudo transcribir desde el navegador. Intenta de nuevo o escribe tu comida.");
+        };
+        recognition.onend = () => {
+          setIsRecording(false);
+          webSpeechRef.current = null;
+        };
+        webSpeechRef.current = recognition;
+        setIsRecording(true);
+        recognition.start();
+        return;
+      }
+
       if (!recording.current) {
         const permission = await Audio.requestPermissionsAsync();
         if (!permission.granted) throw new Error("Permite el acceso al micrófono para grabar.");

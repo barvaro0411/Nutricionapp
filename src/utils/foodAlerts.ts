@@ -280,7 +280,56 @@ export function detectDietaryAlerts(
 }
 
 /**
- * Evalúa conjuntamente sellos oficiales de advertencia y alertas dietéticas del perfil.
+ * Sugiere un sustituto saludable sin sellos cuando un producto presenta sellos Ley 20.606.
+ */
+export function getHealthySubstituteSuggestion(
+  foodName: string,
+  stamps: FoodWarningStamp[]
+): string | null {
+  if (!stamps || stamps.length === 0) return null;
+  const text = normalize(foodName);
+  const hasSugars = stamps.some((s) => s.stamp === "sugars");
+  const hasSodium = stamps.some((s) => s.stamp === "sodium");
+  const hasFats = stamps.some((s) => s.stamp === "fats");
+
+  if (
+    hasSugars &&
+    /\b(coca|cola|pepsi|fanta|sprite|bilz|pap|kem|crush|limon soda|canada dry|7up|seven up|red bull|monster|score|gatorade|powerade|aquarius|watts|nectar|refresco|soda|gaseosa|bebida|jugo|energizante|isotonica)\b/i.test(
+      text
+    )
+  ) {
+    return "💡 Alternativa sin sellos: Cambia por versión Zero / Sin Azúcar o agua con gas y limón.";
+  }
+
+  if (hasSodium) {
+    if (/\b(atun|jurel|sardina|conserva)\b/i.test(text)) {
+      return "💡 Alternativa sin sellos: Prefiere atún o pescado al agua bajo en sodio.";
+    }
+    if (/\b(embutido|salchicha|vienesas|chorizo|jamon)\b/i.test(text)) {
+      return "💡 Alternativa sin sellos: Prefiere pechuga de pollo, pavo natural cocido o huevo duro.";
+    }
+    return "💡 Alternativa sin sellos: Prefiere frutos secos sin sal o cabritas caseras sin sodio añadido.";
+  }
+
+  if (hasFats) {
+    if (/\b(queso|mantequilla|crema)\b/i.test(text)) {
+      return "💡 Alternativa sin sellos: Prefiere quesillo, ricotta fresca o palta natural.";
+    }
+    if (/\b(fritura|frito|papas fritas|empanada)\b/i.test(text)) {
+      return "💡 Alternativa sin sellos: Prefiere versión al horno, en freidora de aire o a la plancha.";
+    }
+    return "💡 Alternativa sin sellos: Opta por preparaciones a la plancha o al horno con aceite de oliva moderado.";
+  }
+
+  if (hasSugars) {
+    return "💡 Alternativa sin sellos: Prefiere versión sin azúcar añadida, fruta fresca o endulzado con stevia.";
+  }
+
+  return "💡 Alternativa sin sellos: Modera la porción o acompaña con verduras frescas y proteína magra.";
+}
+
+/**
+ * Evalúa conjuntamente sellos oficiales de advertencia, alertas dietéticas y sugerencias saludables.
  */
 export function evaluateFoodAlerts(
   item: {
@@ -296,10 +345,12 @@ export function evaluateFoodAlerts(
 ): {
   stamps: FoodWarningStamp[];
   alerts: FoodDietaryAlert[];
+  substituteSuggestion: string | null;
 } {
   const stamps = detectFoodWarningLabels(item);
   const alerts = detectDietaryAlerts(item.food, item, userRestrictions);
-  return { stamps, alerts };
+  const substituteSuggestion = getHealthySubstituteSuggestion(item.food, stamps);
+  return { stamps, alerts, substituteSuggestion };
 }
 
 /**

@@ -4,7 +4,7 @@ import { ArrowLeft, Check, Search, X } from "lucide-react-native";
 import { AppButton } from "@/components/common/AppUI";
 import { colors } from "@/constants/colors";
 import { DetectedFoodItem, FoodUnit } from "@/types/meal";
-import { searchUsdaFoods, UsdaSearchFood, usdaFoodToItem } from "@/services/usdaService";
+import { searchLocalChileanFoods, searchUsdaFoods, UsdaSearchFood, usdaFoodToItem } from "@/services/usdaService";
 import { parseQuantityInput } from "@/utils/liquidUnits";
 
 interface Props {
@@ -18,7 +18,9 @@ export function UsdaSearchModal({ initialQuery = "", initialAmount = 100, initia
   const [query, setQuery] = useState(initialQuery);
   const [amount, setAmount] = useState(String(initialAmount));
   const [unit, setUnit] = useState<FoodUnit>(initialUnit);
-  const [results, setResults] = useState<UsdaSearchFood[]>([]);
+  const [results, setResults] = useState<UsdaSearchFood[]>(() =>
+    initialQuery.trim().length >= 2 ? searchLocalChileanFoods(initialQuery, initialUnit) : []
+  );
   const [selectedFood, setSelectedFood] = useState<UsdaSearchFood | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -26,21 +28,32 @@ export function UsdaSearchModal({ initialQuery = "", initialAmount = 100, initia
   const requestId = useRef(0);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const clearResults = () => {
+  const clearResults = (nextQuery = "", nextUnit = unit) => {
     requestId.current++;
-    setResults([]); setMessage(""); setSearched(false); setLoading(false);
+    const instantLocal = nextQuery.trim().length >= 2 ? searchLocalChileanFoods(nextQuery, nextUnit) : [];
+    setResults(instantLocal); setMessage(""); setSearched(false); setLoading(false);
   };
   const search = async () => {
     if (loading || query.trim().length < 2) return;
     const id = ++requestId.current;
-    setLoading(true); setMessage(""); setResults([]); setSearched(false);
+    const localMatches = searchLocalChileanFoods(query.trim(), unit);
+    setLoading(true); setMessage(""); setResults(localMatches); setSearched(false);
     try {
       const result = await searchUsdaFoods(query.trim(), unit);
       if (mounted.current && id === requestId.current) {
-        setResults(result.foods); setMessage(result.message || ""); setSearched(true);
+        const combined = [...localMatches, ...result.foods].slice(0, 12);
+        setResults(combined); setMessage(result.message || ""); setSearched(true);
       }
     } catch (error) {
-      if (mounted.current && id === requestId.current) setMessage(error instanceof Error ? error.message : "No se pudo buscar. Inténtalo de nuevo.");
+      if (mounted.current && id === requestId.current) {
+        if (localMatches.length > 0) {
+          setResults(localMatches);
+          setSearched(true);
+          setMessage("Mostrando catálogo chileno offline instantáneo.");
+        } else {
+          setMessage(error instanceof Error ? error.message : "No se pudo buscar. Inténtalo de nuevo.");
+        }
+      }
     } finally { if (mounted.current && id === requestId.current) setLoading(false); }
   };
   const parsed = parseQuantityInput(amount, selectedFood?.unit || unit);
@@ -97,11 +110,11 @@ export function UsdaSearchModal({ initialQuery = "", initialAmount = 100, initia
             <>
               <Text style={styles.help}>Escribe el alimento y su preparación para elegir una referencia que corresponda a lo que comiste.</Text>
               <View style={styles.searchRow}><Search size={18} color={colors.primary} /><TextInput accessibilityLabel="Alimento para buscar en USDA" style={styles.searchInput}
-                value={query} onChangeText={value => { setQuery(value); clearResults(); }} placeholder="Ej: arroz cocido o pollo asado"
+                value={query} onChangeText={value => { setQuery(value); clearResults(value, unit); }} placeholder="Ej: arroz cocido o pollo asado"
                 placeholderTextColor={colors.textMuted} maxLength={160} returnKeyType="search" onSubmitEditing={search} /></View>
               <View style={styles.filters}>
                 {(["g", "ml"] as FoodUnit[]).map(value => <TouchableOpacity key={value} accessibilityRole="button" accessibilityLabel={"Buscar USDA en " + value}
-                  accessibilityState={{ selected: unit === value }} onPress={() => { setUnit(value); clearResults(); }}
+                  accessibilityState={{ selected: unit === value }} onPress={() => { setUnit(value); clearResults(query, value); }}
                   aria-pressed={unit === value}
                   style={[styles.unit, unit === value && styles.unitSelected]}><Text style={[styles.unitText, unit === value && { color: colors.primaryDark }]}>{value === "g" ? "Alimentos · g" : "Bebidas · ml"}</Text></TouchableOpacity>)}
               </View>

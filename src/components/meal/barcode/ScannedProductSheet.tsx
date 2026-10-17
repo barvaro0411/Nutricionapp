@@ -102,6 +102,11 @@ export function ScannedProductSheet({
             ))}
           </View>
         )}
+        {productAlerts.substituteSuggestion ? (
+          <View style={styles.substituteTipBox}>
+            <Text style={styles.substituteTipText}>{productAlerts.substituteSuggestion}</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Selector de porción */}
@@ -353,6 +358,21 @@ const styles = StyleSheet.create({
   },
   dietAlertTextDanger: {
     color: "#991B1B",
+  },
+  substituteTipBox: {
+    marginTop: 8,
+    backgroundColor: "#F0FDF4",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
+  substituteTipText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: "#166534",
+    lineHeight: 16,
   },
   portionSection: {
     backgroundColor: "#F8FAFC",

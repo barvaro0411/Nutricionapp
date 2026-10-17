@@ -4,7 +4,9 @@ import { useRouter } from "expo-router";
 import { ArrowUpRight, CalendarDays, Download, Plus, TrendingUp } from "lucide-react-native";
 import { useWeeklyStats } from "@/hooks/useWeeklyStats";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
+import { useWeightTracker } from "@/hooks/useWeightTracker";
 import { WeeklyMacroChart } from "@/components/charts/WeeklyMacroChart";
+import { WeightTrendCard } from "@/components/charts/WeightTrendCard";
 import { PageHeading, StateCard, AppButton } from "@/components/common/AppUI";
 import { colors, layout } from "@/constants/colors";
 import { getDateKey, dateForMealRoute, APP_TIME_ZONE } from "@/utils/dates";
@@ -28,6 +30,7 @@ export default function HistoryScreen() {
   const [showAllDays, setShowAllDays] = useState(false);
   const { data, error, isLoading, refetch, isRefetching } = useWeeklyStats(period);
   const { data: today, refetch: refetchToday } = useDailyNutrition();
+  const { stats: weightStats, logWeight, updateTargetWeight, isLoggingWeight, refetch: refetchWeight } = useWeightTracker(period === 7 ? 7 : 14);
   const activeMetric = metrics.find(item => item.key === metric)!;
   const selected = data?.days.find(day => day.date === selectedDate) || data?.days[data.days.length - 1];
   const loggedDays = data?.loggedDays || 0;
@@ -37,7 +40,7 @@ export default function HistoryScreen() {
   const openDay = (date: string) => router.push({ pathname: "/(tabs)", params: { date } });
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void Promise.all([refetch(), refetchToday()]); }} tintColor={colors.primary} />}>
+      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void Promise.all([refetch(), refetchToday(), refetchWeight()]); }} tintColor={colors.primary} />}>
       <PageHeading eyebrow="Cada registro cuenta" title="Tu progreso"
         description="Descubre tus hábitos y revisa cómo cambia tu alimentación con el tiempo." />
       <View style={styles.periodRow}>
@@ -69,6 +72,12 @@ export default function HistoryScreen() {
             <View style={styles.consistencyTrack}><View style={[styles.consistencyFill, { width: `${loggedDays / period * 100}%` }]} /></View>
             <Text style={styles.summaryNote}>{loggedDays ? "Cada comida registrada te ayuda a entender mejor tu rutina." : "Empieza con una comida. Tu progreso se construye día a día."}</Text>
           </View>
+          <WeightTrendCard
+            stats={weightStats}
+            onLogWeight={logWeight}
+            onUpdateTarget={updateTargetWeight}
+            isSaving={isLoggingWeight}
+          />
           {loggedDays === 0 ? (
             <View style={styles.empty}>
               <StateCard title="Tu historia empieza con una comida" message="Aquí aparecerán tus tendencias cuando guardes alimentos en este periodo." />
