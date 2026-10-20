@@ -163,6 +163,37 @@ CREATE TABLE IF NOT EXISTS public.weight_logs (
   UNIQUE (user_id, logged_date)
 );
 
+-- Si la tabla weight_logs ya existía previamente sin alguna de estas columnas, agregarlas de forma segura:
+ALTER TABLE public.weight_logs
+  ADD COLUMN IF NOT EXISTS logged_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS logged_date date NOT NULL DEFAULT ((now() AT TIME ZONE 'America/Santiago')::date);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.weight_logs'::regclass
+      AND contype = 'u'
+      AND conkey = ARRAY[
+        (SELECT attnum FROM pg_attribute WHERE attrelid = 'public.weight_logs'::regclass AND attname = 'user_id'),
+        (SELECT attnum FROM pg_attribute WHERE attrelid = 'public.weight_logs'::regclass AND attname = 'logged_date')
+      ]
+  ) THEN
+    DELETE FROM public.weight_logs a
+    USING public.weight_logs b
+    WHERE a.user_id = b.user_id
+      AND a.logged_date = b.logged_date
+      AND a.ctid < b.ctid;
+
+    ALTER TABLE public.weight_logs
+      ADD CONSTRAINT weight_logs_user_id_logged_date_key UNIQUE (user_id, logged_date);
+  END IF;
+END;
+$$;
+
 CREATE INDEX IF NOT EXISTS idx_weight_logs_user_date
   ON public.weight_logs(user_id, logged_date DESC);
 
