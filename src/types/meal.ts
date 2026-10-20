@@ -6,7 +6,7 @@ export type MealType = z.infer<typeof MealTypeSchema>;
 export type FoodUnit = "g" | "ml";
 
 export const NutritionReferenceSchema = z.object({
-  source: z.literal("USDA FoodData Central"),
+  source: z.enum(["USDA FoodData Central", "Catálogo Chileno"]),
   fdc_id: z.number().int().positive(),
   description: z.string().min(1).max(500),
   data_type: z.string().max(100).optional(),

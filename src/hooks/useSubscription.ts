@@ -4,6 +4,7 @@ import {
   getSubscription,
   activateTrial,
   UserSubscription,
+  SubscriptionPlanId,
   MAX_FREE_DAILY_SCANS,
 } from "@/services/subscriptionService";
 
@@ -18,9 +19,9 @@ export function useSubscription() {
   });
 
   const activateTrialMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (planId?: Exclude<SubscriptionPlanId, "free">) => {
       if (!user) throw new Error("Inicia sesión para activar tu prueba.");
-      return activateTrial(user.id);
+      return activateTrial(user.id, planId || "pro_annual_clp");
     },
     onSuccess: (newSub) => {
       queryClient.setQueryData(["userSubscription", user?.id], newSub);
@@ -34,6 +35,7 @@ export function useSubscription() {
     planId: "free",
     isPro: false,
     currentPeriodEnd: null,
+    trialUsed: false,
     aiPhotoScansToday: 0,
     maxFreeScans: MAX_FREE_DAILY_SCANS,
     scansRemaining: MAX_FREE_DAILY_SCANS,
@@ -42,6 +44,7 @@ export function useSubscription() {
   return {
     subscription,
     isPro: subscription.isPro,
+    trialUsed: Boolean(subscription.trialUsed),
     scansRemaining: subscription.scansRemaining,
     scansToday: subscription.aiPhotoScansToday,
     maxFreeScans: subscription.maxFreeScans,

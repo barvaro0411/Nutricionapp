@@ -1,4 +1,3 @@
-import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
 import React, { useState, useRef, useEffect } from "react";
 import {
@@ -18,6 +17,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTextAudioMeal } from "@/hooks/useTextAudioMeal";
 import { colors } from "@/constants/colors";
 import { MealType } from "@/types/meal";
+import {
+  AudioRecordingHandle,
+  resetAudioRecordingMode,
+  startAudioRecording,
+} from "@/utils/audioAdapter";
 
 interface TextVoiceModalProps {
   visible: boolean;
@@ -32,7 +36,7 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
   const [isRecording, setIsRecording] = useState(false);
   const [transcribedPreview, setTranscribedPreview] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
-  const recording = useRef<Audio.Recording | null>(null);
+  const recording = useRef<AudioRecordingHandle | null>(null);
   const busy = useRef(false);
   useEffect(() => {
     if (visible) return;
@@ -41,10 +45,10 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
     setIsRecording(false);
     setTranscribedPreview(false);
     setCaptureError(null);
-    if (pending) void pending.stopAndUnloadAsync().catch(() => undefined);
-    if (Platform.OS !== "web") void Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => undefined);
+    if (pending) void pending.cancel();
+    else void resetAudioRecordingMode();
   }, [visible]);
-  useEffect(() => () => { void recording.current?.stopAndUnloadAsync().catch(() => undefined); }, []);
+  useEffect(() => () => { void recording.current?.cancel(); }, []);
 
   const { parseTextMeal, transcribeAudioMeal, processing, isTranscribing, error } = useTextAudioMeal();
 
@@ -107,19 +111,13 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
       }
 
       if (!recording.current) {
-        const permission = await Audio.requestPermissionsAsync();
-        if (!permission.granted) throw new Error("Permite el acceso al micrófono para grabar.");
-        if (Platform.OS !== "web") await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-        const result = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-        recording.current = result.recording;
+        recording.current = await startAudioRecording();
         setIsRecording(true);
       } else {
         const captured = recording.current;
         recording.current = null;
         setIsRecording(false);
-        await captured.stopAndUnloadAsync();
-        if (Platform.OS !== "web") await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-        const uri = captured.getURI();
+        const uri = await captured.stopAndGetUri();
         if (!uri) throw new Error("No se pudo obtener el audio. Intenta grabar de nuevo.");
         let base64: string;
         let mime = "audio/mp4";
@@ -148,7 +146,7 @@ export function TextVoiceModal({ visible, mealType = "almuerzo", onClose }: Text
       }
     } catch (e) {
       setIsRecording(false);
-      if (recording.current) await recording.current.stopAndUnloadAsync().catch(() => undefined);
+      if (recording.current) await recording.current.cancel();
       recording.current = null;
       setCaptureError(e instanceof Error ? e.message : "No se pudo grabar el audio.");
     } finally { busy.current = false; }

@@ -9,6 +9,6 @@ module.exports = {
     "^npm:zod@3.24.1$": "zod",
     "^npm:@supabase/supabase-js@2.117.2$": "@supabase/supabase-js",
   },
-  testPathIgnorePatterns: ["/node_modules/", "<rootDir>/supabase/\\.private/"],
+  testPathIgnorePatterns: ["/node_modules/", "<rootDir>/supabase/\\.private/", "<rootDir>/e2e/"],
   modulePathIgnorePatterns: ["<rootDir>/supabase/\\.private/"],
 };

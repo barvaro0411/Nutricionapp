@@ -11,6 +11,7 @@
     "web": "expo start --web",
     "build:pwa": "expo export --platform web && node scripts/patch-pwa.js",
     "test": "jest",
+    "test:e2e": "npx playwright test",
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "build": "npm run build:pwa",

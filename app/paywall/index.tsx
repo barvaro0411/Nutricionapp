@@ -23,12 +23,16 @@ import {
 
 export default function PaywallScreen() {
   const router = useRouter();
-  const { isPro, activateTrial, isActivatingTrial } = useSubscription();
+  const { isPro, trialUsed, activateTrial, isActivatingTrial } = useSubscription();
   const [selectedPlan, setSelectedPlan] = useState<"annual" | "monthly">("annual");
 
   const handleStartTrial = async () => {
     try {
-      await activateTrial();
+      const planId = selectedPlan === "annual" ? "pro_annual_clp" : "pro_monthly_clp";
+      const updated = await activateTrial(planId);
+      if (!updated?.isPro) {
+        throw new Error("El servidor no pudo confirmar la activación de tu prueba Pro.");
+      }
       showAlert("¡Bienvenido a Pro! 🌟", "Se ha activado tu prueba gratuita de 7 días con escaneos y voz ilimitados.");
       if (router.canGoBack()) {
         router.back();
@@ -36,7 +40,7 @@ export default function PaywallScreen() {
         router.replace("/(tabs)");
       }
     } catch (err: any) {
-      showAlert("Error", err?.message || "No se pudo activar la prueba. Reintenta.");
+      showAlert("No se pudo activar la prueba", err?.message || "No se pudo activar la prueba en el servidor. Reintenta.");
     }
   };
 
@@ -176,16 +180,21 @@ export default function PaywallScreen() {
       <View style={styles.actionsContainer}>
         {!isPro ? (
           <TouchableOpacity
-            style={[styles.primaryActionBtn, isActivatingTrial && styles.disabledBtn]}
+            style={[
+              styles.primaryActionBtn,
+              (isActivatingTrial || trialUsed) && styles.disabledBtn,
+            ]}
             onPress={handleStartTrial}
-            disabled={isActivatingTrial}
+            disabled={isActivatingTrial || trialUsed}
             activeOpacity={0.85}
           >
             {isActivatingTrial ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={styles.primaryActionBtnText}>
-                Comenzar Prueba Gratis de 7 Días
+                {trialUsed
+                  ? "Prueba Gratis de 7 Días ya Utilizada"
+                  : "Comenzar Prueba Gratis de 7 Días"}
               </Text>
             )}
           </TouchableOpacity>

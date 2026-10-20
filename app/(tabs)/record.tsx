@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense, lazy } from "react";
 import {
   View,
   Text,
@@ -22,13 +22,22 @@ import {
 } from "lucide-react-native";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useFavoriteMeals } from "@/hooks/useFavoriteMeals";
-import { TextVoiceModal } from "@/components/meal/TextVoiceModal";
-import { FavoritesModal } from "@/components/meal/FavoritesModal";
-import { UsdaSearchModal } from "@/components/meal/UsdaSearchModal";
+import { useAiConsent } from "@/hooks/useAiConsent";
+import { AiConsentModal } from "@/components/common/AiConsentModal";
 import { MealType } from "@/types/meal";
 import { colors, layout } from "@/constants/colors";
 import { PageHeading } from "@/components/common/AppUI";
 import { getDateKey, dateForMealRoute, loggedAtForDate, APP_TIME_ZONE } from "@/utils/dates";
+
+const TextVoiceModal = lazy(() =>
+  import("@/components/meal/TextVoiceModal").then((m) => ({ default: m.TextVoiceModal }))
+);
+const FavoritesModal = lazy(() =>
+  import("@/components/meal/FavoritesModal").then((m) => ({ default: m.FavoritesModal }))
+);
+const UsdaSearchModal = lazy(() =>
+  import("@/components/meal/UsdaSearchModal").then((m) => ({ default: m.UsdaSearchModal }))
+);
 
 function guessChileanMealTypeByHour(): MealType {
   const hour = new Date().getHours();
@@ -42,6 +51,7 @@ export default function RecordScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ mealType?: MealType; date?: string }>();
   const { favorites } = useFavoriteMeals();
+  const { hasConsent, setConsent, isUpdating } = useAiConsent();
 
   const [selectedMealType, setSelectedMealType] = useState<MealType>(
     params.mealType || guessChileanMealTypeByHour()
@@ -49,6 +59,7 @@ export default function RecordScreen() {
   const [showTextVoiceModal, setShowTextVoiceModal] = useState(false);
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [pendingAiAction, setPendingAiAction] = useState<"camera" | "voice" | null>(null);
 
   useEffect(() => {
     if (params.mealType) setSelectedMealType(params.mealType);
@@ -148,7 +159,7 @@ export default function RecordScreen() {
         <Text style={styles.sectionTitle}>2. Añade lo que comiste</Text>
         <TouchableOpacity style={styles.searchCard} accessibilityRole="button" accessibilityLabel="Buscar un alimento" activeOpacity={0.85}
           onPress={() => { beginMeal(); setShowSearchModal(true); }}>
-          <View style={styles.searchTop}><View style={styles.searchIcon}><Search size={24} color={colors.mint} /></View><View style={styles.catalogBadge}><Text style={styles.catalogBadgeText}>CATÁLOGO USDA</Text></View></View>
+          <View style={styles.searchTop}><View style={styles.searchIcon}><Search size={24} color={colors.mint} /></View><View style={styles.catalogBadge}><Text style={styles.catalogBadgeText}>CATÁLOGO CHILENO + USDA</Text></View></View>
           <Text style={styles.searchTitle}>Encuentra tu alimento</Text>
           <Text style={styles.searchDescription}>Busca en español, elige cómo está preparado y ajusta tu porción.</Text>
           <View style={styles.searchField}><Search size={17} color={colors.primary} /><Text style={styles.searchPlaceholder}>Arroz cocido, pollo, yogur…</Text><ChevronRight size={18} color={colors.primary} /></View>
@@ -166,6 +177,10 @@ export default function RecordScreen() {
           accessibilityLabel="Registrar con foto de comida"
           onPress={() => {
             beginMeal();
+            if (!hasConsent) {
+              setPendingAiAction("camera");
+              return;
+            }
             router.push({
               pathname: "/meal/camera",
               params: { suggestedMealType: selectedMealType },
@@ -198,6 +213,10 @@ export default function RecordScreen() {
           accessibilityLabel="Registrar con texto o voz"
           onPress={() => {
             beginMeal();
+            if (!hasConsent) {
+              setPendingAiAction("voice");
+              return;
+            }
             setShowTextVoiceModal(true);
           }}
           activeOpacity={0.85}
@@ -272,23 +291,62 @@ export default function RecordScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Modal de Texto / Voz */}
-      <TextVoiceModal
-        visible={showTextVoiceModal}
-        mealType={selectedMealType}
-        onClose={() => setShowTextVoiceModal(false)}
+      {/* Modal de Consentimiento de IA */}
+      <AiConsentModal
+        visible={pendingAiAction !== null}
+        isUpdating={isUpdating}
+        onCancel={() => setPendingAiAction(null)}
+        onViewPrivacy={() => {
+          setPendingAiAction(null);
+          router.push("/legal" as any);
+        }}
+        onAccept={async () => {
+          const action = pendingAiAction;
+          try {
+            await setConsent(true);
+          } catch {
+            // Continuar de forma resiliente si la red demora
+          }
+          setPendingAiAction(null);
+          if (action === "camera") {
+            router.push({
+              pathname: "/meal/camera",
+              params: { suggestedMealType: selectedMealType },
+            });
+          } else if (action === "voice") {
+            setShowTextVoiceModal(true);
+          }
+        }}
       />
-      {showSearchModal && <UsdaSearchModal onClose={() => setShowSearchModal(false)} onSelect={item => {
-        useMealReviewStore.getState().addItem(item);
-        router.push("/meal/review");
-      }} />}
 
-      {/* Modal de Comidas Frecuentes */}
-      <FavoritesModal
-        visible={showFavoritesModal}
-        mealType={selectedMealType}
-        onClose={() => setShowFavoritesModal(false)}
-      />
+      <Suspense fallback={null}>
+        {/* Modal de Texto / Voz */}
+        {showTextVoiceModal && (
+          <TextVoiceModal
+            visible={showTextVoiceModal}
+            mealType={selectedMealType}
+            onClose={() => setShowTextVoiceModal(false)}
+          />
+        )}
+        {showSearchModal && (
+          <UsdaSearchModal
+            onClose={() => setShowSearchModal(false)}
+            onSelect={(item) => {
+              useMealReviewStore.getState().addItem(item);
+              router.push("/meal/review");
+            }}
+          />
+        )}
+
+        {/* Modal de Comidas Frecuentes */}
+        {showFavoritesModal && (
+          <FavoritesModal
+            visible={showFavoritesModal}
+            mealType={selectedMealType}
+            onClose={() => setShowFavoritesModal(false)}
+          />
+        )}
+      </Suspense>
     </>
   );
 }

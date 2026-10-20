@@ -96,10 +96,11 @@ function RootNavigationLayout() {
     if (!initialized || isLoading || error) return;
     const inAuth = segments[0] === "(auth)";
     const inRecovery = segments[0] === "reset-password";
+    const inLegal = segments[0] === "legal";
     if (isRecoveringPassword && session) {
       if (!inRecovery) router.replace("/reset-password");
     } else if (!session) {
-      if (!inAuth && !inRecovery) router.replace("/(auth)/login");
+      if (!inAuth && !inRecovery && !inLegal) router.replace("/(auth)/login");
     } else if (inAuth) router.replace("/(tabs)");
   }, [initialized, isLoading, error, segments, session, isRecoveringPassword, router]);
 
@@ -120,6 +121,7 @@ function RootNavigationLayout() {
       <Stack.Screen name="meal/camera" options={{ presentation: "fullScreenModal" }} />
       <Stack.Screen name="meal/barcode" options={{ presentation: "modal" }} />
       <Stack.Screen name="coach/index" options={{ presentation: "modal" }} />
+      <Stack.Screen name="legal/index" options={{ presentation: "modal" }} />
     </Stack>
   </>;
 }

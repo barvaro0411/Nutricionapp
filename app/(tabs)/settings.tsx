@@ -18,10 +18,13 @@ import {
   CheckCircle2,
   LockKeyhole,
   Sparkles,
+  ShieldCheck,
+  Trash2,
 } from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
+import { useAiConsent } from "@/hooks/useAiConsent";
 import { DietaryRestriction, DIETARY_RESTRICTION_LABELS } from "@/types/profile";
 import {
   getReminderPreferences,
@@ -35,11 +38,11 @@ import { colors, layout } from "@/constants/colors";
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user, profile, signOut, updateProfile, loading } = useAuth();
+  const { user, profile, signOut, updateProfile, deleteAccount, loading } = useAuth();
   const { isPro, scansRemaining, maxFreeScans } = useSubscription();
   const { toggleRestriction, hasRestriction } = useDietaryPreferences();
+  const { hasConsent, setConsent, isUpdating: isUpdatingConsent } = useAiConsent();
   const [reminders, setReminders] = useState<MealReminderConfig[]>(
-
     DEFAULT_CHILEAN_REMINDERS,
   );
   const [busyReminder, setBusyReminder] = useState<string | null>(null);
@@ -386,6 +389,55 @@ export default function SettingsScreen() {
           </View>
         ))}
       </View>
+
+      <Text style={styles.sectionTitle}>Privacidad, Datos e IA</Text>
+      <View style={styles.actions}>
+        <View style={styles.action}>
+          <View style={styles.actionIcon}>
+            <Sparkles size={20} color={colors.primary} />
+          </View>
+          <View style={styles.actionCopy}>
+            <Text style={styles.actionTitle}>Consentimiento de Análisis con IA</Text>
+            <Text style={styles.actionDescription}>
+              {hasConsent
+                ? "Autorizado para foto, voz y Coach IA (sin datos personales)."
+                : "Desactivado. Solo registro manual y catálogos locales."}
+            </Text>
+          </View>
+          <Switch
+            accessibilityLabel="Consentimiento de análisis con IA"
+            disabled={isUpdatingConsent || !user}
+            value={hasConsent}
+            onValueChange={(val) => {
+              void setConsent(val).catch((err) => {
+                showAlert("Error", err?.message || "No se pudo guardar tu preferencia.");
+              });
+            }}
+            trackColor={{ false: colors.cardBorder, true: colors.primary }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
+
+        <View style={styles.divider} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Política de Privacidad y Términos de Uso"
+          onPress={() => router.push("/legal" as any)}
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+        >
+          <View style={styles.actionIcon}>
+            <ShieldCheck size={20} color={colors.primary} />
+          </View>
+          <View style={styles.actionCopy}>
+            <Text style={styles.actionTitle}>Privacidad y Términos de Uso</Text>
+            <Text style={styles.actionDescription}>
+              Ley 19.628, retención de fotos (14 días), uso de IA y tus derechos.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </Pressable>
+      </View>
+
       <View style={styles.privacy}>
         <LockKeyhole size={20} color={colors.primary} />
         <View style={styles.actionCopy}>
@@ -405,6 +457,43 @@ export default function SettingsScreen() {
       >
         <LogOut size={18} color={colors.danger} />
         <Text style={styles.logoutText}>Cerrar sesión</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Eliminar mi cuenta permanentemente"
+        disabled={loading}
+        onPress={() =>
+          showAlert(
+            "Eliminar mi cuenta permanentemente",
+            "Esta acción borrará de forma irreversible tu perfil, comidas, hidratación, peso, fotos y conversaciones. ¿Estás seguro?",
+            [
+              { text: "Cancelar", style: "cancel" },
+              {
+                text: "Sí, eliminar mi cuenta",
+                style: "destructive",
+                onPress: async () => {
+                  const res = await deleteAccount();
+                  if (res.success) {
+                    showAlert(
+                      "Cuenta eliminada",
+                      "Tu cuenta y todos tus datos han sido eliminados."
+                    );
+                    router.replace("/(auth)/login");
+                  } else {
+                    showAlert(
+                      "Error al eliminar cuenta",
+                      res.error || "Reintenta más tarde."
+                    );
+                  }
+                },
+              },
+            ]
+          )
+        }
+        style={({ pressed }) => [styles.deleteAccountBtn, pressed && styles.pressed]}
+      >
+        <Trash2 size={16} color={colors.textSecondary} />
+        <Text style={styles.deleteAccountText}>Eliminar mi cuenta y datos</Text>
       </Pressable>
       <Text style={styles.footer}>Nutrición IA · Un día a la vez</Text>
     </ScrollView>
@@ -691,6 +780,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 14,
     color: colors.textSecondary,
+  },
+  deleteAccountBtn: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 46,
+    marginTop: 12,
+    borderRadius: 14,
+  },
+  deleteAccountText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    textDecorationLine: "underline",
   },
   footer: {
     fontSize: 11,

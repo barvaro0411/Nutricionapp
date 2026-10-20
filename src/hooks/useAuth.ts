@@ -3,6 +3,7 @@ import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Database } from "@/types/database.types";
 import { translateAuthError } from "@/utils/authErrors";
+import { deleteOwnAccount } from "@/services/privacyService";
 import * as Linking from "expo-linking";
 
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
@@ -88,15 +89,12 @@ export function useAuth() {
         return { success: false, error: friendlyMsg };
       }
 
-      // Si Supabase tiene protección de enumeración activada y el usuario ya existe,
-      // identities es un array vacío y session es null.
       if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
         const existsMsg = "Este correo electrónico ya está registrado. Por favor inicia sesión.";
         setError(existsMsg);
         return { success: false, error: existsMsg, code: "user_already_exists" };
       }
 
-      // Si la confirmación de correo está activada en Supabase, session es null
       const needsEmailConfirmation = !data.session;
 
       if (data.session) {
@@ -197,6 +195,22 @@ export function useAuth() {
     }
   };
 
+  const deleteAccount = async () => {
+    if (!user) return { success: false, error: "No hay sesión activa" };
+    setLoading(true);
+    setError(null);
+    try {
+      await deleteOwnAccount(user.id);
+      return { success: true };
+    } catch (err: any) {
+      const msg = err?.message || "No se pudo eliminar la cuenta.";
+      setError(msg);
+      return { success: false, error: msg };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     session,
     user,
@@ -210,5 +224,6 @@ export function useAuth() {
     resetPassword,
     fetchProfile,
     updateProfile,
+    deleteAccount,
   };
 }

@@ -57,12 +57,16 @@ export function MealReviewItemCard({
           <Text style={styles.itemNameText}>{item.food}</Text>
           {item.nutrition_reference && (
             <View>
-              <Text style={styles.nutritionSourceText}>Nutrientes: USDA · Revisa la porción</Text>
+              <Text style={styles.nutritionSourceText}>
+                {item.nutrition_reference.source === "Catálogo Chileno"
+                  ? "Nutrientes: Catálogo Chileno · Revisa la porción"
+                  : "Nutrientes: USDA · Revisa la porción"}
+              </Text>
               <Text style={styles.nutritionSourceText}>{item.nutrition_reference.description}</Text>
             </View>
           )}
           {!item.nutrition_reference && (
-            <Text style={styles.nutritionSourceText}>Sin referencia USDA · Revisa los nutrientes</Text>
+            <Text style={styles.nutritionSourceText}>Sin referencia verificada · Revisa los nutrientes</Text>
           )}
           {isLowConfidence && (
             <View style={styles.warningPill}>

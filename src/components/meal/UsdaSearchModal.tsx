@@ -72,13 +72,13 @@ export function UsdaSearchModal({ initialQuery = "", initialAmount = 100, initia
         <View style={styles.card} accessibilityViewIsModal>
           <View style={styles.header}>
             {selectedFood && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver a los resultados" onPress={() => setSelectedFood(null)} style={styles.iconButton}><ArrowLeft size={20} color={colors.text} /></TouchableOpacity>}
-            <View style={styles.headerCopy}><Text accessibilityRole="header" style={styles.title}>{selectedFood ? "Ajusta tu porción" : "Buscar alimentos"}</Text><Text style={styles.subtitle}>{selectedFood ? "Revisa cuánto vas a comer" : "Datos de USDA FoodData Central"}</Text></View>
+            <View style={styles.headerCopy}><Text accessibilityRole="header" style={styles.title}>{selectedFood ? "Ajusta tu porción" : "Buscar alimentos"}</Text><Text style={styles.subtitle}>{selectedFood ? "Revisa cuánto vas a comer" : "Catálogo Chileno y USDA FoodData Central"}</Text></View>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar búsqueda USDA" onPress={onClose} style={styles.iconButton}><X size={20} color={colors.textSecondary} /></TouchableOpacity>
           </View>
           {selectedFood ? (
             <>
               <ScrollView style={[styles.results, styles.detailScroll]} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.detail}>
-                <View style={styles.foodHeading}><Text style={styles.name}>{selectedFood.label}</Text><Text style={styles.help}>{selectedFood.description}</Text><Text style={styles.source}>Referencia USDA · #{selectedFood.fdcId}</Text></View>
+                <View style={styles.foodHeading}><Text style={styles.name}>{selectedFood.label}</Text><Text style={styles.help}>{selectedFood.description}</Text><Text style={styles.source}>{selectedFood.nutrition_reference.source === "Catálogo Chileno" ? "Catálogo Chileno · Referencia local" : `Referencia USDA · #${selectedFood.fdcId}`}</Text></View>
                 <Text style={styles.label}>Cantidad que vas a consumir</Text>
                 <View style={styles.quantityRow}>
                   <TextInput accessibilityLabel="Porción USDA" style={[styles.input, styles.quantity]} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" maxLength={16} selectTextOnFocus />

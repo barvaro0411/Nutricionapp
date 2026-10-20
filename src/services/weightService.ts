@@ -75,6 +75,41 @@ export function validateWeightKg(input: number | string): { ok: true; value: num
   return { ok: true, value: Math.round(num * 10) / 10 };
 }
 
+function parseLocalEntries(raw: string | null): WeightEntry[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (e): e is WeightEntry =>
+          e &&
+          typeof e.date === "string" &&
+          typeof e.weightKg === "number" &&
+          Number.isFinite(e.weightKg) &&
+          e.weightKg >= 30 &&
+          e.weightKg <= 300
+      )
+      .sort((a, b) => a.date.localeCompare(b.date));
+  } catch {
+    return [];
+  }
+}
+
+function mergeWeightEntries(localEntries: WeightEntry[], remoteEntries: WeightEntry[]): WeightEntry[] {
+  const byDate = new Map<string, WeightEntry>();
+  for (const item of localEntries) {
+    byDate.set(item.date, item);
+  }
+  for (const remote of remoteEntries) {
+    const existing = byDate.get(remote.date);
+    if (!existing || new Date(remote.loggedAt).getTime() >= new Date(existing.loggedAt).getTime()) {
+      byDate.set(remote.date, remote);
+    }
+  }
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export async function getWeightHistory(
   userId: string,
   profile?: ProfileRow | null
@@ -82,26 +117,53 @@ export async function getWeightHistory(
   if (!userId) return [];
 
   const raw = await readLocalString(historyStorageKey(userId));
-  let entries: WeightEntry[] = [];
+  const localEntries = parseLocalEntries(raw);
+  let remoteEntries: WeightEntry[] = [];
+  const remoteDates = new Set<string>();
 
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        entries = parsed
-          .filter(
-            (e): e is WeightEntry =>
-              e &&
-              typeof e.date === "string" &&
-              typeof e.weightKg === "number" &&
-              Number.isFinite(e.weightKg) &&
-              e.weightKg >= 30 &&
-              e.weightKg <= 300
-          )
-          .sort((a, b) => a.date.localeCompare(b.date));
+  try {
+    const query = supabase
+      .from("weight_logs")
+      .select("logged_date, weight_kg, logged_at")
+      .eq("user_id", userId)
+      .order("logged_date", { ascending: true })
+      .limit(90);
+
+    const { data, error } = await query;
+    if (!error && Array.isArray(data)) {
+      remoteEntries = data
+        .map((row) => ({
+          date: String(row.logged_date),
+          weightKg: Math.round(Number(row.weight_kg) * 10) / 10,
+          loggedAt: String(row.logged_at || new Date().toISOString()),
+        }))
+        .filter((e) => Number.isFinite(e.weightKg) && e.weightKg >= 30 && e.weightKg <= 300);
+
+      for (const r of remoteEntries) {
+        remoteDates.add(r.date);
       }
+    }
+  } catch {
+    // Offline or weight_logs table not reachable; fall back to local cache
+  }
+
+  let entries = mergeWeightEntries(localEntries, remoteEntries);
+
+  // Sincronizar entradas locales pendientes hacia weight_logs en segundo plano
+  const unsyncedLocal = localEntries.filter((e) => !remoteDates.has(e.date));
+  if (unsyncedLocal.length > 0) {
+    try {
+      await supabase.from("weight_logs").upsert(
+        unsyncedLocal.map((e) => ({
+          user_id: userId,
+          logged_date: e.date,
+          weight_kg: e.weightKg,
+          logged_at: e.loggedAt,
+        })),
+        { onConflict: "user_id,logged_date" }
+      );
     } catch {
-      entries = [];
+      // Ignorar si no hay conectividad
     }
   }
 
@@ -111,13 +173,30 @@ export async function getWeightHistory(
     const initialDate = profile?.updated_at
       ? getDateKey(new Date(profile.updated_at))
       : getDateKey();
+    const initialLoggedAt = profile?.updated_at || new Date().toISOString();
+    const initialWeight = Math.round(profileWeight * 10) / 10;
     entries = [
       {
         date: initialDate,
-        weightKg: Math.round(profileWeight * 10) / 10,
-        loggedAt: profile?.updated_at || new Date().toISOString(),
+        weightKg: initialWeight,
+        loggedAt: initialLoggedAt,
       },
     ];
+    await writeLocalString(historyStorageKey(userId), JSON.stringify(entries));
+    try {
+      await supabase.from("weight_logs").upsert(
+        {
+          user_id: userId,
+          logged_date: initialDate,
+          weight_kg: initialWeight,
+          logged_at: initialLoggedAt,
+        },
+        { onConflict: "user_id,logged_date" }
+      );
+    } catch {
+      // Offline fallback
+    }
+  } else if (entries.length > 0) {
     await writeLocalString(historyStorageKey(userId), JSON.stringify(entries));
   }
 
@@ -139,7 +218,8 @@ export async function logWeightEntry(params: {
   const nowIso = new Date().toISOString();
 
   const currentProfile = useAuthStore.getState().profile;
-  const existing = await getWeightHistory(userId, currentProfile);
+  const raw = await readLocalString(historyStorageKey(userId));
+  const existing = parseLocalEntries(raw);
 
   const byDate = new Map<string, WeightEntry>();
   for (const item of existing) {
@@ -154,7 +234,22 @@ export async function logWeightEntry(params: {
   const updated = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
   await writeLocalString(historyStorageKey(userId), JSON.stringify(updated));
 
-  // Sincronizar con profiles.current_weight_kg en Supabase si es el registro más reciente
+  // 1. Persistir registro histórico en tabla weight_logs (con RLS por usuario)
+  try {
+    await supabase.from("weight_logs").upsert(
+      {
+        user_id: userId,
+        logged_date: date,
+        weight_kg: normalizedWeight,
+        logged_at: nowIso,
+      },
+      { onConflict: "user_id,logged_date" }
+    );
+  } catch {
+    // Queda respaldado en almacenamiento local para sincronizar luego
+  }
+
+  // 2. Sincronizar con profiles.current_weight_kg en Supabase si es el registro más reciente
   const latest = updated[updated.length - 1];
   if (latest && latest.date === date) {
     try {
@@ -189,6 +284,11 @@ export async function logWeightEntry(params: {
 }
 
 export function deriveDefaultTargetWeight(profile?: ProfileRow | null): number | null {
+  const explicitTarget = Number(profile?.target_weight_kg);
+  if (Number.isFinite(explicitTarget) && explicitTarget >= 30 && explicitTarget <= 300) {
+    return Math.round(explicitTarget * 10) / 10;
+  }
+
   const current = Number(profile?.current_weight_kg);
   if (!Number.isFinite(current) || current < 30 || current > 300) return null;
 
@@ -205,6 +305,10 @@ export async function getTargetWeight(
   userId: string,
   profile?: ProfileRow | null
 ): Promise<number | null> {
+  const profileTarget = Number(profile?.target_weight_kg);
+  if (Number.isFinite(profileTarget) && profileTarget >= 30 && profileTarget <= 300) {
+    return Math.round(profileTarget * 10) / 10;
+  }
   if (!userId) return deriveDefaultTargetWeight(profile);
   const raw = await readLocalString(targetStorageKey(userId));
   if (raw) {
@@ -219,8 +323,41 @@ export async function saveTargetWeight(userId: string, targetKg: number): Promis
   if (!validation.ok) {
     throw new Error(validation.error);
   }
-  await writeLocalString(targetStorageKey(userId), String(validation.value));
-  return validation.value;
+  const normalizedTarget = validation.value;
+  await writeLocalString(targetStorageKey(userId), String(normalizedTarget));
+
+  if (userId) {
+    const nowIso = new Date().toISOString();
+    const currentProfile = useAuthStore.getState().profile;
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({ target_weight_kg: normalizedTarget, updated_at: nowIso })
+        .eq("id", userId)
+        .select()
+        .single();
+
+      if (!error && data && useAuthStore.getState().user?.id === userId) {
+        useAuthStore.getState().setProfile(data);
+      } else if (currentProfile && useAuthStore.getState().user?.id === userId) {
+        useAuthStore.getState().setProfile({
+          ...currentProfile,
+          target_weight_kg: normalizedTarget,
+          updated_at: nowIso,
+        });
+      }
+    } catch {
+      if (currentProfile && useAuthStore.getState().user?.id === userId) {
+        useAuthStore.getState().setProfile({
+          ...currentProfile,
+          target_weight_kg: normalizedTarget,
+          updated_at: nowIso,
+        });
+      }
+    }
+  }
+
+  return normalizedTarget;
 }
 
 export function buildWeightTrendStats(

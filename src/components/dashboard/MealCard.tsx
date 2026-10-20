@@ -104,7 +104,9 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress, onSuggestMe
                         {item.nutrition_reference && (
                           <View style={styles.verifiedBadge}>
                             <Check size={9} color={colors.primaryDark} />
-                            <Text style={styles.verifiedText}>Verificado</Text>
+                            <Text style={styles.verifiedText}>
+                              {item.nutrition_reference.source === "Catálogo Chileno" ? "Catálogo CL" : "Verificado"}
+                            </Text>
                           </View>
                         )}
                         <Text style={styles.itemCalories}>{Math.round(item.calories).toLocaleString("es-CL")} kcal</Text>

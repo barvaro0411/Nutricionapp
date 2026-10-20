@@ -8,7 +8,7 @@ import {
   APP_TIME_ZONE,
 } from "@/utils/dates";
 import { showAlert } from "@/utils/alerts";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, Suspense, lazy } from "react";
 import { adjustGoalsForActivity } from "@/utils/nutritionCalculator";
 import {
   View,
@@ -46,18 +46,31 @@ import { DailySummary } from "@/components/dashboard/DailySummary";
 import { DayStrip } from "@/components/dashboard/DayStrip";
 import { MealCard } from "@/components/dashboard/MealCard";
 import { WaterCard } from "@/components/dashboard/WaterCard";
-import { ActivityModal } from "@/components/dashboard/ActivityModal";
-import { TextVoiceModal } from "@/components/meal/TextVoiceModal";
-import { FavoritesModal } from "@/components/meal/FavoritesModal";
-import { MasterPlanModal } from "@/components/dashboard/MasterPlanModal";
 import { StreakBadge } from "@/components/dashboard/StreakBadge";
-import { StreakModal } from "@/components/dashboard/StreakModal";
 import { SmartCoachCard } from "@/components/dashboard/SmartCoachCard";
-import { AppGuideModal } from "@/components/dashboard/AppGuideModal";
 import { OfflineBanner } from "@/components/common/OfflineBanner";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { StateCard } from "@/components/common/AppUI";
 import { colors, shadows, layout } from "@/constants/colors";
+
+const ActivityModal = lazy(() =>
+  import("@/components/dashboard/ActivityModal").then((m) => ({ default: m.ActivityModal }))
+);
+const TextVoiceModal = lazy(() =>
+  import("@/components/meal/TextVoiceModal").then((m) => ({ default: m.TextVoiceModal }))
+);
+const FavoritesModal = lazy(() =>
+  import("@/components/meal/FavoritesModal").then((m) => ({ default: m.FavoritesModal }))
+);
+const MasterPlanModal = lazy(() =>
+  import("@/components/dashboard/MasterPlanModal").then((m) => ({ default: m.MasterPlanModal }))
+);
+const StreakModal = lazy(() =>
+  import("@/components/dashboard/StreakModal").then((m) => ({ default: m.StreakModal }))
+);
+const AppGuideModal = lazy(() =>
+  import("@/components/dashboard/AppGuideModal").then((m) => ({ default: m.AppGuideModal }))
+);
 import { MealType } from "@/types/meal";
 
 export default function DashboardScreen() {
@@ -592,60 +605,74 @@ export default function DashboardScreen() {
         )}
       </ScrollView>
 
-      {/* Modal de Texto / Voz */}
-      <TextVoiceModal
-        visible={showTextVoiceModal || showTextVoice}
-        mealType={activeMealType}
-        onClose={() => {
-          setShowTextVoiceModal(false);
-          closeTextVoice();
-        }}
-      />
+      <Suspense fallback={null}>
+        {/* Modal de Texto / Voz */}
+        {(showTextVoiceModal || showTextVoice) && (
+          <TextVoiceModal
+            visible={showTextVoiceModal || showTextVoice}
+            mealType={activeMealType}
+            onClose={() => {
+              setShowTextVoiceModal(false);
+              closeTextVoice();
+            }}
+          />
+        )}
 
-      {/* Modal de Comidas Frecuentes */}
-      <FavoritesModal
-        visible={showFavoritesModal || showFavorites}
-        onClose={() => {
-          setShowFavoritesModal(false);
-          closeFavorites();
-        }}
-      />
+        {/* Modal de Comidas Frecuentes */}
+        {(showFavoritesModal || showFavorites) && (
+          <FavoritesModal
+            visible={showFavoritesModal || showFavorites}
+            onClose={() => {
+              setShowFavoritesModal(false);
+              closeFavorites();
+            }}
+          />
+        )}
 
-      {/* Modal de Actividad Física y Apple Health */}
-      <ActivityModal
-        visible={showActivityModal}
-        currentBurned={burnedCalories}
-        currentSteps={steps}
-        onClose={() => setShowActivityModal(false)}
-        onSave={async (cal, st) => {
-          await logActivity({ calories: cal, steps: st });
-        }}
-      />
+        {/* Modal de Actividad Física y Apple Health */}
+        {showActivityModal && (
+          <ActivityModal
+            visible={showActivityModal}
+            currentBurned={burnedCalories}
+            currentSteps={steps}
+            onClose={() => setShowActivityModal(false)}
+            onSave={async (cal, st) => {
+              await logActivity({ calories: cal, steps: st });
+            }}
+          />
+        )}
 
-      {/* Modal de Mi Plan Maestro */}
-      <MasterPlanModal
-        visible={showMasterPlanModal}
-        onClose={() => setShowMasterPlanModal(false)}
-      />
+        {/* Modal de Mi Plan Maestro */}
+        {showMasterPlanModal && (
+          <MasterPlanModal
+            visible={showMasterPlanModal}
+            onClose={() => setShowMasterPlanModal(false)}
+          />
+        )}
 
-      {/* Modal de Racha de Hábitos (Fase 3) */}
-      <StreakModal
-        visible={showStreakModal}
-        onClose={() => setShowStreakModal(false)}
-        onLogMealPress={() => {
-          beginMeal();
-          router.push({
-            pathname: "/meal/camera",
-            params: { suggestedMealType: "almuerzo" },
-          });
-        }}
-      />
+        {/* Modal de Racha de Hábitos (Fase 3) */}
+        {showStreakModal && (
+          <StreakModal
+            visible={showStreakModal}
+            onClose={() => setShowStreakModal(false)}
+            onLogMealPress={() => {
+              beginMeal();
+              router.push({
+                pathname: "/meal/camera",
+                params: { suggestedMealType: "almuerzo" },
+              });
+            }}
+          />
+        )}
 
-      {/* Modal de Guía de la App y Explicación de Botones */}
-      <AppGuideModal
-        visible={showGuideModal}
-        onClose={() => setShowGuideModal(false)}
-      />
+        {/* Modal de Guía de la App y Explicación de Botones */}
+        {showGuideModal && (
+          <AppGuideModal
+            visible={showGuideModal}
+            onClose={() => setShowGuideModal(false)}
+          />
+        )}
+      </Suspense>
     </>
   );
 }

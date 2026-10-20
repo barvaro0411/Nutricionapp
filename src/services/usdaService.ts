@@ -3,6 +3,7 @@ import { supabase } from "./supabase";
 import { DetectedFoodItemSchema, FoodUnit, NutritionReferenceSchema } from "@/types/meal";
 import { CHILEAN_FOOD_FAMILIES } from "@/constants/chileanPresets";
 import { isLiquidFood } from "@/utils/liquidUnits";
+import { extractFunctionErrorMessage } from "@/utils/functionErrors";
 
 const SearchFoodSchema = z.object({
   fdcId: z.number().int().positive(), description: z.string().min(1).max(500), dataType: z.string(), label: z.string().min(1).max(500),
@@ -52,10 +53,10 @@ export function searchLocalChileanFoods(query: string, unit: FoodUnit): UsdaSear
           fat: variant.fatPer100g,
         },
         nutrition_reference: {
-          source: "USDA FoodData Central",
+          source: "Catálogo Chileno",
           fdc_id: fdcId,
           description: variant.food,
-          data_type: "Foundation",
+          data_type: "ChileanLocal",
           basis: itemUnit === "ml" ? "100ml" : "100g",
         },
       });
@@ -69,10 +70,7 @@ export function searchLocalChileanFoods(query: string, unit: FoodUnit): UsdaSear
 export async function searchUsdaFoods(query: string, unit: FoodUnit) {
   const { data, error } = await supabase.functions.invoke("search-foods", { body: { query, unit } });
   if (error) {
-    let message = "No se pudo consultar USDA. Inténtalo de nuevo.";
-    if (error.context instanceof Response) {
-      try { const body = await error.context.json(); if (typeof body.error?.message === "string") message = body.error.message; } catch { /* Keep the usable fallback. */ }
-    }
+    const message = await extractFunctionErrorMessage(error, "No se pudo consultar USDA. Inténtalo de nuevo.");
     throw new Error(message);
   }
   const parsed = ResponseSchema.safeParse(data);

@@ -24,6 +24,8 @@ export interface Database {
           age: number | null;
           height_cm: number | null;
           current_weight_kg: number | null;
+          target_weight_kg?: number | null;
+          ai_consent_at?: string | null;
           activity_level: "sedentary" | "light" | "moderate" | "active" | "very_active" | null;
           objective: "lose_weight" | "maintain" | "gain_muscle" | null;
           created_at: string;
@@ -37,6 +39,8 @@ export interface Database {
           age?: number | null;
           height_cm?: number | null;
           current_weight_kg?: number | null;
+          target_weight_kg?: number | null;
+          ai_consent_at?: string | null;
           activity_level?: "sedentary" | "light" | "moderate" | "active" | "very_active" | null;
           objective?: "lose_weight" | "maintain" | "gain_muscle" | null;
           created_at?: string;
@@ -50,6 +54,8 @@ export interface Database {
           age?: number | null;
           height_cm?: number | null;
           current_weight_kg?: number | null;
+          target_weight_kg?: number | null;
+          ai_consent_at?: string | null;
           activity_level?: "sedentary" | "light" | "moderate" | "active" | "very_active" | null;
           objective?: "lose_weight" | "maintain" | "gain_muscle" | null;
           updated_at?: string;
@@ -522,6 +528,7 @@ export interface Database {
           plan_id: "free" | "pro_monthly_clp" | "pro_annual_clp";
           revenuecat_customer_id: string | null;
           current_period_end: string | null;
+          trial_started_at?: string | null;
           ai_photo_scans_today: number;
           last_scan_date: string;
           created_at: string;
@@ -533,6 +540,7 @@ export interface Database {
           plan_id?: "free" | "pro_monthly_clp" | "pro_annual_clp";
           revenuecat_customer_id?: string | null;
           current_period_end?: string | null;
+          trial_started_at?: string | null;
           ai_photo_scans_today?: number;
           last_scan_date?: string;
           created_at?: string;
@@ -543,8 +551,38 @@ export interface Database {
           plan_id?: "free" | "pro_monthly_clp" | "pro_annual_clp";
           revenuecat_customer_id?: string | null;
           current_period_end?: string | null;
+          trial_started_at?: string | null;
           ai_photo_scans_today?: number;
           last_scan_date?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      weight_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          logged_date: string;
+          weight_kg: number;
+          logged_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          logged_date?: string;
+          weight_kg: number;
+          logged_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          logged_date?: string;
+          weight_kg?: number;
+          logged_at?: string;
           updated_at?: string;
         };
         Relationships: [];
@@ -579,6 +617,16 @@ export interface Database {
         Args: {
           target_user_id: string;
         };
+        Returns: Json;
+      };
+      activate_free_trial: {
+        Args: {
+          p_plan_id?: string;
+        };
+        Returns: Database["public"]["Tables"]["subscriptions"]["Row"];
+      };
+      delete_own_account: {
+        Args: Record<PropertyKey, never>;
         Returns: Json;
       };
     };

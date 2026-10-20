@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "chore/**"
+      - "feat/**"
+      - "fix/**"
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-build:
+    name: Lint, Type-Check, Tests, Edge Functions & PWA Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: "true"
+      EXPO_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: "ci-placeholder-anon-key"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Setup Deno 2
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      - name: TypeScript type-check
+        run: npm run type-check
+
+      - name: ESLint check
+        run: npm run lint
+
+      - name: Run unit and integration tests
+        run: npm test -- --runInBand
+
+      - name: Check Supabase Edge Functions (Deno)
+        run: |
+          deno check --config supabase/functions/deno.json \
+            supabase/functions/analyze-meal/index.ts \
+            supabase/functions/coach-live-session/index.ts \
+            supabase/functions/nutrition-coach/index.ts \
+            supabase/functions/parse-meal-text/index.ts \
+            supabase/functions/search-foods/index.ts
+
+      - name: Build PWA bundle
+        run: npm run build:pwa

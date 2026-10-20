@@ -40,3 +40,8 @@ auditoria/*.json
 !.env.example
 .env*
 artifacts/
+playwright-report/
+test-results/
+coverage/
+*.tsbuildinfo
+.playwright/

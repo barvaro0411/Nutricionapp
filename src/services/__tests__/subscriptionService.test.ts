@@ -2,9 +2,12 @@ import {
   getSubscription,
   checkAndIncrementAiQuota,
   activateTrial,
+  purchaseProPlan,
+  registerPaymentAdapter,
   MAX_FREE_DAILY_SCANS,
 } from "../subscriptionService";
 import { supabase } from "@/services/supabase";
+import { getDateKey } from "@/utils/dates";
 
 jest.mock("@/services/supabase", () => ({
   supabase: {
@@ -16,6 +19,7 @@ jest.mock("@/services/supabase", () => ({
 describe("subscriptionService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    registerPaymentAdapter(null);
   });
 
   describe("getSubscription", () => {
@@ -26,7 +30,8 @@ describe("subscriptionService", () => {
       expect(sub.scansRemaining).toBe(MAX_FREE_DAILY_SCANS);
     });
 
-    test("returns active Pro subscription when status is active", async () => {
+    test("returns active Pro subscription when status is active and period is valid", async () => {
+      const futureIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       (supabase.from as jest.Mock).mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
@@ -36,7 +41,7 @@ describe("subscriptionService", () => {
                 status: "active",
                 plan_id: "pro_monthly_clp",
                 ai_photo_scans_today: 12,
-                current_period_end: "2026-11-01T00:00:00Z",
+                current_period_end: futureIso,
               },
               error: null,
             }),
@@ -51,7 +56,59 @@ describe("subscriptionService", () => {
       expect(sub.scansRemaining).toBe(9999);
     });
 
-    test("calculates remaining free scans correctly for free user", async () => {
+    test("marks expired trial as non-Pro", async () => {
+      const pastIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      (supabase.from as jest.Mock).mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            maybeSingle: jest.fn().mockResolvedValue({
+              data: {
+                user_id: "expired_user",
+                status: "trialing",
+                plan_id: "pro_annual_clp",
+                trial_started_at: pastIso,
+                current_period_end: pastIso,
+                ai_photo_scans_today: 1,
+                last_scan_date: getDateKey(),
+              },
+              error: null,
+            }),
+          }),
+        }),
+      });
+
+      const sub = await getSubscription("expired_user");
+      expect(sub.isPro).toBe(false);
+      expect(sub.trialUsed).toBe(true);
+      expect(sub.scansRemaining).toBe(2);
+    });
+
+    test("resets daily scan counter when last_scan_date is from a previous day", async () => {
+      (supabase.from as jest.Mock).mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            maybeSingle: jest.fn().mockResolvedValue({
+              data: {
+                user_id: "free_user_yesterday",
+                status: "free",
+                plan_id: "free",
+                ai_photo_scans_today: 3,
+                last_scan_date: "2020-01-01",
+                current_period_end: null,
+              },
+              error: null,
+            }),
+          }),
+        }),
+      });
+
+      const sub = await getSubscription("free_user_yesterday");
+      expect(sub.isPro).toBe(false);
+      expect(sub.aiPhotoScansToday).toBe(0);
+      expect(sub.scansRemaining).toBe(MAX_FREE_DAILY_SCANS);
+    });
+
+    test("calculates remaining free scans correctly for free user today", async () => {
       (supabase.from as jest.Mock).mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
@@ -61,6 +118,7 @@ describe("subscriptionService", () => {
                 status: "free",
                 plan_id: "free",
                 ai_photo_scans_today: 2,
+                last_scan_date: getDateKey(),
                 current_period_end: null,
               },
               error: null,
@@ -72,7 +130,7 @@ describe("subscriptionService", () => {
       const sub = await getSubscription("free_user_1");
       expect(sub.isPro).toBe(false);
       expect(sub.aiPhotoScansToday).toBe(2);
-      expect(sub.scansRemaining).toBe(1); // 3 - 2 = 1
+      expect(sub.scansRemaining).toBe(1);
     });
   });
 
@@ -101,37 +159,73 @@ describe("subscriptionService", () => {
       expect(result.allowed).toBe(false);
       expect(result.remaining).toBe(0);
     });
+
+    test("throws error instead of fake success when RPC fails", async () => {
+      (supabase.rpc as jest.Mock).mockResolvedValue({
+        data: null,
+        error: { message: "No autorizado" },
+      });
+
+      await expect(checkAndIncrementAiQuota("user_123")).rejects.toThrow("No autorizado");
+    });
   });
 
   describe("activateTrial", () => {
-    test("activates a 7-day trialing subscription", async () => {
-      (supabase.from as jest.Mock).mockReturnValue({
-        upsert: jest.fn().mockReturnValue({
-          select: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { user_id: "user_trial", status: "trialing" },
-              error: null,
-            }),
-          }),
-        }),
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            maybeSingle: jest.fn().mockResolvedValue({
-              data: {
-                user_id: "user_trial",
-                status: "trialing",
-                plan_id: "pro_monthly_clp",
-                ai_photo_scans_today: 0,
-              },
-              error: null,
-            }),
-          }),
-        }),
+    test("activates a 7-day trialing subscription via server RPC", async () => {
+      const futureIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      (supabase.rpc as jest.Mock).mockResolvedValue({
+        data: {
+          user_id: "user_trial",
+          status: "trialing",
+          plan_id: "pro_annual_clp",
+          trial_started_at: new Date().toISOString(),
+          current_period_end: futureIso,
+          ai_photo_scans_today: 0,
+        },
+        error: null,
       });
 
-      const sub = await activateTrial("user_trial");
+      const sub = await activateTrial("user_trial", "pro_annual_clp");
+      expect(supabase.rpc).toHaveBeenCalledWith("activate_free_trial", {
+        p_plan_id: "pro_annual_clp",
+      });
       expect(sub.isPro).toBe(true);
       expect(sub.status).toBe("trialing");
+      expect(sub.trialUsed).toBe(true);
+    });
+
+    test("throws error when server rejects trial activation", async () => {
+      (supabase.rpc as jest.Mock).mockResolvedValue({
+        data: null,
+        error: { message: "Ya utilizaste tu prueba gratuita de 7 días en esta cuenta." },
+      });
+
+      await expect(activateTrial("user_trial")).rejects.toThrow(
+        "Ya utilizaste tu prueba gratuita de 7 días en esta cuenta."
+      );
+    });
+  });
+
+  describe("purchaseProPlan", () => {
+    test("uses registered payment adapter when configured", async () => {
+      const mockSub = {
+        userId: "u1",
+        status: "active" as const,
+        planId: "pro_annual_clp" as const,
+        isPro: true,
+        currentPeriodEnd: new Date(Date.now() + 86400000).toISOString(),
+        trialUsed: true,
+        aiPhotoScansToday: 0,
+        maxFreeScans: 3,
+        scansRemaining: 9999,
+      };
+      registerPaymentAdapter({
+        name: "revenuecat",
+        purchasePlan: jest.fn().mockResolvedValue(mockSub),
+      });
+
+      const res = await purchaseProPlan("u1", "pro_annual_clp");
+      expect(res.isPro).toBe(true);
     });
   });
 });

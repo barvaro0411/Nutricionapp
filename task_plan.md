@@ -1,59 +1,43 @@
-# Task Plan: Optimizar, limpiar y ordenar Nutricionapp
+# Task Plan: Optimizar, limpiar y ejecutar Roadmap de Nutricionapp
 
 ## Goal
-Optimizar, limpiar y organizar el proyecto Nutricionapp en la rama `chore/project-cleanup`, realizando primero una auditoría detallada, aplicando mejoras por lotes pequeños (organización/docs, código/tipos, rendimiento medido) conservando el coach, la voz, integraciones gratuitas y secretos, ejecutando verificaciones y generando el informe completo en `docs/project-cleanup-report.md`.
+Optimizar, limpiar y organizar el proyecto Nutricionapp, y ejecutar el plan de trabajo por etapas (Inmediato, Corto plazo y base técnica de Mediano plazo) conservando el coach, la voz, las integraciones gratuitas y los secretos, con verificación completa en TypeScript, ESLint, Jest, Deno y compilación PWA.
 
 ## Current Phase
-Phase 2: Lote 1 - Organización y Documentación
-
-## Next Step
-Ejecutar Lote 1: Organizar documentación y scripts, retirar dependencias sin uso verificadas (`query-string`), limpiar código huérfano y redactar `docs/project-cleanup-report.md`.
+Completado — Lista para revisión y despliegue de migración Supabase.
 
 ## Phases
 
-### Phase 1: Auditoría y Línea Base
+### Phase 1: Auditoría, Limpieza y Optimización Base
 - [x] Ejecutar verificaciones iniciales (`type-check`, `lint`, `test -- --runInBand`, `build:pwa`, `git diff --check`, Deno check)
-- [x] Analizar documentación clave (`README`, `ai-providers.md`, `coach-voice.md`, etc.) y configs
-- [x] Generar inventario de carpetas, responsabilidades, dependencias, duplicaciones y candidatos a código muerto
-- [x] Registrar línea base cuantitativa y hallazgos en `findings.md`
+- [x] Retirar dependencias y código sin uso (`query-string`, `@expo/vector-icons`, `QuickLogModal.tsx`)
+- [x] Modularizar `app/meal/review.tsx` y `app/meal/barcode.tsx` y unificar utilidades (`nutritionCalculator.ts`, `functionErrors.ts`)
+- [x] Reducir bundle web inicial con tree-shaking de íconos (`scripts/babel-icon-imports.cjs`) y carga diferida de `@zxing/library`
 - Status: complete
 
-### Phase 2: Lote 1 - Organización y Documentación
-- [ ] Retirar dependencias y código sin uso comprobados (`query-string`, `QuickLogModal.tsx`)
-- [ ] Organizar documentación y scripts por propósito conservando puntos de entrada y enlaces
-- [ ] Crear documento inicial `docs/project-cleanup-report.md` con auditoría completa
-- [ ] Ejecutar verificaciones intermedias (`type-check`, `lint`, `test`, `build:pwa`)
-- [ ] Realizar commit del Lote 1
-- Status: in_progress
+### Phase 2: Inmediato (1–3 días)
+- [x] Corregir trial y cuota en servidor (`activate_free_trial`, `check_and_increment_ai_quota`); eliminar mensaje de éxito falso en cliente/paywall
+- [x] Añadir CI en GitHub Actions (`.github/workflows/ci.yml`) con `npm ci`, `lint`, `type-check`, `tests`, `deno check` y `build:pwa`
+- [x] Actualizar `findings.md`, `progress.md` y `task_plan.md`
+- Status: complete
 
-### Phase 3: Lote 2 - Código, Tipos y Unificación
-- [ ] Unificar utilidades y tipos duplicados
-- [ ] Estandarizar manejo de errores y contratos
-- [ ] Modularizar pantallas/componentes sobredimensionados que lo justifiquen sin romper rutas de Expo Router
-- [ ] Verificar compatibilidad frontend-backend (imports compartidos desde Deno Edge Functions)
-- [ ] Ejecutar verificaciones intermedias (`type-check`, `lint`, `test`)
-- Status: pending
+### Phase 3: Corto plazo (1–2 semanas)
+- [x] Migración de procedencia para el catálogo local (`Catálogo Chileno` vs `USDA FoodData Central`) y ajuste de UI
+- [x] Tabla `public.weight_logs` con RLS y sincronización cliente/servidor en `weightService.ts`
+- [x] Eliminación de cuenta (`delete_own_account`), Política de Privacidad, Términos de Uso (`/legal`) y consentimiento explícito de IA (`AiConsentModal`, `ai_consent_at`)
+- [x] Cabecera `Content-Security-Policy` en `vercel.json`, `.gitignore` para artefactos, limpieza de `supabase/.private` y ramas locales obsoletas
+- Status: complete
 
-### Phase 4: Lote 3 - Rendimiento Medido y Dependencias
-- [ ] Analizar tamaño de bundle antes/después y re-renders
-- [ ] Optimizar memoización/consultas donde haya evidencia
-- [ ] Revisar dependencias en `package.json`
-- [ ] Registrar métricas cuantitativas antes/después
-- Status: pending
-
-### Phase 5: Verificación Integral y Reporte Final
-- [ ] Ejecutar suite completa: `type-check`, `lint`, `test -- --runInBand`, `build:pwa`, `git diff --check`
-- [ ] Comprobar tipos de las 5 Edge Functions en Deno
-- [ ] Completar `docs/project-cleanup-report.md` con evidencia, cambios, métricas y estado para revisión
-- [ ] Revisar diff final en `chore/project-cleanup` sin publicar a producción
-- Status: pending
+### Phase 4: Mediano plazo (Base técnica)
+- [x] Adaptador de pagos (`PaymentProviderAdapter` / `registerPaymentAdapter`) y flujo de suscripción en `subscriptionService.ts`
+- [x] Configuración `eas.json` para builds iOS/Android y suite E2E base con Playwright (`playwright.config.ts`, `e2e/smoke.spec.ts`)
+- [x] Desacoplamiento de `expo-av` mediante `src/utils/audioAdapter.ts` con importación dinámica
+- [x] Code splitting de la PWA (`React.lazy` en modales secundarios + chunks asíncronos) y reducción adicional del bundle inicial
+- Status: complete
 
 ## Decisions Made
 | Decision | Rationale | Impact |
 |---|---|---|
-| Usar rama `chore/project-cleanup` | Requerido por la especificación de la tarea | Aislamiento seguro sin tocar main ni producción |
-| Proteger Edge Functions y rutas de Expo Router | Edge functions importan desde `src/` y Expo Router depende de rutas en `app/` | Prevenir roturas silenciosas |
-
-## Errors Encountered
-| Error | Attempt | Resolution |
-|---|---|---|
+| Trial de 7 días controlado por servidor (`activate_free_trial`) | Evitar manipulación desde cliente y falsos positivos cuando RLS bloquea escrituras directas en `subscriptions` | 1 prueba gratuita real por cuenta y confirmación real en UI |
+| Mantener 1 llamada RPC por invocación en Edge Functions | Los tests contractuales de Edge Functions verifican una única llamada RPC (`reserve_ai_request`) por request | Compatibilidad total con la suite de pruebas de funciones |
+| Aislar `expo-av` en `src/utils/audioAdapter.ts` con `import("expo-av")` | Preparar reemplazo futuro por `expo-audio` y sacar `expo-av` del bundle inicial de la PWA | Menor peso inicial en web y punto único de cambio para audio nativo |
