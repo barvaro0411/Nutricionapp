@@ -14,9 +14,10 @@ import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
 import { isRecipeCompatible } from "@/utils/foodAlerts";
 import { colors, layout } from "@/constants/colors";
-import { DetectedFoodItem } from "@/types/meal";
+import { DetectedFoodItem, MealType } from "@/types/meal";
 import { isLiquidFood, formatQuantityDisplay } from "@/utils/liquidUnits";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Minus, Plus, Utensils } from "lucide-react-native";
 
 export default function RecipeDetailScreen() {
   const router = useRouter();
@@ -26,6 +27,15 @@ export default function RecipeDetailScreen() {
   const { initializeReview } = useMealReviewStore();
   const { restrictions } = useDietaryPreferences();
 
+  const [servingsToLog, setServingsToLog] = React.useState(1);
+  const [selectedMealType, setSelectedMealType] = React.useState<MealType>("almuerzo");
+
+  React.useEffect(() => {
+    if (recipe?.mealType) {
+      setSelectedMealType(recipe.mealType);
+    }
+  }, [recipe?.mealType]);
+
   const compatibility = React.useMemo(() => {
     if (!recipe || restrictions.length === 0) return null;
     return isRecipeCompatible(recipe, restrictions);
@@ -34,18 +44,21 @@ export default function RecipeDetailScreen() {
   const handleLogRecipe = () => {
     if (!recipe) return;
 
-    // Convertir ingredientes al formato de items de comida
+    const baseServings = Math.max(1, recipe.servings || 1);
+    const factor = servingsToLog / baseServings;
+
+    // Convertir ingredientes al formato de items de comida escalados por porción
     const detectedItems: DetectedFoodItem[] = recipe.ingredients.map((ing, idx) => {
       const isLiquid = isLiquidFood(ing.foodName);
       return {
         id: `recipe_ing_${idx}_${Date.now()}`,
         food: ing.foodName,
-        grams: ing.grams / recipe.servings,
+        grams: Math.round(ing.grams * factor),
         unit: isLiquid ? "ml" : "g",
-        calories: ing.calories / recipe.servings,
-        protein: ing.protein / recipe.servings,
-        carbs: ing.carbs / recipe.servings,
-        fat: ing.fat / recipe.servings,
+        calories: Math.round(ing.calories * factor * 10) / 10,
+        protein: Math.round(ing.protein * factor * 10) / 10,
+        carbs: Math.round(ing.carbs * factor * 10) / 10,
+        fat: Math.round(ing.fat * factor * 10) / 10,
         confidence: 1.0,
       };
     });
@@ -54,7 +67,7 @@ export default function RecipeDetailScreen() {
     initializeReview({
       imagePath: "",
       localImageUri: "",
-      mealType: recipe.mealType,
+      mealType: selectedMealType,
       items: detectedItems,
     });
 
@@ -173,9 +186,79 @@ export default function RecipeDetailScreen() {
         ))}
       </View>
 
+      {/* Selector de Porción y Momento del Día */}
+      <View style={styles.logConfigCard}>
+        <View style={styles.logConfigHeader}>
+          <Utensils size={16} color={colors.primary} />
+          <Text style={styles.logConfigTitle}>¿Cómo lo registrarás hoy?</Text>
+        </View>
+
+        {/* Tipo de comida */}
+        <Text style={styles.logConfigLabel}>MOMENTO DEL DÍA</Text>
+        <View style={styles.mealTypeChipsRow}>
+          {(
+            [
+              { key: "desayuno", label: "Desayuno" },
+              { key: "almuerzo", label: "Almuerzo" },
+              { key: "cena", label: "Once / Cena" },
+              { key: "snack", label: "Colación" },
+            ] as const
+          ).map((m) => {
+            const active = selectedMealType === m.key;
+            return (
+              <TouchableOpacity
+                key={m.key}
+                accessibilityRole="button"
+                accessibilityLabel={`Comida: ${m.label}`}
+                style={[styles.mealTypeChip, active && styles.mealTypeChipActive]}
+                onPress={() => setSelectedMealType(m.key)}
+              >
+                <Text style={[styles.mealTypeChipText, active && styles.mealTypeChipTextActive]}>
+                  {m.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Selector de porciones */}
+        <View style={styles.servingsRow}>
+          <View>
+            <Text style={styles.logConfigLabel}>PORCIONES</Text>
+            <Text style={styles.servingsCalc}>
+              ~{Math.round(recipe.caloriesPerServing * servingsToLog)} kcal en total
+            </Text>
+          </View>
+
+          <View style={styles.servingsStepper}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Restar 0.5 porción"
+              style={styles.servingsBtn}
+              onPress={() => setServingsToLog((s) => Math.max(0.5, Math.round((s - 0.5) * 10) / 10))}
+            >
+              <Minus size={15} color={colors.text} />
+            </TouchableOpacity>
+
+            <Text style={styles.servingsValue}>{servingsToLog}</Text>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Sumar 0.5 porción"
+              style={styles.servingsBtn}
+              onPress={() => setServingsToLog((s) => Math.min(6, Math.round((s + 0.5) * 10) / 10))}
+            >
+              <Plus size={15} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
       {/* Botón de acción: Registrar en comida */}
       <TouchableOpacity accessibilityRole="button" style={styles.logButton} onPress={handleLogRecipe}>
-        <Text style={styles.logButtonText}>🍽️ Registrar esta Receta en mi Día</Text>
+        <Text style={styles.logButtonText}>
+          🍽️ Registrar en mi {selectedMealType === "desayuno" ? "Desayuno" : selectedMealType === "almuerzo" ? "Almuerzo" : selectedMealType === "cena" ? "Once / Cena" : "Colación"}
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -402,5 +485,93 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#A16207",
     lineHeight: 18,
+  },
+  logConfigCard: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    marginBottom: 16,
+  },
+  logConfigHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  logConfigTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  logConfigLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  mealTypeChipsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+  mealTypeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  mealTypeChipActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  mealTypeChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  mealTypeChipTextActive: {
+    color: colors.primaryDark,
+    fontWeight: "700",
+  },
+  servingsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  servingsCalc: {
+    fontSize: 12,
+    color: colors.primaryDark,
+    fontWeight: "600",
+  },
+  servingsStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 12,
+    padding: 4,
+  },
+  servingsBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  servingsValue: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: colors.text,
+    minWidth: 28,
+    textAlign: "center",
   },
 });

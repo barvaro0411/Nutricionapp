@@ -107,12 +107,12 @@ export function WaterCard({
           disabled={loading}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Añadir 250 ml de agua"
+          accessibilityLabel="Añadir 250 ml de agua (un vaso)"
         >
-          <GlassWater size={16} color={colors.water} />
+          <GlassWater size={15} color={colors.water} />
           <View>
-            <Text style={styles.pillText}>250 ml</Text>
-            <Text style={styles.pillSubtext}>Añadir un vaso</Text>
+            <Text style={styles.pillText}>+250 ml</Text>
+            <Text style={styles.pillSubtext}>Vaso</Text>
           </View>
         </TouchableOpacity>
 
@@ -122,12 +122,27 @@ export function WaterCard({
           disabled={loading}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Añadir 500 ml de agua"
+          accessibilityLabel="Añadir 500 ml de agua (botella)"
         >
-          <Plus size={16} color={colors.water} />
+          <Plus size={15} color={colors.water} />
           <View>
-            <Text style={styles.pillText}>500 ml</Text>
-            <Text style={styles.pillSubtext}>Añadir botella</Text>
+            <Text style={styles.pillText}>+500 ml</Text>
+            <Text style={styles.pillSubtext}>Botella</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.pillBtn}
+          onPress={() => onAddWater(750)}
+          disabled={loading}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Añadir 750 ml de agua (shaker o botilito)"
+        >
+          <Droplets size={15} color={colors.water} />
+          <View>
+            <Text style={styles.pillText}>+750 ml</Text>
+            <Text style={styles.pillSubtext}>Shaker</Text>
           </View>
         </TouchableOpacity>
 
