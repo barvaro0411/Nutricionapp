@@ -146,30 +146,35 @@ export default function ProfileSetupScreen() {
     });
   };
 
+  const handleBack = () => {
+    if (isFromSettings) {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)/settings");
+      }
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Botón Volver a Ajustes */}
-      {isFromSettings ? (
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Volver a ajustes"
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft size={18} color={colors.text} />
-          <Text style={styles.backButtonText}>Volver a Ajustes</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Volver"
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft size={18} color={colors.text} />
-          <Text style={styles.backButtonText}>Atrás</Text>
-        </TouchableOpacity>
-      )}
+      {/* Botón Volver a Ajustes / Atrás */}
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={isFromSettings ? "Volver a ajustes" : "Volver"}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        style={styles.backButton}
+        onPress={handleBack}
+      >
+        <ArrowLeft size={18} color={colors.text} />
+        <Text style={styles.backButtonText}>
+          {isFromSettings ? "Volver a Ajustes" : "Atrás"}
+        </Text>
+      </TouchableOpacity>
 
       {/* Cabecera */}
       <View style={styles.header}>
@@ -546,8 +551,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     marginTop: Platform.OS === "ios" ? 18 : 12,
-    marginBottom: 12,
-    paddingVertical: 6,
+    marginBottom: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
     alignSelf: "flex-start",
   },
   backButtonText: {

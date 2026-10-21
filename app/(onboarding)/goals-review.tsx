@@ -110,8 +110,18 @@ export default function GoalsReviewScreen() {
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Volver a modificar medidas"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace({
+                pathname: "/(onboarding)/profile-setup",
+                params: { fromSettings: "true" },
+              });
+            }
+          }}
         >
           <ArrowLeft size={18} color={colors.text} />
           <Text style={styles.backButtonText}>Modificar datos</Text>
@@ -310,9 +320,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginTop: 20,
-    marginBottom: 8,
-    paddingVertical: 6,
+    marginTop: 18,
+    marginBottom: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
     alignSelf: "flex-start",
   },
   backButtonText: {
