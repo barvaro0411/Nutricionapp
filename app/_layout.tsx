@@ -96,7 +96,7 @@ function RootNavigationLayout() {
     if (!initialized || isLoading || error) return;
     const inAuth = segments[0] === "(auth)";
     const inRecovery = segments[0] === "reset-password";
-    const inLegal = segments[0] === "legal";
+    const inLegal = (segments[0] as string) === "legal";
     if (isRecoveringPassword && session) {
       if (!inRecovery) router.replace("/reset-password");
     } else if (!session) {
