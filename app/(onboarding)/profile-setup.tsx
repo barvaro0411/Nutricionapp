@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,12 +9,19 @@ import {
   Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
+import {
+  ArrowLeft,
+  Sparkles,
+  Minus,
+  Plus,
+  Info,
+  Check,
+} from "lucide-react-native";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { colors, layout } from "@/constants/colors";
 import { Gender, ActivityLevel, Objective } from "@/types/profile";
 import { parseDecimal } from "@/utils/dates";
-import { calculateNutritionGoals } from "@/utils/nutritionCalculator";
+import { calculateBMR, calculateTDEE, calculateNutritionGoals } from "@/utils/nutritionCalculator";
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
@@ -23,7 +30,7 @@ export default function ProfileSetupScreen() {
   const { profile } = useAuthStore();
 
   const [gender, setGender] = useState<Gender>(profile?.gender || "male");
-  const [age, setAge] = useState(profile?.age ? String(profile.age) : "");
+  const [age, setAge] = useState(profile?.age ? String(profile.age) : "28");
   const [heightCm, setHeightCm] = useState(profile?.height_cm ? String(profile.height_cm) : "175");
   const [weightKg, setWeightKg] = useState(profile?.current_weight_kg ? String(profile.current_weight_kg) : "75");
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>(
@@ -32,21 +39,80 @@ export default function ProfileSetupScreen() {
   const [objective, setObjective] = useState<Objective>(profile?.objective || "lose_weight");
   const [error, setError] = useState<string | null>(null);
 
-  const handleCalculateGoals = () => {
-    const parsedAge = parseDecimal(age);
-    const parsedHeight = parseDecimal(heightCm);
-    const parsedWeight = parseDecimal(weightKg);
+  // Steppers para ajustes rápidos táctiles
+  const handleAdjustValue = (
+    currentValue: string,
+    delta: number,
+    min: number,
+    max: number,
+    isFloat = false
+  ): string => {
+    const parsed = parseDecimal(currentValue) || min;
+    const next = Math.max(min, Math.min(max, parsed + delta));
+    return isFloat ? String(Math.round(next * 10) / 10) : String(Math.round(next));
+  };
 
-    if (!Number.isInteger(parsedAge) || parsedAge < 14 || parsedAge > 100) {
+  // Cálculos en vivo reactivos
+  const parsedAge = parseDecimal(age);
+  const parsedHeight = parseDecimal(heightCm);
+  const parsedWeight = parseDecimal(weightKg);
+
+  const isAgeValid = Number.isInteger(parsedAge) && parsedAge >= 14 && parsedAge <= 100;
+  const isHeightValid = !isNaN(parsedHeight) && parsedHeight >= 100 && parsedHeight <= 240;
+  const isWeightValid = !isNaN(parsedWeight) && parsedWeight >= 30 && parsedWeight <= 300;
+  const canCalculate = isAgeValid && isHeightValid && isWeightValid;
+
+  const livePreview = useMemo(() => {
+    if (!canCalculate) return null;
+
+    const heightM = parsedHeight / 100;
+    const bmi = Math.round((parsedWeight / (heightM * heightM)) * 10) / 10;
+    let bmiCategory = { label: "Saludable", color: colors.primaryDark, bg: colors.primaryLight };
+    if (bmi < 18.5) {
+      bmiCategory = { label: "Bajo peso", color: "#B45309", bg: "#FEF3C7" };
+    } else if (bmi < 25) {
+      bmiCategory = { label: "Saludable", color: colors.primaryDark, bg: colors.primaryLight };
+    } else if (bmi < 30) {
+      bmiCategory = { label: "Sobrepeso leve", color: "#B45309", bg: "#FEF3C7" };
+    } else {
+      bmiCategory = { label: "Obesidad", color: colors.danger, bg: "#FEE2E2" };
+    }
+
+    const bmr = calculateBMR(parsedWeight, parsedHeight, parsedAge, gender);
+    const tdee = calculateTDEE(bmr, activityLevel);
+
+    let targetCalories = tdee;
+    let objectiveBadge = "Mantenimiento";
+    if (objective === "lose_weight") {
+      targetCalories = Math.max(1200, tdee - Math.min(500, Math.round(tdee * 0.2)));
+      objectiveBadge = "Déficit moderado (-20%)";
+    } else if (objective === "gain_muscle") {
+      targetCalories = Math.round(tdee * 1.1);
+      objectiveBadge = "Superávit controlado (+10%)";
+    }
+
+    return {
+      bmi,
+      bmiCategory,
+      bmr,
+      tdee,
+      targetCalories,
+      objectiveBadge,
+      waterMl: Math.round(parsedWeight * 35),
+    };
+  }, [canCalculate, parsedAge, parsedHeight, parsedWeight, gender, activityLevel, objective]);
+
+  const handleCalculateGoals = () => {
+    if (!isAgeValid) {
       setError("Ingresa una edad válida (entre 14 y 100 años).");
       return;
     }
-    if (isNaN(parsedHeight) || parsedHeight < 100 || parsedHeight > 240) {
-      setError("Ingresa una estatura válida en centímetros (ej: 175).");
+    if (!isHeightValid) {
+      setError("Ingresa una estatura válida en centímetros (entre 100 y 240 cm).");
       return;
     }
-    if (isNaN(parsedWeight) || parsedWeight < 35 || parsedWeight > 250) {
-      setError("Ingresa un peso válido en kilogramos (ej: 75).");
+    if (!isWeightValid) {
+      setError("Ingresa un peso válido en kilogramos (entre 30 y 300 kg).");
       return;
     }
 
@@ -62,7 +128,6 @@ export default function ProfileSetupScreen() {
       objective,
     });
 
-    // Navegar a la pantalla de revisión de metas pasando los parámetros
     router.push({
       pathname: "/(onboarding)/goals-review",
       params: {
@@ -83,7 +148,8 @@ export default function ProfileSetupScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {isFromSettings && (
+      {/* Botón Volver a Ajustes */}
+      {isFromSettings ? (
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Volver a ajustes"
@@ -93,148 +159,373 @@ export default function ProfileSetupScreen() {
           <ArrowLeft size={18} color={colors.text} />
           <Text style={styles.backButtonText}>Volver a Ajustes</Text>
         </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <ArrowLeft size={18} color={colors.text} />
+          <Text style={styles.backButtonText}>Atrás</Text>
+        </TouchableOpacity>
       )}
+
+      {/* Cabecera */}
       <View style={styles.header}>
-        <Text style={styles.stepIndicator}>
-          {isFromSettings ? "Ajustes de Perfil" : "Paso 1 de 2"}
-        </Text>
+        <View style={styles.badgePill}>
+          <Text style={styles.stepIndicator}>
+            {isFromSettings ? "Ajustes de Perfil" : "Paso 1 de 2"}
+          </Text>
+        </View>
         <Text style={styles.title}>
-          {isFromSettings ? "Actualizar medidas y metas" : "Cuéntanos sobre ti"}
+          {isFromSettings ? "Recalibrar medidas y metas" : "Cuéntanos sobre ti"}
         </Text>
         <Text style={styles.subtitle}>
           {isFromSettings
-            ? "Modifica tu peso o nivel de actividad para recalcular tus metas automáticamente."
-            : "Usaremos tus datos para estimar una meta inicial. Podrás ajustarla cuando lo necesites."}
+            ? "Modifica tu peso o rutina para recalcular tus requerimientos con precisión médica."
+            : "Usaremos tus medidas para calcular una pauta adaptada a tu cuerpo y objetivo."}
         </Text>
       </View>
 
+      {/* Tarjeta de Previsualización Inteligente en Tiempo Real */}
+      {livePreview && (
+        <View style={styles.liveCard}>
+          <View style={styles.liveCardHeader}>
+            <View style={styles.liveCardTitleRow}>
+              <Sparkles size={16} color={colors.primaryDark} />
+              <Text style={styles.liveCardTitle}>Estimación en tiempo real</Text>
+            </View>
+            <View style={[styles.bmiPill, { backgroundColor: livePreview.bmiCategory.bg }]}>
+              <Text style={[styles.bmiPillText, { color: livePreview.bmiCategory.color }]}>
+                IMC {livePreview.bmi} · {livePreview.bmiCategory.label}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.liveMetricsGrid}>
+            <View style={styles.liveMetricItem}>
+              <Text style={styles.liveMetricLabel}>GASTO TOTAL (TDEE)</Text>
+              <Text style={styles.liveMetricValue}>{livePreview.tdee} kcal</Text>
+              <Text style={styles.liveMetricSub}>Basal: {livePreview.bmr} kcal</Text>
+            </View>
+
+            <View style={styles.liveMetricDivider} />
+
+            <View style={styles.liveMetricItem}>
+              <Text style={styles.liveMetricLabel}>META CALÓRICA</Text>
+              <Text style={[styles.liveMetricValue, { color: colors.primaryDark }]}>
+                {livePreview.targetCalories} kcal
+              </Text>
+              <Text style={styles.liveMetricSub}>{livePreview.objectiveBadge}</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       {error && (
-        <View style={styles.errorBox}>
+        <View style={styles.errorBox} accessibilityRole="alert">
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
 
-      {/* Sexo */}
+      {/* 1. SEXO BIOLÓGICO */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Sexo Biológico</Text>
-        <View style={styles.optionsRow}>
+        <View style={styles.sectionLabelRow}>
+          <Text style={styles.sectionLabel}>Sexo Biológico</Text>
+          <View style={styles.infoHintRow}>
+            <Info size={13} color={colors.textSecondary} />
+            <Text style={styles.infoHintText}>Para la fórmula metabólica</Text>
+          </View>
+        </View>
+
+        <View style={styles.genderRow}>
           {(
             [
-              { key: "male", label: "Hombre" },
-              { key: "female", label: "Mujer" },
+              { key: "male", label: "Hombre", emoji: "👨" },
+              { key: "female", label: "Mujer", emoji: "👩" },
+              { key: "other", label: "Otro / Neutro", emoji: "⚧️" },
             ] as const
-          ).map((item) => (
-            <TouchableOpacity accessibilityRole="button"
-              key={item.key}
-              style={[styles.pillOption, gender === item.key && styles.pillOptionActive]}
-              onPress={() => setGender(item.key)}
-            >
-              <Text style={[styles.pillText, gender === item.key && styles.pillTextActive]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          ).map((item) => {
+            const active = gender === item.key;
+            return (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={`Sexo biológico: ${item.label}`}
+                accessibilityState={{ selected: active }}
+                key={item.key}
+                style={[styles.genderCard, active && styles.genderCardActive]}
+                onPress={() => setGender(item.key)}
+              >
+                <Text style={styles.genderEmoji}>{item.emoji}</Text>
+                <Text style={[styles.genderLabel, active && styles.genderLabelActive]}>
+                  {item.label}
+                </Text>
+                {active && (
+                  <View style={styles.activeCheckIcon}>
+                    <Check size={12} color="#FFFFFF" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
-      {/* Medidas (Edad, Altura, Peso) */}
-      <View style={styles.measuresRow}>
-        <View style={styles.measureCol}>
-          <Text style={styles.sectionLabel}>Edad</Text>
-          <TextInput
-            style={styles.numericInput}
-            keyboardType="numeric"
-            accessibilityLabel="Edad"
-            value={age}
-            onChangeText={setAge}
-            placeholder="28"
-          />
-          <Text style={styles.unitText}>años</Text>
-        </View>
+      {/* 2. MEDIDAS CORPORALES (EDAD, ESTATURA, PESO) */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Medidas Corporales</Text>
 
-        <View style={styles.measureCol}>
-          <Text style={styles.sectionLabel}>Estatura</Text>
-          <TextInput
-            style={styles.numericInput}
-            keyboardType="numeric"
-            accessibilityLabel="Estatura en centímetros"
-            value={heightCm}
-            onChangeText={setHeightCm}
-            placeholder="175"
-          />
-          <Text style={styles.unitText}>cm</Text>
-        </View>
+        <View style={styles.measureCardsRow}>
+          {/* Edad */}
+          <View style={styles.measureCard}>
+            <Text style={styles.measureCardLabel}>EDAD</Text>
+            <View style={styles.measureStepperRow}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Restar 1 año"
+                style={styles.stepperBtn}
+                onPress={() => setAge(handleAdjustValue(age, -1, 14, 100))}
+              >
+                <Minus size={14} color={colors.text} />
+              </TouchableOpacity>
 
-        <View style={styles.measureCol}>
-          <Text style={styles.sectionLabel}>Peso actual</Text>
-          <TextInput
-            style={styles.numericInput}
-            keyboardType="decimal-pad"
-            accessibilityLabel="Peso en kilogramos"
-            value={weightKg}
-            onChangeText={setWeightKg}
-            placeholder="75"
-          />
-          <Text style={styles.unitText}>kg</Text>
+              <TextInput
+                style={styles.measureInput}
+                keyboardType="numeric"
+                accessibilityLabel="Edad en años"
+                value={age}
+                onChangeText={setAge}
+                maxLength={3}
+                placeholder="28"
+                selectTextOnFocus
+              />
+
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Sumar 1 año"
+                style={styles.stepperBtn}
+                onPress={() => setAge(handleAdjustValue(age, 1, 14, 100))}
+              >
+                <Plus size={14} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.measureUnit}>años</Text>
+          </View>
+
+          {/* Estatura */}
+          <View style={styles.measureCard}>
+            <Text style={styles.measureCardLabel}>ESTATURA</Text>
+            <View style={styles.measureStepperRow}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Restar 1 centímetro"
+                style={styles.stepperBtn}
+                onPress={() => setHeightCm(handleAdjustValue(heightCm, -1, 100, 240))}
+              >
+                <Minus size={14} color={colors.text} />
+              </TouchableOpacity>
+
+              <TextInput
+                style={styles.measureInput}
+                keyboardType="numeric"
+                accessibilityLabel="Estatura en centímetros"
+                value={heightCm}
+                onChangeText={setHeightCm}
+                maxLength={3}
+                placeholder="175"
+                selectTextOnFocus
+              />
+
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Sumar 1 centímetro"
+                style={styles.stepperBtn}
+                onPress={() => setHeightCm(handleAdjustValue(heightCm, 1, 100, 240))}
+              >
+                <Plus size={14} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.measureUnit}>cm</Text>
+          </View>
+
+          {/* Peso Actual */}
+          <View style={[styles.measureCard, styles.measureCardHighlight]}>
+            <Text style={[styles.measureCardLabel, { color: colors.primaryDark }]}>
+              PESO ACTUAL
+            </Text>
+            <View style={styles.measureStepperRow}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Restar 0.5 kg"
+                style={styles.stepperBtn}
+                onPress={() => setWeightKg(handleAdjustValue(weightKg, -0.5, 30, 300, true))}
+              >
+                <Minus size={14} color={colors.text} />
+              </TouchableOpacity>
+
+              <TextInput
+                style={[styles.measureInput, { color: colors.primaryDark }]}
+                keyboardType="decimal-pad"
+                accessibilityLabel="Peso actual en kilogramos"
+                value={weightKg}
+                onChangeText={setWeightKg}
+                maxLength={5}
+                placeholder="75"
+                selectTextOnFocus
+              />
+
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Sumar 0.5 kg"
+                style={styles.stepperBtn}
+                onPress={() => setWeightKg(handleAdjustValue(weightKg, 0.5, 30, 300, true))}
+              >
+                <Plus size={14} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.measureUnit}>kg</Text>
+          </View>
         </View>
       </View>
 
-      {/* Nivel de Actividad */}
+      {/* 3. NIVEL DE ACTIVIDAD FÍSICA */}
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Nivel de Actividad Semanal</Text>
+        <Text style={styles.sectionSublabel}>
+          Determina el multiplicador de tu gasto calórico diario.
+        </Text>
+
         {(
           [
-            { key: "sedentary", title: "Sedentario", desc: "Trabajo sentado, poco ejercicio" },
-            { key: "light", title: "Ligero", desc: "1-2 entrenamientos o caminatas por semana" },
-            { key: "moderate", title: "Moderado", desc: "3-5 entrenamientos a la semana" },
-            { key: "active", title: "Activo", desc: "6-7 sesiones o trabajo físico activo" },
+            {
+              key: "sedentary",
+              emoji: "🛋️",
+              title: "Sedentario",
+              desc: "Trabajo sentado, poco o ningún ejercicio planificado.",
+              mult: "x1.2",
+            },
+            {
+              key: "light",
+              emoji: "🚶‍♂️",
+              title: "Ligero",
+              desc: "1 a 2 días de caminata o entrenamiento por semana.",
+              mult: "x1.375",
+            },
+            {
+              key: "moderate",
+              emoji: "🏃‍♂️",
+              title: "Moderado (Recomendado)",
+              desc: "3 a 5 días de entrenamiento por semana.",
+              mult: "x1.55",
+            },
+            {
+              key: "active",
+              emoji: "⚡",
+              title: "Activo",
+              desc: "6 a 7 días de entrenamiento intenso o labor activa.",
+              mult: "x1.725",
+            },
+            {
+              key: "very_active",
+              emoji: "🏋️‍♂️",
+              title: "Muy Activo",
+              desc: "Trabajo físico pesado o entrenamientos dobles.",
+              mult: "x1.9",
+            },
           ] as const
-        ).map((item) => (
-          <TouchableOpacity accessibilityRole="button"
-            key={item.key}
-            style={[styles.cardOption, activityLevel === item.key && styles.cardOptionActive]}
-            onPress={() => setActivityLevel(item.key)}
-          >
-            <View style={styles.cardOptionRadio}>
-              {activityLevel === item.key && <View style={styles.radioDot} />}
-            </View>
-            <View style={styles.cardOptionText}>
-              <Text style={styles.cardOptionTitle}>{item.title}</Text>
-              <Text style={styles.cardOptionDesc}>{item.desc}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+        ).map((item) => {
+          const active = activityLevel === item.key;
+          return (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={`${item.title}: ${item.desc}`}
+              accessibilityState={{ selected: active }}
+              key={item.key}
+              style={[styles.cardOption, active && styles.cardOptionActive]}
+              onPress={() => setActivityLevel(item.key)}
+            >
+              <Text style={styles.cardEmoji}>{item.emoji}</Text>
+              <View style={styles.cardOptionText}>
+                <View style={styles.cardTitleRow}>
+                  <Text style={[styles.cardOptionTitle, active && styles.cardOptionTitleActive]}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.multBadge}>{item.mult}</Text>
+                </View>
+                <Text style={styles.cardOptionDesc}>{item.desc}</Text>
+              </View>
+              <View style={[styles.cardOptionRadio, active && styles.cardOptionRadioActive]}>
+                {active && <Check size={13} color="#FFFFFF" />}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* Objetivo */}
+      {/* 4. OBJETIVO NUTRICIONAL */}
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>¿Cuál es tu objetivo?</Text>
+        <Text style={styles.sectionSublabel}>
+          Ajustaremos el reparto calórico y de macronutrientes a esta meta.
+        </Text>
+
         {(
           [
-            { key: "lose_weight", title: "Bajar grasa corporal", desc: "Déficit calórico moderado" },
-            { key: "maintain", title: "Mantener mi peso", desc: "Equilibrio y recomposición" },
-            { key: "gain_muscle", title: "Aumentar masa muscular", desc: "Superávit calórico controlado" },
+            {
+              key: "lose_weight",
+              emoji: "🎯",
+              title: "Reducir grasa corporal",
+              desc: "Déficit calórico moderado (~20%) con alta proteína para proteger tu masa muscular.",
+            },
+            {
+              key: "maintain",
+              emoji: "⚖️",
+              title: "Mantener mi peso y recomposición",
+              desc: "Consumo calórico equivalente a tu gasto diario (100% TDEE).",
+            },
+            {
+              key: "gain_muscle",
+              emoji: "💪",
+              title: "Aumentar masa muscular",
+              desc: "Superávit calórico controlado (+10%) optimizado para hipertrofia y fuerza.",
+            },
           ] as const
-        ).map((item) => (
-          <TouchableOpacity accessibilityRole="button"
-            key={item.key}
-            style={[styles.cardOption, objective === item.key && styles.cardOptionActive]}
-            onPress={() => setObjective(item.key)}
-          >
-            <View style={styles.cardOptionRadio}>
-              {objective === item.key && <View style={styles.radioDot} />}
-            </View>
-            <View style={styles.cardOptionText}>
-              <Text style={styles.cardOptionTitle}>{item.title}</Text>
-              <Text style={styles.cardOptionDesc}>{item.desc}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+        ).map((item) => {
+          const active = objective === item.key;
+          return (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={`${item.title}: ${item.desc}`}
+              accessibilityState={{ selected: active }}
+              key={item.key}
+              style={[styles.cardOption, active && styles.cardOptionActive]}
+              onPress={() => setObjective(item.key)}
+            >
+              <Text style={styles.cardEmoji}>{item.emoji}</Text>
+              <View style={styles.cardOptionText}>
+                <Text style={[styles.cardOptionTitle, active && styles.cardOptionTitleActive]}>
+                  {item.title}
+                </Text>
+                <Text style={styles.cardOptionDesc}>{item.desc}</Text>
+              </View>
+              <View style={[styles.cardOptionRadio, active && styles.cardOptionRadioActive]}>
+                {active && <Check size={13} color="#FFFFFF" />}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      <TouchableOpacity accessibilityRole="button" style={styles.continueButton} onPress={handleCalculateGoals}>
+      {/* Botón de Acción Principal */}
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={isFromSettings ? "Continuar a revisar metas" : "Calcular mis metas nutricionales"}
+        style={styles.continueButton}
+        onPress={handleCalculateGoals}
+      >
         <Text style={styles.continueButtonText}>
-          {isFromSettings ? "Recalcular mis metas →" : "Calcular mis Objetivos"}
+          {isFromSettings ? "Continuar a revisión de metas →" : "Calcular mis metas nutricionales →"}
         </Text>
       </TouchableOpacity>
     </ScrollView>
@@ -254,8 +545,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginTop: Platform.OS === "ios" ? 20 : 12,
-    marginBottom: 8,
+    marginTop: Platform.OS === "ios" ? 18 : 12,
+    marginBottom: 12,
     paddingVertical: 6,
     alignSelf: "flex-start",
   },
@@ -265,19 +556,25 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   header: {
-    marginTop: Platform.OS === "ios" ? 16 : 8,
-    marginBottom: 24,
+    marginBottom: 20,
+  },
+  badgePill: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 8,
   },
   stepIndicator: {
-    color: colors.primary,
-    fontWeight: "700",
-    fontSize: 13,
+    color: colors.primaryDark,
+    fontWeight: "800",
+    fontSize: 11,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 6,
   },
   title: {
-    letterSpacing: -0.8,
+    letterSpacing: -0.6,
     fontSize: 26,
     fontWeight: "800",
     color: colors.text,
@@ -288,6 +585,76 @@ const styles = StyleSheet.create({
     marginTop: 6,
     lineHeight: 20,
   },
+  liveCard: {
+    backgroundColor: "#F0FDF4",
+    borderWidth: 1.5,
+    borderColor: "#BBF7D0",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 24,
+  },
+  liveCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: 12,
+  },
+  liveCardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  liveCardTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.primaryDark,
+    letterSpacing: 0.3,
+  },
+  bmiPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  bmiPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  liveMetricsGrid: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#DCFCE7",
+  },
+  liveMetricItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  liveMetricDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: colors.cardBorder,
+  },
+  liveMetricLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.textSecondary,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  liveMetricValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  liveMetricSub: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   errorBox: {
     backgroundColor: colors.dangerLight,
     padding: 12,
@@ -296,72 +663,135 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: colors.danger,
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 13,
+    fontWeight: "600",
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 26,
+  },
+  sectionLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
   },
   sectionLabel: {
     fontSize: 15,
     fontWeight: "700",
     color: colors.text,
-    marginBottom: 10,
   },
-  optionsRow: {
+  sectionSublabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 12,
+    marginTop: 2,
+  },
+  infoHintRow: {
     flexDirection: "row",
-    gap: 12,
-  },
-  pillOption: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.cardBorder,
-    backgroundColor: colors.card,
     alignItems: "center",
+    gap: 4,
   },
-  pillOptionActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  pillText: {
-    fontSize: 15,
-    fontWeight: "600",
+  infoHintText: {
+    fontSize: 11,
     color: colors.textSecondary,
   },
-  pillTextActive: {
+  genderRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  genderCard: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  genderCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: "#F0FDF4",
+  },
+  genderEmoji: {
+    fontSize: 22,
+    marginBottom: 4,
+  },
+  genderLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    textAlign: "center",
+  },
+  genderLabelActive: {
     color: colors.primaryDark,
     fontWeight: "700",
   },
-  measuresRow: {
+  activeCheckIcon: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  measureCardsRow: {
     flexDirection: "row",
-    gap: 12,
-    marginBottom: 24,
+    gap: 10,
   },
-  measureCol: {
+  measureCard: {
     flex: 1,
-    minWidth: 0,
-  },
-  numericInput: {
-    width: "100%",
-    minWidth: 0,
     backgroundColor: colors.card,
     borderWidth: 1.5,
     borderColor: colors.cardBorder,
-    borderRadius: 14,
-    fontSize: 20,
-    fontWeight: "700",
-    textAlign: "center",
-    paddingVertical: 14,
-    color: colors.text,
+    borderRadius: 16,
+    padding: 10,
+    alignItems: "center",
   },
-  unitText: {
-    fontSize: 12,
-    color: colors.textMuted,
+  measureCardHighlight: {
+    borderColor: "#A7F3D0",
+    backgroundColor: "#FCFDFD",
+  },
+  measureCardLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    color: colors.textSecondary,
+    marginBottom: 6,
+  },
+  measureStepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    width: "100%",
+  },
+  stepperBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  measureInput: {
+    width: 44,
+    fontSize: 18,
+    fontWeight: "800",
     textAlign: "center",
+    color: colors.text,
+    paddingVertical: 4,
+  },
+  measureUnit: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.textMuted,
     marginTop: 4,
-    fontWeight: "500",
   },
   cardOption: {
     flexDirection: "row",
@@ -372,50 +802,71 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.cardBorder,
     marginBottom: 10,
+    gap: 12,
   },
   cardOptionActive: {
     borderColor: colors.primary,
     backgroundColor: "#F0FDF4",
   },
-  cardOptionRadio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.textMuted,
-    marginRight: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
+  cardEmoji: {
+    fontSize: 22,
   },
   cardOptionText: {
     flex: 1,
   },
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
   cardOptionTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
     color: colors.text,
   },
+  cardOptionTitleActive: {
+    color: colors.primaryDark,
+  },
+  multBadge: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.primaryDark,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
   cardOptionDesc: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
+    lineHeight: 16,
+  },
+  cardOptionRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.card,
+  },
+  cardOptionRadioActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
   },
   continueButton: {
     backgroundColor: colors.primary,
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: "center",
-    marginTop: 12,
+    marginTop: 8,
   },
   continueButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
   },
 });
