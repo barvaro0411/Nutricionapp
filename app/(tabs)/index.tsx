@@ -399,11 +399,28 @@ export default function DashboardScreen() {
               )}
             </View>
 
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir comida a este día" activeOpacity={0.85}
-              onPress={() => handleAddMeal("almuerzo")} style={styles.addMealAction}>
-              <View style={styles.addMealIcon}><Plus size={21} color="white" /></View>
-              <View style={styles.addMealCopy}><Text style={styles.addMealTitle}>Añadir comida</Text><Text style={styles.addMealDescription}>Busca, escribe o fotografía tu plato</Text></View>
-              <ArrowUpRight size={21} color={colors.primary} />
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Añadir comida a este día"
+              activeOpacity={0.85}
+              onPress={() => {
+                beginMeal();
+                router.push("/(tabs)/record");
+              }}
+              style={styles.addMealAction}
+            >
+              <View style={styles.addMealIcon}>
+                <Plus size={20} color={colors.primary} />
+              </View>
+              <View style={styles.addMealCopy}>
+                <Text style={styles.addMealTitle}>Añadir comida</Text>
+                <Text style={styles.addMealDescription}>
+                  Busca alimentos, usa la cámara IA o dicta con tu voz
+                </Text>
+              </View>
+              <View style={styles.addMealArrowWrap}>
+                <ArrowUpRight size={18} color={colors.primary} />
+              </View>
             </TouchableOpacity>
             <View style={[styles.summaryLayout, wide && styles.summaryWide]}>
               <View style={styles.summaryMain}>
@@ -776,11 +793,38 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   dateRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  addMealAction: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, backgroundColor: colors.primaryLight, borderRadius: 18, marginBottom: 20, borderWidth: 1, borderColor: "#D3EADB" },
-  addMealIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  addMealAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    marginTop: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    ...shadows.card,
+  },
+  addMealIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   addMealCopy: { flex: 1, minWidth: 0 },
-  addMealTitle: { color: colors.primaryDark, fontSize: 15, fontWeight: "800" },
-  addMealDescription: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 3 },
+  addMealTitle: { color: colors.text, fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
+  addMealDescription: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  addMealArrowWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   mealsHeading: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 4, marginBottom: 18 },
   mealsDescription: { color: colors.textSecondary, fontSize: 12, marginTop: 5 },
   progressLink: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, borderRadius: 14, backgroundColor: colors.primaryLight },
