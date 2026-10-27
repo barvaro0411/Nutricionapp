@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "build": "npm run build:pwa",
+    "benchmark:chile": "node scripts/run-chilean-benchmark.cjs",
     "icons": "node scripts/generate-icons.cjs",
     "check:tooling": "node scripts/check-tooling-security.cjs",
     "postinstall": "patch-package --error-on-fail && npm run check:tooling"

@@ -2,10 +2,11 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from "react-native";
 import { colors, shadows } from "@/constants/colors";
 import { DetectedFoodItem, FoodUnit } from "@/types/meal";
-import { findFamilyForFood } from "@/constants/chileanPresets";
+import { findFamilyForFood, CHILEAN_CATALOG_METADATA } from "@/constants/chileanPresets";
 import { resolveItemUnit, getStandardPortions, parseQuantityInput } from "@/utils/liquidUnits";
 import { getVariant, DrinkVariantData } from "@/utils/drinkVariants";
 import { evaluateFoodAlerts } from "@/utils/foodAlerts";
+import { validateMacroCalorieCoherence } from "@/utils/nutritionCalculator";
 import { DietaryRestriction } from "@/types/profile";
 
 export interface MealReviewItemCardProps {
@@ -14,6 +15,7 @@ export interface MealReviewItemCardProps {
   restrictions?: DietaryRestriction[];
   inputValue?: string;
   inputError?: string;
+  rememberedGrams?: number;
   onRemove: (index: number) => void;
   onOpenUsda: (itemId: string | null) => void;
   onOpenVariants: (index: number) => void;
@@ -23,6 +25,7 @@ export interface MealReviewItemCardProps {
   onChangeQuantity: (index: number, value: string, parsedValue: number, newUnit: FoodUnit, errorMsg?: string) => void;
   onBlurQuantity: (index: number) => void;
   onSelectPortion: (index: number, amount: number) => void;
+  onReconcileCalories?: (index: number) => void;
 }
 
 export function MealReviewItemCard({
@@ -31,6 +34,7 @@ export function MealReviewItemCard({
   restrictions = [],
   inputValue,
   inputError,
+  rememberedGrams,
   onRemove,
   onOpenUsda,
   onOpenVariants,
@@ -40,6 +44,7 @@ export function MealReviewItemCard({
   onChangeQuantity,
   onBlurQuantity,
   onSelectPortion,
+  onReconcileCalories,
 }: MealReviewItemCardProps) {
   const hasVariants = !!findFamilyForFood(item.food);
   const isLowConfidence = item.confidence && item.confidence < 0.75;
@@ -48,6 +53,7 @@ export function MealReviewItemCard({
   const drinkVariant = getVariant(item.food);
   const standardPortions = getStandardPortions(itemUnit);
   const { stamps, alerts, substituteSuggestion } = evaluateFoodAlerts(item, restrictions);
+  const coherence = validateMacroCalorieCoherence(item);
 
   return (
     <View style={styles.itemCard}>
@@ -59,7 +65,7 @@ export function MealReviewItemCard({
             <View>
               <Text style={styles.nutritionSourceText}>
                 {item.nutrition_reference.source === "Catálogo Chileno"
-                  ? "Nutrientes: Catálogo Chileno · Revisa la porción"
+                  ? `Nutrientes: ${CHILEAN_CATALOG_METADATA.badgeLabel} · Revisa la porción`
                   : "Nutrientes: USDA · Revisa la porción"}
               </Text>
               <Text style={styles.nutritionSourceText}>{item.nutrition_reference.description}</Text>
@@ -72,6 +78,32 @@ export function MealReviewItemCard({
             <View style={styles.warningPill}>
               <Text style={styles.warningPillText}>⚠️ Revisa este alimento</Text>
             </View>
+          )}
+          {!coherence.coherent && coherence.expectedCalories > 0 && onReconcileCalories && (
+            <TouchableOpacity
+              style={styles.atwaterPill}
+              accessibilityRole="button"
+              accessibilityLabel={`Ajustar calorías de ${item.food} según sus macronutrientes`}
+              onPress={() => onReconcileCalories(index)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.atwaterPillText}>
+                ⚡ Macros equivalen a {Math.round(coherence.expectedCalories)} kcal (4P+4C+9G) · Toca para ajustar
+              </Text>
+            </TouchableOpacity>
+          )}
+          {rememberedGrams && Math.round(rememberedGrams) !== Math.round(item.grams) && (
+            <TouchableOpacity
+              style={styles.rememberedPill}
+              accessibilityRole="button"
+              accessibilityLabel={`Aplicar tu porción habitual de ${Math.round(rememberedGrams)} ${itemUnit}`}
+              onPress={() => onSelectPortion(index, rememberedGrams)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.rememberedPillText}>
+                🧠 Tu porción habitual: {Math.round(rememberedGrams)}{itemUnit} · Aplicar
+              </Text>
+            </TouchableOpacity>
           )}
           {(stamps.length > 0 || alerts.length > 0) && (
             <View style={styles.foodAlertsRow}>
@@ -281,6 +313,36 @@ const styles = StyleSheet.create({
   warningPillText: {
     fontSize: 11,
     color: "#92400E",
+    fontWeight: "700",
+  },
+  atwaterPill: {
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+    marginTop: 5,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  atwaterPillText: {
+    fontSize: 11,
+    color: "#1E40AF",
+    fontWeight: "700",
+  },
+  rememberedPill: {
+    backgroundColor: "#F0FDF4",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+    marginTop: 5,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
+  rememberedPillText: {
+    fontSize: 11,
+    color: "#166534",
     fontWeight: "700",
   },
   foodAlertsRow: {

@@ -4,6 +4,53 @@ export interface PortionOption {
   unit?: "g" | "ml";
 }
 
+export type ChileanCatalogSourceId = "INTA_UCHILE_2018" | "MINSAL_2010" | "RECETARIO_ESTANDAR_CL";
+
+export interface ChileanCatalogMetadata {
+  version: string;
+  updatedAt: string;
+  badgeLabel: string;
+  sources: Record<
+    ChileanCatalogSourceId,
+    {
+      name: string;
+      institution: string;
+      edition: string;
+      year: number;
+      url: string;
+    }
+  >;
+}
+
+export const CHILEAN_CATALOG_METADATA: ChileanCatalogMetadata = {
+  version: "2026.2",
+  updatedAt: "2026-10-23",
+  badgeLabel: "Catálogo Chileno (v2026.2 · INTA / Minsal)",
+  sources: {
+    INTA_UCHILE_2018: {
+      name: "Tabla de Composición Química de Alimentos Chilenos",
+      institution: "INTA - Universidad de Chile",
+      edition: "8ª edición revisada",
+      year: 2018,
+      url: "https://repositorio.uchile.cl/handle/2250/121427",
+    },
+    MINSAL_2010: {
+      name: "Base Nacional de Composición de Alimentos",
+      institution: "Ministerio de Salud de Chile (MINSAL)",
+      edition: "Actualización Nacional",
+      year: 2010,
+      url: "https://www.minsal.cl/composicion-de-alimentos/",
+    },
+    RECETARIO_ESTANDAR_CL: {
+      name: "Porciones de Intercambio y Recetario Estandarizado Chileno",
+      institution: "INTA / MINSAL",
+      edition: "Referencia Clínica 2026",
+      year: 2026,
+      url: "https://www.minsal.cl/composicion-de-alimentos/",
+    },
+  },
+};
+
 export interface FoodVariant {
   food: string;
   caloriesPer100g: number;
@@ -11,6 +58,7 @@ export interface FoodVariant {
   carbsPer100g: number;
   fatPer100g: number;
   cookingMethod?: string;
+  sourceId?: ChileanCatalogSourceId;
   portions?: PortionOption[];
 }
 
@@ -679,8 +727,196 @@ export const CHILEAN_FOOD_FAMILIES: Record<string, FoodFamily> = {
         carbsPer100g: 20,
         fatPer100g: 12.0,
         cookingMethod: "🌭 Pan alargado, vacuno, palta, tomate, mayo",
+        sourceId: "RECETARIO_ESTANDAR_CL",
         portions: [
           { label: "1 sándwich As (~250g)", grams: 250 },
+        ],
+      },
+      {
+        food: "Completo dinámico",
+        caloriesPer100g: 220,
+        proteinPer100g: 6.4,
+        carbsPer100g: 21.5,
+        fatPer100g: 12.0,
+        cookingMethod: "🌭 Pan, vienesa, palta, tomate, americana, chucrut, mayo",
+        sourceId: "RECETARIO_ESTANDAR_CL",
+        portions: [
+          { label: "1 completo dinámico (~250g)", grams: 250 },
+        ],
+      },
+      {
+        food: "Churrasco italiano",
+        caloriesPer100g: 215,
+        proteinPer100g: 11.5,
+        carbsPer100g: 18.0,
+        fatPer100g: 10.8,
+        cookingMethod: "🥪 Pan frica/marraqueta, posta a la plancha, palta, tomate, mayo",
+        sourceId: "RECETARIO_ESTANDAR_CL",
+        portions: [
+          { label: "1 churrasco mediano (~260g)", grams: 260 },
+          { label: "1 churrasco grande (~330g)", grams: 330 },
+        ],
+      },
+      {
+        food: "Barros Luco",
+        caloriesPer100g: 255,
+        proteinPer100g: 14.5,
+        carbsPer100g: 19.0,
+        fatPer100g: 13.5,
+        cookingMethod: "🥪 Pan marraqueta/molde, vacuno a la plancha y queso fundido",
+        sourceId: "RECETARIO_ESTANDAR_CL",
+        portions: [
+          { label: "1 sándwich regular (~230g)", grams: 230 },
+        ],
+      },
+      {
+        food: "Marraqueta con palta",
+        caloriesPer100g: 224,
+        proteinPer100g: 5.8,
+        carbsPer100g: 34.0,
+        fatPer100g: 7.2,
+        cookingMethod: "🥑 Pan batido con palta Hass molida",
+        sourceId: "INTA_UCHILE_2018",
+        portions: [
+          { label: "Media marraqueta con palta (~140g)", grams: 140 },
+          { label: "1 marraqueta entera con palta (~260g)", grams: 260 },
+        ],
+      },
+      {
+        food: "Humita en hoja",
+        caloriesPer100g: 145,
+        proteinPer100g: 4.0,
+        carbsPer100g: 24.5,
+        fatPer100g: 3.5,
+        cookingMethod: "🌽 Choclo molido con albahaca y cebolla cocido en chala",
+        sourceId: "INTA_UCHILE_2018",
+        portions: [
+          { label: "1 humita mediana (~220g)", grams: 220 },
+          { label: "1 humita grande (~280g)", grams: 280 },
+        ],
+      },
+      {
+        food: "Lentejas con arroz y longaniza",
+        caloriesPer100g: 138,
+        proteinPer100g: 7.8,
+        carbsPer100g: 18.0,
+        fatPer100g: 3.8,
+        cookingMethod: "🍲 Guiso casero tradicional",
+        sourceId: "MINSAL_2010",
+        portions: [
+          { label: "1 plato hondo (~350g)", grams: 350 },
+        ],
+      },
+      {
+        food: "Carbonada chilena de vacuno",
+        caloriesPer100g: 76,
+        proteinPer100g: 5.5,
+        carbsPer100g: 8.5,
+        fatPer100g: 2.2,
+        cookingMethod: "🍲 Sopa con vacuno picado, papa, zapallo, choclo y arvejas",
+        sourceId: "INTA_UCHILE_2018",
+        portions: [
+          { label: "1 plato hondo (~350g)", grams: 350 },
+        ],
+      },
+      {
+        food: "Pantrucas en caldo",
+        caloriesPer100g: 98,
+        proteinPer100g: 5.2,
+        carbsPer100g: 14.5,
+        fatPer100g: 2.1,
+        cookingMethod: "🍲 Caldo con masas de harina, papa y huevo",
+        sourceId: "MINSAL_2010",
+        portions: [
+          { label: "1 plato hondo (~350g)", grams: 350 },
+        ],
+      },
+      {
+        food: "Paila marina",
+        caloriesPer100g: 78,
+        proteinPer100g: 10.5,
+        carbsPer100g: 3.5,
+        fatPer100g: 2.4,
+        cookingMethod: "🦪 Caldo de mariscos surtidos y pescado en greda",
+        sourceId: "INTA_UCHILE_2018",
+        portions: [
+          { label: "1 paila individual (~380g)", grams: 380 },
+        ],
+      },
+      {
+        food: "Chorrillana tradicional",
+        caloriesPer100g: 235,
+        proteinPer100g: 9.8,
+        carbsPer100g: 21.0,
+        fatPer100g: 12.4,
+        cookingMethod: "🍟 Papas fritas, vacuno salteado, cebolla caramelizada y huevo frito",
+        sourceId: "RECETARIO_ESTANDAR_CL",
+        portions: [
+          { label: "Porción individual (~320g)", grams: 320 },
+        ],
+      },
+      {
+        food: "Sopaipilla tradicional con zapallo",
+        caloriesPer100g: 328,
+        proteinPer100g: 6.2,
+        carbsPer100g: 43.0,
+        fatPer100g: 14.5,
+        cookingMethod: "🎃 Masa con zapallo frita",
+        sourceId: "INTA_UCHILE_2018",
+        portions: [
+          { label: "1 sopaipilla mediana (~55g)", grams: 55 },
+          { label: "2 sopaipillas (~110g)", grams: 110 },
+        ],
+      },
+      {
+        food: "Sopaipilla pasada en chancaca",
+        caloriesPer100g: 255,
+        proteinPer100g: 3.8,
+        carbsPer100g: 41.5,
+        fatPer100g: 8.2,
+        cookingMethod: "🍯 En almíbar de chancaca con canela y cáscara de naranja",
+        sourceId: "RECETARIO_ESTANDAR_CL",
+        portions: [
+          { label: "Porción 2 unidades con salsa (~180g)", grams: 180 },
+        ],
+      },
+      {
+        food: "Mote con huesillo",
+        caloriesPer100g: 108,
+        proteinPer100g: 1.8,
+        carbsPer100g: 24.5,
+        fatPer100g: 0.3,
+        cookingMethod: "🍑 Huesillo cocido en jugo acaramelado con mote de trigo",
+        sourceId: "INTA_UCHILE_2018",
+        portions: [
+          { label: "1 vaso tradicional (300ml)", grams: 300, unit: "ml" },
+          { label: "1 vaso grande (450ml)", grams: 450, unit: "ml" },
+        ],
+      },
+      {
+        food: "Calzones rotos",
+        caloriesPer100g: 375,
+        proteinPer100g: 6.5,
+        carbsPer100g: 51.0,
+        fatPer100g: 16.0,
+        cookingMethod: "🍩 Masa dulce frita con azúcar flor",
+        sourceId: "MINSAL_2010",
+        portions: [
+          { label: "1 unidad (~50g)", grams: 50 },
+          { label: "2 unidades (~100g)", grams: 100 },
+        ],
+      },
+      {
+        food: "Leche con plátano licuada",
+        caloriesPer100g: 74,
+        proteinPer100g: 2.8,
+        carbsPer100g: 12.0,
+        fatPer100g: 1.6,
+        cookingMethod: "🍌 Batido tradicional con leche semidescremada",
+        sourceId: "INTA_UCHILE_2018",
+        portions: [
+          { label: "1 vaso (250ml)", grams: 250, unit: "ml" },
+          { label: "1 tazón grande (350ml)", grams: 350, unit: "ml" },
         ],
       },
     ],
@@ -785,7 +1021,19 @@ export function findFamilyForFood(foodName: string): FoodFamily | null {
     n.includes("carbonada") ||
     n.includes("empanada") ||
     n.includes("completo") ||
-    n.includes("as italiano")
+    n.includes("as italiano") ||
+    n.includes("churrasco italiano") ||
+    n.includes("barros luco") ||
+    n.includes("marraqueta con palta") ||
+    n.includes("humita") ||
+    n.includes("lentejas") ||
+    n.includes("pantrucas") ||
+    n.includes("paila marina") ||
+    n.includes("chorrillana") ||
+    n.includes("sopaipilla") ||
+    n.includes("mote con huesillo") ||
+    n.includes("calzones rotos") ||
+    n.includes("leche con platano")
   ) {
     return CHILEAN_FOOD_FAMILIES.platos_chilenos;
   }

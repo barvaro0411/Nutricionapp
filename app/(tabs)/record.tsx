@@ -19,9 +19,13 @@ import {
   PencilLine,
   CalendarDays,
   Check,
+  RotateCcw,
+  FileText,
 } from "lucide-react-native";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useFavoriteMeals } from "@/hooks/useFavoriteMeals";
+import { useYesterdayMeals } from "@/hooks/useYesterdayMeal";
+import { CHILEAN_CATALOG_METADATA } from "@/constants/chileanPresets";
 import { useAiConsent } from "@/hooks/useAiConsent";
 import { AiConsentModal } from "@/components/common/AiConsentModal";
 import { MealType } from "@/types/meal";
@@ -67,6 +71,8 @@ export default function RecordScreen() {
 
   const selectedDate = dateForMealRoute(params.date);
   const dateKey = getDateKey(selectedDate);
+  const { data: yesterdayMeals } = useYesterdayMeals(selectedDate);
+  const yesterdayMealForType = yesterdayMeals?.[selectedMealType];
 
   const habitualFavorite =
     favorites.find((f) => f.meal_type === selectedMealType) || favorites[0] || null;
@@ -126,6 +132,35 @@ export default function RecordScreen() {
           </View>
         </View>
 
+        {/* Repetir comida de ayer (1 toque sin llamadas a IA) */}
+        {yesterdayMealForType && (
+          <TouchableOpacity
+            style={styles.yesterdayBanner}
+            accessibilityRole="button"
+            accessibilityLabel={`Repetir comida de ayer: ${yesterdayMealForType.summaryLabel}`}
+            activeOpacity={0.85}
+            onPress={() => {
+              beginMeal();
+              useMealReviewStore.getState().loadFavoriteCombo(yesterdayMealForType, selectedMealType);
+              router.push("/meal/review");
+            }}
+          >
+            <View style={styles.yesterdayIconWrap}>
+              <RotateCcw size={18} color="#1D4ED8" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.yesterdayOverline}>REPETIR DE AYER · 1 TOQUE</Text>
+              <Text style={styles.yesterdayTitle}>
+                {yesterdayMealForType.summaryLabel}
+              </Text>
+              <Text style={styles.yesterdayMeta}>
+                {Math.round(yesterdayMealForType.total_calories)} kcal · {Math.round(yesterdayMealForType.total_protein)}g Prot · Cargar en 1 toque
+              </Text>
+            </View>
+            <ChevronRight size={18} color="#1D4ED8" />
+          </TouchableOpacity>
+        )}
+
         {/* Predicción de comida habitual por horario (1 toque sin llamadas a IA) */}
         {habitualFavorite && (
           <TouchableOpacity
@@ -159,7 +194,7 @@ export default function RecordScreen() {
         <Text style={styles.sectionTitle}>2. Añade lo que comiste</Text>
         <TouchableOpacity style={styles.searchCard} accessibilityRole="button" accessibilityLabel="Buscar un alimento" activeOpacity={0.85}
           onPress={() => { beginMeal(); setShowSearchModal(true); }}>
-          <View style={styles.searchTop}><View style={styles.searchIcon}><Search size={24} color={colors.mint} /></View><View style={styles.catalogBadge}><Text style={styles.catalogBadgeText}>CATÁLOGO CHILENO + USDA</Text></View></View>
+          <View style={styles.searchTop}><View style={styles.searchIcon}><Search size={24} color={colors.mint} /></View><View style={styles.catalogBadge}><Text style={styles.catalogBadgeText}>{CHILEAN_CATALOG_METADATA.badgeLabel.toUpperCase()}</Text></View></View>
           <Text style={styles.searchTitle}>Encuentra tu alimento</Text>
           <Text style={styles.searchDescription}>Busca en español, elige cómo está preparado y ajusta tu porción.</Text>
           <View style={styles.searchField}><Search size={17} color={colors.primary} /><Text style={styles.searchPlaceholder}>Arroz cocido, pollo, yogur…</Text><ChevronRight size={18} color={colors.primary} /></View>
@@ -204,6 +239,42 @@ export default function RecordScreen() {
             </Text>
           </View>
           <ChevronRight size={18} color={colors.primary} />
+        </TouchableOpacity>
+
+        {/* 2. Lector de Etiqueta Nutricional con IA */}
+        <TouchableOpacity
+          style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Leer etiqueta nutricional con IA"
+          onPress={() => {
+            beginMeal();
+            if (!hasConsent) {
+              setPendingAiAction("camera");
+              return;
+            }
+            router.push({
+              pathname: "/meal/camera",
+              params: { suggestedMealType: selectedMealType, mode: "nutrition_label" },
+            });
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: "#FDF2F8" }]}>
+            <FileText size={22} color="#DB2777" />
+          </View>
+          <View style={styles.methodInfo}>
+            <View style={styles.titleRow}>
+              <Text style={styles.methodTitle}>Foto a Etiqueta Nutricional</Text>
+              <View style={[styles.featuredBadge, { backgroundColor: "#DB2777" }]}>
+                <Sparkles size={11} color="#FFFFFF" />
+                <Text style={styles.featuredBadgeText}>CON IA</Text>
+              </View>
+            </View>
+            <Text style={styles.methodDesc}>
+              Apunta a la tabla nutricional del envase para extraer calorías y macros exactos.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
         {/* 2. Escribir o Dictar por Voz */}
@@ -399,6 +470,42 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   habitualMeta: {
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  yesterdayBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1.5,
+    borderColor: "#BFDBFE",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 14,
+  },
+  yesterdayIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#DBEAFE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  yesterdayOverline: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    color: "#1D4ED8",
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  yesterdayTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  yesterdayMeta: {
     fontSize: 11.5,
     color: colors.textSecondary,
     marginTop: 2,
