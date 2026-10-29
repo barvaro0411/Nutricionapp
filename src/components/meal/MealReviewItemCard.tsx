@@ -6,6 +6,7 @@ import { findFamilyForFood, CHILEAN_CATALOG_METADATA } from "@/constants/chilean
 import { resolveItemUnit, getStandardPortions, parseQuantityInput } from "@/utils/liquidUnits";
 import { getVariant, DrinkVariantData } from "@/utils/drinkVariants";
 import { evaluateFoodAlerts } from "@/utils/foodAlerts";
+import { ChileanWarningStamps } from "@/components/food/ChileanWarningStamps";
 import { validateMacroCalorieCoherence } from "@/utils/nutritionCalculator";
 import { DietaryRestriction } from "@/types/profile";
 
@@ -105,13 +106,11 @@ export function MealReviewItemCard({
               </Text>
             </TouchableOpacity>
           )}
-          {(stamps.length > 0 || alerts.length > 0) && (
+          {stamps.length > 0 && (
+            <ChileanWarningStamps stamps={stamps} compact showZeroNotice={false} />
+          )}
+          {alerts.length > 0 && (
             <View style={styles.foodAlertsRow}>
-              {stamps.map((stamp) => (
-                <View key={stamp.stamp} style={styles.stampBadge}>
-                  <Text style={styles.stampText}>{stamp.label}</Text>
-                </View>
-              ))}
               {alerts.map((alert, aIdx) => (
                 <View
                   key={aIdx}

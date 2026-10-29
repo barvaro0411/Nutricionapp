@@ -14,6 +14,7 @@ import { BarcodeProduct } from "@/services/barcodeService";
 import { FoodUnit } from "@/types/meal";
 import { DietaryRestriction } from "@/types/profile";
 import { evaluateFoodAlerts } from "@/utils/foodAlerts";
+import { ChileanWarningStamps } from "@/components/food/ChileanWarningStamps";
 import {
   parseQuantityInput,
   getStandardPortions,
@@ -75,13 +76,16 @@ export function ScannedProductSheet({
         {product.brand ? <Text style={styles.productBrand}>{product.brand}</Text> : null}
         <Text style={styles.productCode}>Código: {product.barcode}</Text>
 
-        {(productAlerts.stamps.length > 0 || productAlerts.alerts.length > 0) && (
+        {/* Sellos negros oficiales de la Ley 20.606 */}
+        <View style={styles.stampsContainer}>
+          <ChileanWarningStamps
+            stamps={productAlerts.stamps}
+            showZeroNotice={true}
+          />
+        </View>
+
+        {productAlerts.alerts.length > 0 && (
           <View style={styles.productAlertsRow}>
-            {productAlerts.stamps.map((stamp) => (
-              <View key={stamp.stamp} style={styles.stampBadge}>
-                <Text style={styles.stampText}>{stamp.label}</Text>
-              </View>
-            ))}
             {productAlerts.alerts.map((alert, aIdx) => (
               <View
                 key={aIdx}
@@ -318,6 +322,10 @@ const styles = StyleSheet.create({
   productCode: {
     fontSize: 11,
     color: colors.textMuted,
+  },
+  stampsContainer: {
+    marginTop: 8,
+    marginBottom: 4,
   },
   productAlertsRow: {
     flexDirection: "row",

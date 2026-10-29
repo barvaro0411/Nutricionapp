@@ -7,8 +7,9 @@ import {
   loggedAtForDate,
   APP_TIME_ZONE,
 } from "@/utils/dates";
-import { showAlert } from "@/utils/alerts";
+import { showAlert, showToast } from "@/utils/alerts";
 import React, { useState, useEffect, useMemo, Suspense, lazy } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { adjustGoalsForActivity } from "@/utils/nutritionCalculator";
 import {
   View,
@@ -40,8 +41,10 @@ import {
 } from "lucide-react-native";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useWaterTracker } from "@/hooks/useWaterTracker";
+import { useYesterdayMeals, YesterdayMealOption } from "@/hooks/useYesterdayMeal";
 import { useActivitySync } from "@/hooks/useActivitySync";
 import { useAdaptiveReminders } from "@/hooks/useAdaptiveReminders";
+import { saveMealToDatabase } from "@/services/mealService";
 import { DailySummary } from "@/components/dashboard/DailySummary";
 import { DayStrip } from "@/components/dashboard/DayStrip";
 import { MealCard } from "@/components/dashboard/MealCard";
@@ -71,7 +74,7 @@ const StreakModal = lazy(() =>
 const AppGuideModal = lazy(() =>
   import("@/components/dashboard/AppGuideModal").then((m) => ({ default: m.AppGuideModal }))
 );
-import { MealType } from "@/types/meal";
+import { MealType, DetectedFoodItem } from "@/types/meal";
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -79,8 +82,12 @@ export default function DashboardScreen() {
   const { width } = useWindowDimensions();
   const wide = width >= 820;
   const compact = width < 380;
+  const user = useAuthStore((state) => state.user);
   const profile = useAuthStore((state) => state.profile);
+  const queryClient = useQueryClient();
   const { data: personalPlan } = usePersonalPlan();
+  const { data: yesterdayMeals } = useYesterdayMeals(selectedDate);
+  const [repeatingType, setRepeatingType] = useState<MealType | null>(null);
   const beginMeal = () => {
     useMealReviewStore.getState().reset();
     useMealReviewStore.getState().setLoggedAt(loggedAtForDate(selectedDate));
@@ -145,6 +152,56 @@ export default function DashboardScreen() {
       pathname: "/(tabs)/record",
       params: { mealType, date: getDateKey(selectedDate) },
     });
+  };
+
+  const handleRepeatYesterday = async (yesterdayMeal: YesterdayMealOption) => {
+    if (!user) {
+      showAlert("Iniciar sesión", "Inicia sesión para registrar comidas.");
+      return;
+    }
+    setRepeatingType(yesterdayMeal.meal_type);
+    try {
+      const items: DetectedFoodItem[] = yesterdayMeal.items.map((i, idx) => ({
+        id: `repeat_${Date.now()}_${idx}`,
+        food: i.food_name,
+        grams: i.grams,
+        unit: i.unit,
+        calories: i.calories,
+        protein: i.protein,
+        carbs: i.carbs,
+        fat: i.fat,
+        confidence: 1.0,
+        nutrition_reference: i.nutrition_reference,
+      }));
+
+      await saveMealToDatabase({
+        userId: user.id,
+        mealType: yesterdayMeal.meal_type,
+        imagePath: null,
+        items,
+        totals: {
+          calories: yesterdayMeal.total_calories,
+          protein: yesterdayMeal.total_protein,
+          carbs: yesterdayMeal.total_carbs,
+          fat: yesterdayMeal.total_fat,
+        },
+        notes: `Repetido de ayer: ${yesterdayMeal.summaryLabel}`,
+        loggedAt: loggedAtForDate(selectedDate),
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
+      showToast(`¡${yesterdayMeal.summaryLabel} guardado en 1 toque!`);
+    } catch (err: any) {
+      showAlert("Error", err?.message || "No se pudo guardar la comida.");
+    } finally {
+      setRepeatingType(null);
+    }
+  };
+
+  const handleCustomizeYesterday = (yesterdayMeal: YesterdayMealOption) => {
+    beginMeal();
+    useMealReviewStore.getState().loadFavoriteCombo(yesterdayMeal, yesterdayMeal.meal_type);
+    router.push("/meal/review");
   };
 
   const handleSuggestMeal = (mealType: MealType) => {
@@ -393,6 +450,10 @@ export default function DashboardScreen() {
                       meals={data?.meals || []}
                       onAddPress={handleAddMeal}
                       onSuggestMeal={handleSuggestMeal}
+                      yesterdayMeal={yesterdayMeals?.[type]}
+                      onRepeatYesterday={handleRepeatYesterday}
+                      onCustomizeYesterday={handleCustomizeYesterday}
+                      isRepeating={repeatingType === type}
                     />
                   </View>
                 ),
