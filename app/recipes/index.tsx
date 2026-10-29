@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,10 +10,22 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ArrowLeft, ArrowUpRight, ChefHat, Clock3 } from "lucide-react-native";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  ChefHat,
+  Clock3,
+  ShoppingBasket,
+  Check,
+  Plus,
+} from "lucide-react-native";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
 import { isRecipeCompatible } from "@/utils/foodAlerts";
+import { useShoppingListStore } from "@/stores/useShoppingListStore";
+import { buildShoppingList } from "@/utils/shoppingListUtils";
+import { ShoppingListModal } from "@/components/recipes/ShoppingListModal";
+import { showToast } from "@/utils/alerts";
 import {
   PageHeading,
   FormField,
@@ -41,8 +53,25 @@ export default function RecipesCatalogScreen() {
   const [selectedType, setSelectedType] = useState<MealType | undefined>();
   const [filterCompatibleOnly, setFilterCompatibleOnly] = useState(false);
   const [search, setSearch] = useState("");
+  const [showShoppingModal, setShowShoppingModal] = useState(false);
   const { restrictions } = useDietaryPreferences();
   const { data: recipes, isLoading, error, refetch } = useRecipes(selectedType);
+  const {
+    plannedRecipes,
+    checkedMap,
+    customItems,
+    hydrate,
+    toggleRecipeInList,
+  } = useShoppingListStore();
+
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  const shoppingItems = useMemo(
+    () => buildShoppingList(plannedRecipes, checkedMap, customItems),
+    [plannedRecipes, checkedMap, customItems]
+  );
 
   const filtered = (recipes || []).filter((recipe) => {
     const matchesSearch = normalize(recipe.title + " " + recipe.description).includes(
@@ -65,22 +94,68 @@ export default function RecipesCatalogScreen() {
       ]}
       keyboardShouldPersistTaps="handled"
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Volver a mi día"
-        onPress={() =>
-          router.canGoBack() ? router.back() : router.replace("/(tabs)")
-        }
-        style={styles.back}
-      >
-        <ArrowLeft size={18} color={colors.primary} />
-        <Text style={styles.backText}>Volver</Text>
-      </Pressable>
+      <View style={styles.topActionsRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Volver a mi día"
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace("/(tabs)")
+          }
+          style={styles.back}
+        >
+          <ArrowLeft size={18} color={colors.primary} />
+          <Text style={styles.backText}>Volver</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Abrir lista de compras para la feria y supermercado"
+          onPress={() => setShowShoppingModal(true)}
+          style={styles.shoppingHeaderBtn}
+        >
+          <ShoppingBasket size={17} color="#FFFFFF" />
+          <Text style={styles.shoppingHeaderBtnText}>
+            Lista de Compras
+            {shoppingItems.length > 0 ? ` (${shoppingItems.length})` : ""}
+          </Text>
+        </Pressable>
+      </View>
+
       <PageHeading
         eyebrow="Un poco de inspiración"
         title="Ideas para tu próxima comida"
         description="Recetas para variar tu rutina, disfrutar lo que comes y conocer sus nutrientes."
       />
+
+      {/* Banner de Planificación Semanal */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Planificar compras de la semana para la feria y supermercado"
+        onPress={() => setShowShoppingModal(true)}
+        style={styles.plannerBanner}
+      >
+        <View style={styles.plannerIconWrap}>
+          <ShoppingBasket size={22} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.plannerOverline}>
+            FERIA LIBRE Y SUPERMERCADO
+          </Text>
+          <Text style={styles.plannerTitle}>
+            {plannedRecipes.length > 0
+              ? `${plannedRecipes.length} ${
+                  plannedRecipes.length === 1 ? "receta" : "recetas"
+                } en tu lista (${shoppingItems.length} ingredientes)`
+              : "Planifica tus compras de la semana"}
+          </Text>
+          <Text style={styles.plannerDesc}>
+            {plannedRecipes.length > 0
+              ? "Toca para revisar, tachar en el súper o compartir por WhatsApp."
+              : "Suma tus recetas favoritas con '+ Lista' y agruparemos verduras, carnes y abarrotes automáticamente."}
+          </Text>
+        </View>
+        <ArrowUpRight size={18} color={colors.primary} />
+      </Pressable>
       <FormField
         label="Buscar recetas"
         placeholder="Ej: pollo, avena, porotos…"
@@ -249,10 +324,56 @@ export default function RecipesCatalogScreen() {
                   </Text>
                 </View>
                 <View style={styles.cardFooter}>
-                  <Text style={styles.details}>
-                    Ver ingredientes y preparación
-                  </Text>
-                  <ArrowUpRight size={17} color={colors.primary} />
+                  <View style={styles.detailsRow}>
+                    <Text style={styles.details}>
+                      Ver ingredientes y preparación
+                    </Text>
+                    <ArrowUpRight size={17} color={colors.primary} />
+                  </View>
+                  {(() => {
+                    const inList = plannedRecipes.some((r) => r.recipe.id === recipe.id);
+                    return (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          inList
+                            ? `Quitar ${recipe.title} de la lista de compras`
+                            : `Agregar ${recipe.title} a la lista de compras`
+                        }
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          const added = toggleRecipeInList(recipe);
+                          showToast({
+                            type: added ? "success" : "info",
+                            title: added
+                              ? "¡Sumada a tu Lista de Compras!"
+                              : "Quitada de tu lista",
+                            message: added
+                              ? `Se agregaron los ingredientes de "${recipe.title}".`
+                              : `Se quitaron los ingredientes de "${recipe.title}".`,
+                          });
+                        }}
+                        style={[
+                          styles.addToListBtn,
+                          inList && styles.addToListBtnActive,
+                        ]}
+                      >
+                        {inList ? (
+                          <Check size={13} color={colors.primaryDark} strokeWidth={3} />
+                        ) : (
+                          <Plus size={13} color={colors.primary} strokeWidth={2.5} />
+                        )}
+                        <Text
+                          style={[
+                            styles.addToListBtnText,
+                            inList && styles.addToListBtnTextActive,
+                          ]}
+                        >
+                          {inList ? "En tu lista" : "Lista de compras"}
+                        </Text>
+                      </Pressable>
+                    );
+                  })()}
                 </View>
               </Pressable>
             ))}
@@ -260,19 +381,28 @@ export default function RecipesCatalogScreen() {
         </>
       )}
 
+      <ShoppingListModal
+        visible={showShoppingModal}
+        onClose={() => setShowShoppingModal(false)}
+      />
     </ScrollView>
   );
 }
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { ...layout.page },
+  topActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 16,
+  },
   back: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     minHeight: 40,
-    alignSelf: "flex-start",
-    marginBottom: 16,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 12,
@@ -281,6 +411,58 @@ const styles = StyleSheet.create({
     borderColor: colors.cardBorder,
   },
   backText: { fontSize: 13, fontWeight: "600", color: colors.text },
+  shoppingHeaderBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    minHeight: 40,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+  },
+  shoppingHeaderBtnText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  plannerBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: colors.primaryGhost,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  plannerIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  plannerOverline: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.primary,
+    letterSpacing: 0.7,
+    marginBottom: 2,
+  },
+  plannerTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  plannerDesc: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+    lineHeight: 17,
+  },
   filters: { gap: 8, paddingBottom: 12, marginBottom: 10 },
   chip: {
     minHeight: 44,
@@ -372,10 +554,42 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8,
+    flexWrap: "wrap",
+    gap: 10,
     paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: colors.cardBorder,
   },
-  details: { flex: 1, fontSize: 12, fontWeight: "600", color: colors.primary },
+  detailsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+    minWidth: 140,
+  },
+  details: { fontSize: 12, fontWeight: "600", color: colors.primary },
+  addToListBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+    borderRadius: 10,
+    backgroundColor: colors.primaryGhost,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
+  addToListBtnActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  addToListBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  addToListBtnTextActive: {
+    color: colors.primaryDark,
+    fontWeight: "800",
+  },
 });

@@ -1,9 +1,12 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { Sparkles, ArrowRight, Bot } from "lucide-react-native";
+import { Sparkles, ArrowRight, Bot, Volume2, Square, CheckCircle2, Lightbulb } from "lucide-react-native";
 import { colors, shadows } from "@/constants/colors";
+import { useCoachSpeech } from "@/hooks/useCoachSpeech";
+import { buildDailyClosingSummary } from "@/utils/dailyClosingUtils";
 
 interface SmartCoachCardProps {
+  userName?: string | null;
   consumedCalories: number;
   goalCalories: number;
   remainingCalories: number;
@@ -26,6 +29,7 @@ interface CoachInsight {
 }
 
 export function SmartCoachCard({
+  userName,
   consumedCalories,
   goalCalories,
   remainingCalories,
@@ -37,6 +41,48 @@ export function SmartCoachCard({
   mealCount,
   onAskCoach,
 }: SmartCoachCardProps) {
+  const speech = useCoachSpeech();
+  const [showClosing, setShowClosing] = useState(false);
+
+  const closingSummary = useMemo(
+    () =>
+      buildDailyClosingSummary({
+        userName,
+        consumedCalories,
+        goalCalories,
+        consumedProtein,
+        goalProtein,
+        waterMl,
+        targetWaterMl,
+        mealCount,
+      }),
+    [
+      userName,
+      consumedCalories,
+      goalCalories,
+      consumedProtein,
+      goalProtein,
+      waterMl,
+      targetWaterMl,
+      mealCount,
+    ]
+  );
+
+  const isSpeakingClosing = speech.speakingId === "daily-closing";
+
+  const handleToggleClosingAudio = () => {
+    if (!showClosing) {
+      setShowClosing(true);
+      if (speech.supported) {
+        speech.toggle("daily-closing", closingSummary.spokenText);
+      }
+      return;
+    }
+    if (speech.supported) {
+      speech.toggle("daily-closing", closingSummary.spokenText);
+    }
+  };
+
   const currentHour = new Date().getHours();
   const calPct = goalCalories > 0 ? (consumedCalories / goalCalories) * 100 : 0;
   const proteinPct = goalProtein > 0 ? (consumedProtein / goalProtein) * 100 : 0;
@@ -132,29 +178,124 @@ export function SmartCoachCard({
       <Text style={styles.title}>{insight.title}</Text>
       <Text style={styles.message}>{insight.message}</Text>
 
-      {/* Botón de Acción a Coach */}
-      <TouchableOpacity
-        style={styles.actionBtn}
-        onPress={() => onAskCoach(insight.prompt)}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel={`Preguntar al coach: ${insight.prompt}`}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 7, flex: 1 }}>
-          <Sparkles size={15} color="#FFFFFF" />
-          <Text style={styles.actionBtnText} numberOfLines={1}>
-            Preguntarle al Coach
+      {/* Botones de Acción: Preguntar al Coach + Audio-Cierre del Día */}
+      <View style={styles.actionsRow}>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => onAskCoach(insight.prompt)}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`Preguntar al coach: ${insight.prompt}`}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 7, flex: 1 }}>
+            <Sparkles size={15} color="#FFFFFF" />
+            <Text style={styles.actionBtnText} numberOfLines={1}>
+              Preguntarle al Coach
+            </Text>
+          </View>
+          <ArrowRight size={15} color="#FFFFFF" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.audioCloseBtn,
+            isSpeakingClosing && styles.audioCloseBtnActive,
+          ]}
+          onPress={handleToggleClosingAudio}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="¿Cómo estuvo mi día? Escuchar audio-cierre del día con el Coach IA"
+        >
+          {isSpeakingClosing ? (
+            <Square size={15} color={colors.danger} />
+          ) : (
+            <Volume2 size={16} color={colors.primary} />
+          )}
+          <Text
+            style={[
+              styles.audioCloseBtnText,
+              isSpeakingClosing && { color: colors.danger },
+            ]}
+          >
+            {isSpeakingClosing ? "Detener voz" : "¿Cómo estuvo mi día?"}
           </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Tarjeta expandible de Audio-Cierre del Día */}
+      {showClosing && (
+        <View style={styles.closingBox}>
+          <View style={styles.closingHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.closingOverline}>
+                🎙️ AUDIO-CIERRE DEL DÍA · COACH IA
+              </Text>
+              <Text style={styles.closingHeadline}>{closingSummary.headline}</Text>
+            </View>
+            <View style={styles.closingBadge}>
+              <Text style={styles.closingBadgeText}>{closingSummary.badgeText}</Text>
+            </View>
+          </View>
+
+          <View style={styles.closingPointRow}>
+            <CheckCircle2 size={15} color={colors.primary} style={{ marginTop: 2 }} />
+            <Text style={styles.closingPointText}>{closingSummary.achievement}</Text>
+          </View>
+
+          <View style={styles.closingPointRow}>
+            <Lightbulb size={15} color="#D97706" style={{ marginTop: 2 }} />
+            <Text style={styles.closingPointText}>{closingSummary.tomorrowTip}</Text>
+          </View>
+
+          <View style={styles.closingFooter}>
+            {speech.supported && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={
+                  isSpeakingClosing ? "Detener narración" : "Escuchar resumen en voz alta"
+                }
+                onPress={() =>
+                  speech.toggle("daily-closing", closingSummary.spokenText)
+                }
+                style={styles.listenAgainBtn}
+              >
+                {isSpeakingClosing ? (
+                  <Square size={13} color={colors.danger} />
+                ) : (
+                  <Volume2 size={14} color={colors.primary} />
+                )}
+                <Text
+                  style={[
+                    styles.listenAgainText,
+                    isSpeakingClosing && { color: colors.danger },
+                  ]}
+                >
+                  {isSpeakingClosing ? "Escuchando…" : "Escuchar con voz"}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Conversar mi cierre del día con el Coach IA"
+              onPress={() => {
+                speech.stop();
+                onAskCoach(closingSummary.coachPrompt);
+              }}
+              style={styles.deepDiveBtn}
+            >
+              <Text style={styles.deepDiveText}>Profundizar con Coach ›</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        <ArrowRight size={15} color="#FFFFFF" />
-      </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 22,
     padding: 18,
     marginVertical: 12,
@@ -177,7 +318,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#DCFCE7",
+    borderColor: colors.cardBorder,
   },
   aiTagText: {
     fontSize: 11,
@@ -206,13 +347,20 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginBottom: 16,
   },
+  actionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   actionBtn: {
+    flex: 1,
+    minWidth: 170,
     backgroundColor: colors.primary,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 11,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     borderRadius: 14,
     ...shadows.glow,
   },
@@ -220,5 +368,110 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "800",
+  },
+  audioCloseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    borderRadius: 14,
+    backgroundColor: colors.primaryGhost,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  audioCloseBtnActive: {
+    backgroundColor: colors.dangerLight,
+    borderColor: colors.danger,
+  },
+  audioCloseBtnText: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    color: colors.primaryDark,
+  },
+  closingBox: {
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: colors.primaryGhost,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    gap: 10,
+  },
+  closingHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  closingOverline: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.primary,
+    letterSpacing: 0.7,
+    marginBottom: 2,
+  },
+  closingHeadline: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  closingBadge: {
+    backgroundColor: colors.card,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  closingBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.primaryDark,
+  },
+  closingPointRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  closingPointText: {
+    flex: 1,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.text,
+  },
+  closingFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.cardBorder,
+  },
+  listenAgainBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 9,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  listenAgainText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  deepDiveBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  deepDiveText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.primaryDark,
   },
 });

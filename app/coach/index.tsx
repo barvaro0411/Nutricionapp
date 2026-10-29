@@ -337,6 +337,7 @@ export default function CoachChatScreen() {
   };
 
   const quickPrompts = [
+    { title: "¿Cómo estuvo mi día?", description: "Balance y cierre del día", prompt: "Hazme el cierre de mi día según mis comidas y agua registradas hoy, felicitándome por mis avances y dándome un consejo práctico para mañana.", Icon: Sparkles },
     { title: "Ideas para cenar", description: "Según tus registros", prompt: "¿Qué puedo cenar con las calorías que me faltan hoy?", Icon: Utensils },
     { title: "Mi proteína", description: "Revisa tu meta de hoy", prompt: "¿Cómo voy con mi meta de proteína de hoy?", Icon: Target },
     { title: "Una colación", description: "Opciones con proteína", prompt: "Recomiéndame un snack chileno alto en proteína", Icon: Apple },

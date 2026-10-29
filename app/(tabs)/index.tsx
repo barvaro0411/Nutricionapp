@@ -38,7 +38,10 @@ import {
   HelpCircle,
   Plus,
   ArrowUpRight,
+  Moon,
+  Sun,
 } from "lucide-react-native";
+import { useThemeStore } from "@/stores/useThemeStore";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useWaterTracker } from "@/hooks/useWaterTracker";
 import { useYesterdayMeals, YesterdayMealOption } from "@/hooks/useYesterdayMeal";
@@ -84,7 +87,14 @@ export default function DashboardScreen() {
   const compact = width < 380;
   const user = useAuthStore((state) => state.user);
   const profile = useAuthStore((state) => state.profile);
+  const { isDark, toggleDark } = useThemeStore();
   const queryClient = useQueryClient();
+  const [selectedDate, setSelectedDate] = useState<Date>(() =>
+    dateForMealRoute(params.date),
+  );
+  useEffect(() => {
+    if (params.date) setSelectedDate(dateForMealRoute(params.date));
+  }, [params.date]);
   const { data: personalPlan } = usePersonalPlan();
   const { data: yesterdayMeals } = useYesterdayMeals(selectedDate);
   const [repeatingType, setRepeatingType] = useState<MealType | null>(null);
@@ -92,12 +102,6 @@ export default function DashboardScreen() {
     useMealReviewStore.getState().reset();
     useMealReviewStore.getState().setLoggedAt(loggedAtForDate(selectedDate));
   };
-  const [selectedDate, setSelectedDate] = useState<Date>(() =>
-    dateForMealRoute(params.date),
-  );
-  useEffect(() => {
-    if (params.date) setSelectedDate(dateForMealRoute(params.date));
-  }, [params.date]);
   const { showTextVoice, showFavorites, closeTextVoice, closeFavorites } =
     useQuickLogStore();
   const [showTextVoiceModal, setShowTextVoiceModal] = useState(false);
@@ -165,7 +169,7 @@ export default function DashboardScreen() {
         id: `repeat_${Date.now()}_${idx}`,
         food: i.food_name,
         grams: i.grams,
-        unit: i.unit,
+        unit: i.unit || "g",
         calories: i.calories,
         protein: i.protein,
         carbs: i.carbs,
@@ -186,11 +190,15 @@ export default function DashboardScreen() {
           fat: yesterdayMeal.total_fat,
         },
         notes: `Repetido de ayer: ${yesterdayMeal.summaryLabel}`,
-        loggedAt: loggedAtForDate(selectedDate),
+        loggedAt: new Date(loggedAtForDate(selectedDate)),
       });
 
       await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
-      showToast(`¡${yesterdayMeal.summaryLabel} guardado en 1 toque!`);
+      showToast({
+        type: "success",
+        title: "¡Guardado en 1 toque!",
+        message: `${yesterdayMeal.summaryLabel} (${Math.round(yesterdayMeal.total_calories)} kcal)`,
+      });
     } catch (err: any) {
       showAlert("Error", err?.message || "No se pudo guardar la comida.");
     } finally {
@@ -296,6 +304,21 @@ export default function DashboardScreen() {
             )}
           </View>
           <View style={styles.headerRightActions}>
+            <TouchableOpacity
+              style={styles.helpGuideBtn}
+              onPress={toggleDark}
+              activeOpacity={0.8}
+              accessibilityLabel={
+                isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"
+              }
+              accessibilityRole="button"
+            >
+              {isDark ? (
+                <Sun size={18} color={colors.primary} />
+              ) : (
+                <Moon size={18} color={colors.primary} />
+              )}
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.helpGuideBtn}
               onPress={() => setShowGuideModal(true)}
@@ -579,6 +602,7 @@ export default function DashboardScreen() {
                   <>
                     {/* Smart Coach Proactivo (Fase 3) */}
                     <SmartCoachCard
+                      userName={profile?.full_name}
                       consumedCalories={data?.consumed.calories || 0}
                       goalCalories={adjustedGoals.calories}
                       remainingCalories={Math.max(0, adjustedGoals.calories - (data?.consumed.calories || 0))}

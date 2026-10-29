@@ -17,7 +17,10 @@ import { colors, layout } from "@/constants/colors";
 import { DetectedFoodItem, MealType } from "@/types/meal";
 import { isLiquidFood, formatQuantityDisplay } from "@/utils/liquidUnits";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Minus, Plus, Utensils } from "lucide-react-native";
+import { Minus, Plus, Utensils, ShoppingBasket, Check } from "lucide-react-native";
+import { useShoppingListStore } from "@/stores/useShoppingListStore";
+import { ShoppingListModal } from "@/components/recipes/ShoppingListModal";
+import { showToast } from "@/utils/alerts";
 
 export default function RecipeDetailScreen() {
   const router = useRouter();
@@ -26,9 +29,15 @@ export default function RecipeDetailScreen() {
   const { data: recipe, isLoading, error } = useRecipeDetail(id || "");
   const { initializeReview } = useMealReviewStore();
   const { restrictions } = useDietaryPreferences();
+  const { plannedRecipes, hydrate, addOrUpdateRecipe } = useShoppingListStore();
 
   const [servingsToLog, setServingsToLog] = React.useState(1);
   const [selectedMealType, setSelectedMealType] = React.useState<MealType>("almuerzo");
+  const [showShoppingModal, setShowShoppingModal] = React.useState(false);
+
+  React.useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
 
   React.useEffect(() => {
     if (recipe?.mealType) {
@@ -260,6 +269,46 @@ export default function RecipeDetailScreen() {
           🍽️ Registrar en mi {selectedMealType === "desayuno" ? "Desayuno" : selectedMealType === "almuerzo" ? "Almuerzo" : selectedMealType === "cena" ? "Once / Cena" : "Colación"}
         </Text>
       </TouchableOpacity>
+
+      {/* Botón de Lista de Compras */}
+      {(() => {
+        const inList = plannedRecipes.some((r) => r.recipe.id === recipe.id);
+        return (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Agregar ingredientes a mi Lista de Compras"
+            style={[
+              styles.shoppingListBtn,
+              inList && styles.shoppingListBtnActive,
+            ]}
+            onPress={() => {
+              addOrUpdateRecipe(recipe, servingsToLog);
+              showToast({
+                type: "success",
+                title: "¡Ingredientes en tu Lista!",
+                message: `Se sumaron ${servingsToLog} porciones de "${recipe.title}" para la feria y supermercado.`,
+              });
+              setShowShoppingModal(true);
+            }}
+          >
+            {inList ? (
+              <Check size={17} color={colors.primaryDark} strokeWidth={3} />
+            ) : (
+              <ShoppingBasket size={17} color={colors.primary} />
+            )}
+            <Text style={styles.shoppingListBtnText}>
+              {inList
+                ? `En tu Lista de Compras (${servingsToLog} porc.) · Ver lista`
+                : `🛒 Sumar ingredientes a mi Lista de Compras (${servingsToLog} porc.)`}
+            </Text>
+          </TouchableOpacity>
+        );
+      })()}
+
+      <ShoppingListModal
+        visible={showShoppingModal}
+        onClose={() => setShowShoppingModal(false)}
+      />
     </ScrollView>
   );
 }
@@ -573,5 +622,28 @@ const styles = StyleSheet.create({
     color: colors.text,
     minWidth: 28,
     textAlign: "center",
+  },
+  shoppingListBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 50,
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    marginTop: 10,
+    backgroundColor: colors.primaryGhost,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  shoppingListBtnActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primaryDark,
+  },
+  shoppingListBtnText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.primaryDark,
   },
 });

@@ -26,6 +26,9 @@ import {
   Utensils,
   Activity,
   History,
+  Moon,
+  Sun,
+  Smartphone,
 } from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -33,6 +36,7 @@ import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
 import { useAiConsent } from "@/hooks/useAiConsent";
 import { useWeightTracker } from "@/hooks/useWeightTracker";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
+import { useThemeStore, ThemeMode } from "@/stores/useThemeStore";
 import { DietaryRestriction, DIETARY_RESTRICTION_LABELS } from "@/types/profile";
 import {
   getReminderPreferences,
@@ -54,6 +58,7 @@ export default function SettingsScreen() {
   const { hasConsent, setConsent, isUpdating: isUpdatingConsent } = useAiConsent();
   const { stats, logWeight, updateTargetWeight } = useWeightTracker();
   const { data: dailyNutrition } = useDailyNutrition();
+  const { mode: themeMode, isDark, setMode: setThemeMode } = useThemeStore();
 
   const [reminders, setReminders] = useState<MealReminderConfig[]>(
     DEFAULT_CHILEAN_REMINDERS
@@ -518,6 +523,48 @@ export default function SettingsScreen() {
             </Text>
           </View>
         </View>
+      </View>
+
+      {/* SECCIÓN: APARIENCIA Y MODO OSCURO */}
+      <Text style={styles.sectionTitle}>Apariencia y Confort Visual</Text>
+      <Text style={styles.sectionDescription}>
+        Elige entre el tema claro o el modo Bosque Nocturno para registrar la once o la cena sin cansar la vista.
+      </Text>
+      <View style={styles.themeCard}>
+        <View style={styles.themeOptionsRow}>
+          {(
+            [
+              { key: "light" as ThemeMode, label: "Claro", desc: "Fresco y luminoso", Icon: Sun },
+              { key: "dark" as ThemeMode, label: "Oscuro", desc: "Bosque nocturno", Icon: Moon },
+              { key: "system" as ThemeMode, label: "Automático", desc: "Según tu equipo", Icon: Smartphone },
+            ]
+          ).map(({ key, label, desc, Icon }) => {
+            const active = themeMode === key;
+            return (
+              <Pressable
+                key={key}
+                accessibilityRole="button"
+                accessibilityLabel={`Tema ${label}`}
+                accessibilityState={{ selected: active }}
+                onPress={() => setThemeMode(key)}
+                style={[styles.themeOptionBtn, active && styles.themeOptionBtnActive]}
+              >
+                <View style={[styles.themeIconCircle, active && styles.themeIconCircleActive]}>
+                  <Icon size={18} color={active ? "#FFFFFF" : colors.primary} />
+                </View>
+                <Text style={[styles.themeOptionTitle, active && styles.themeOptionTitleActive]}>
+                  {label}
+                </Text>
+                <Text style={styles.themeOptionDesc}>{desc}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.themeStatusHint}>
+          {isDark
+            ? "🌙 Modo Bosque Nocturno activo · Descanso visual activado"
+            : "☀️ Modo Claro activo · Contraste diurno"}
+        </Text>
       </View>
 
       {/* 3. SECCIÓN: PREFERENCIAS Y ALÉRGENOS */}
@@ -1240,5 +1287,64 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: "center",
     marginTop: 20,
+  },
+  themeCard: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    marginBottom: 8,
+    gap: 12,
+  },
+  themeOptionsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  themeOptionBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 15,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    gap: 6,
+  },
+  themeOptionBtnActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  themeIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  themeIconCircleActive: {
+    backgroundColor: colors.primary,
+  },
+  themeOptionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  themeOptionTitleActive: {
+    color: colors.primaryDark,
+    fontWeight: "800",
+  },
+  themeOptionDesc: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    textAlign: "center",
+  },
+  themeStatusHint: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    textAlign: "center",
   },
 });
