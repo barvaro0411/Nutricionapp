@@ -1,6 +1,8 @@
 import { ApiError, type ServerClient } from "./http.ts";
 import { APP_TIME_ZONE, getDateKey, getDayRange, getWeekday } from "../../../src/utils/dates.ts";
 import { remainingNutrition, sumNutrition } from "./nutritionMath.ts";
+import { extractDietaryPreferences } from "./dietaryPreferences.ts";
+import { countCompletedHabits, resolveDayPlanTargets, sanitizeCheckedItems } from "../../../src/utils/personalPlan.ts";
 interface CoachMeal {
   meal_type?: string;
   total_calories: number; total_protein: number; total_carbs: number; total_fat: number;
@@ -12,7 +14,7 @@ export async function loadCoachContext(client: ServerClient, userId: string, now
   const dateKey = getDateKey(now);
   const mealColumns: string = scope === "full" ? "meal_type,total_calories,total_protein,total_carbs,total_fat,meal_items(food_name,grams,unit)" : "total_calories,total_protein,total_carbs,total_fat";
   const [profile, goal, meals, history, personalPlan, activity, water] = await Promise.all([
-    scope === "full" ? client.from("profiles").select("objective,current_weight_kg,height_cm").eq("id", userId).single() : Promise.resolve({ data: null, error: null }),
+    scope === "full" ? client.from("profiles").select("objective,current_weight_kg,height_cm,dietary_restrictions,custom_allergies").eq("id", userId).single() : Promise.resolve({ data: null, error: null }),
     client.from("goals").select("*").eq("user_id", userId).eq("is_active", true).maybeSingle(),
     client.from("meals").select(mealColumns).eq("user_id", userId).gte("logged_at", start).lt("logged_at", end).order("logged_at").returns<CoachMeal[]>(),
     scope === "full" ? client.from("coach_messages").select("role,content").eq("user_id", userId).order("created_at", { ascending: false }).order("role", { ascending: true }).limit(6) : Promise.resolve({ data: [], error: null }),
@@ -24,17 +26,48 @@ export async function loadCoachContext(client: ServerClient, userId: string, now
   if (!goal.data) throw new ApiError(400, "GOALS_REQUIRED", "Configura tus metas antes de consultar al coach.");
   let target = goal.data;
   const plan = personalPlan.data?.plan;
-  const standard = plan?.dailyGoals?.standard;
-  const matchDay = plan?.dailyGoals?.matchDay;
-  if (getWeekday(now) === 0 && standard && matchDay && target.calories === standard.calories && target.protein_g === standard.proteinG && target.carbs_g === standard.carbsG && target.fat_g === standard.fatG) {
-    target = { ...target, calories: matchDay.calories, protein_g: matchDay.proteinG, carbs_g: matchDay.carbsG, fat_g: matchDay.fatG };
+  const resolvedTarget = resolveDayPlanTargets(plan, getWeekday(now), {
+    calories: Number(target.calories),
+    proteinG: Number(target.protein_g),
+    carbsG: Number(target.carbs_g),
+    fatG: Number(target.fat_g),
+  });
+  if (resolvedTarget.isMatchDay) {
+    target = {
+      ...target,
+      calories: resolvedTarget.calories,
+      protein_g: resolvedTarget.proteinG,
+      carbs_g: resolvedTarget.carbsG,
+      fat_g: resolvedTarget.fatG,
+    };
   }
+
+  let todayChecklist: { completedCount: number; totalItems: number; pct: number } | null = null;
+  if (scope === "full" && Array.isArray(plan?.dailyChecklist) && plan.dailyChecklist.length > 0) {
+    try {
+      const checklistRes = await client
+        .from("plan_daily_checklists")
+        .select("checked_items")
+        .eq("user_id", userId)
+        .eq("plan_date", dateKey)
+        .maybeSingle();
+      if (!checklistRes?.error) {
+        const checked = sanitizeCheckedItems(checklistRes?.data?.checked_items);
+        todayChecklist = countCompletedHabits(checked, plan.dailyChecklist);
+      }
+    } catch {
+      // Best-effort context enrichment; ignore if table or mock lacks daily checklists.
+    }
+  }
+
   const consumed = sumNutrition((meals.data || []).map(m => ({ calories: Number(m.total_calories), protein: Number(m.total_protein), carbs: Number(m.total_carbs), fat: Number(m.total_fat) })));
   const remaining = remainingNutrition({ calories: Number(target.calories), protein: Number(target.protein_g), carbs: Number(target.carbs_g), fat: Number(target.fat_g) }, consumed, Number(activity.data?.active_calories_burned || 0));
-  const compactPlan = plan ? { objective: plan.user?.objectiveTitle, dailyGoals: plan.dailyGoals, mealSchedule: plan.mealSchedule, supplements: plan.supplements, dailyChecklist: plan.dailyChecklist,
+  const compactPlan = plan ? { objective: plan.user?.objectiveTitle, dailyGoals: plan.dailyGoals, isMatchDayToday: resolvedTarget.isMatchDay, todayChecklist, mealSchedule: plan.mealSchedule, supplements: plan.supplements, dailyChecklist: plan.dailyChecklist,
     weeklyRoutine: Array.isArray(plan.weeklyRoutine) ? plan.weeklyRoutine.map(({ day, activity, goal, intensity }: { day: string; activity: string; goal: string; intensity: string }) => ({ day, activity, goal, intensity })) : [] } : null;
+  const dietaryPreferences = scope === "full" ? extractDietaryPreferences(profile.data) : null;
   const context = { date: dateKey, weekday: new Intl.DateTimeFormat("es-CL", { weekday: "long", timeZone: APP_TIME_ZONE }).format(now),
     profile: { objective: profile.data?.objective, current_weight_kg: profile.data?.current_weight_kg, height_cm: profile.data?.height_cm },
+    ...(dietaryPreferences ? { dietaryPreferences } : {}),
     target: { calories: target.calories, protein_g: target.protein_g, carbs_g: target.carbs_g, fat_g: target.fat_g }, consumed, remaining,
     meals: scope === "full" ? (meals.data || []).map(meal => ({ type: meal.meal_type,
       nutrients: { calories: meal.total_calories, protein: meal.total_protein, carbs: meal.total_carbs, fat: meal.total_fat },

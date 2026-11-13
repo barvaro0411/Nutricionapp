@@ -57,6 +57,8 @@ jobs:
           deno check --config supabase/functions/deno.json \
             supabase/functions/analyze-meal/index.ts \
             supabase/functions/coach-live-session/index.ts \
+            supabase/functions/generate-personal-plan/index.ts \
+            supabase/functions/generate-recipe/index.ts \
             supabase/functions/nutrition-coach/index.ts \
             supabase/functions/parse-meal-text/index.ts \
             supabase/functions/search-foods/index.ts

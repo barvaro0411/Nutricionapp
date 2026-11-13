@@ -98,3 +98,48 @@ export const DIETARY_RESTRICTION_LABELS: Record<
     description: "Alerta ante mariscos, crustáceos o pescados",
   },
 };
+
+export const CUSTOM_ALLERGY_MAX_ITEMS = 15;
+export const CUSTOM_ALLERGY_MAX_LENGTH = 60;
+
+export interface DietaryPreferences {
+  restrictions: DietaryRestriction[];
+  customAllergies: string[];
+}
+
+export function normalizeDietaryRestrictions(values: unknown): DietaryRestriction[] {
+  if (!Array.isArray(values)) return [];
+  const seen = new Set<DietaryRestriction>();
+  for (const item of values) {
+    const parsed = DietaryRestrictionSchema.safeParse(item);
+    if (parsed.success && !seen.has(parsed.data)) {
+      seen.add(parsed.data);
+    }
+  }
+  return Array.from(seen);
+}
+
+export function normalizeCustomAllergies(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const raw of values) {
+    if (typeof raw !== "string") continue;
+    const cleaned = raw.trim().replace(/\s+/g, " ").slice(0, CUSTOM_ALLERGY_MAX_LENGTH).trim();
+    if (!cleaned) continue;
+
+    const dedupeKey = cleaned
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    if (seen.has(dedupeKey)) continue;
+
+    seen.add(dedupeKey);
+    normalized.push(cleaned);
+    if (normalized.length >= CUSTOM_ALLERGY_MAX_ITEMS) break;
+  }
+
+  return normalized;
+}
+

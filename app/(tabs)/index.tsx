@@ -48,6 +48,7 @@ import { MealCard } from "@/components/dashboard/MealCard";
 import { WaterCard } from "@/components/dashboard/WaterCard";
 import { StreakBadge } from "@/components/dashboard/StreakBadge";
 import { SmartCoachCard } from "@/components/dashboard/SmartCoachCard";
+import { MasterPlanCard } from "@/components/dashboard/MasterPlanCard";
 import { OfflineBanner } from "@/components/common/OfflineBanner";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { StateCard } from "@/components/common/AppUI";
@@ -64,6 +65,11 @@ const FavoritesModal = lazy(() =>
 );
 const MasterPlanModal = lazy(() =>
   import("@/components/dashboard/MasterPlanModal").then((m) => ({ default: m.MasterPlanModal }))
+);
+const MasterPlanBuilderModal = lazy(() =>
+  import("@/components/dashboard/MasterPlanBuilderModal").then((m) => ({
+    default: m.MasterPlanBuilderModal,
+  }))
 );
 const StreakModal = lazy(() =>
   import("@/components/dashboard/StreakModal").then((m) => ({ default: m.StreakModal }))
@@ -97,6 +103,7 @@ export default function DashboardScreen() {
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [showMasterPlanModal, setShowMasterPlanModal] = useState(false);
+  const [showMasterPlanBuilder, setShowMasterPlanBuilder] = useState(false);
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [showDays, setShowDays] = useState(false);
@@ -565,38 +572,13 @@ export default function DashboardScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Banner Mi Plan Maestro */}
-                {personalPlan && (
-                  <TouchableOpacity
-                    style={styles.masterPlanBanner}
-                    onPress={() => setShowMasterPlanModal(true)}
-                    activeOpacity={0.85}
-                  >
-                    <View style={styles.masterPlanBadge}>
-                      <Target size={18} color="#FFFFFF" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        <Text style={styles.masterPlanTitle}>
-                          Mi Plan Maestro
-                        </Text>
-                        <View style={styles.masterPlanPill}>
-                          <Text style={styles.masterPlanPillText}>Activo</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.masterPlanSubtitle}>
-                        {personalPlan.user.objectiveTitle}
-                      </Text>
-                    </View>
-                    <ChevronRight size={18} color={colors.primary} />
-                  </TouchableOpacity>
-                )}
+                {/* Plan Maestro + Checklist Diario */}
+                <MasterPlanCard
+                  plan={personalPlan ?? null}
+                  selectedDate={selectedDate}
+                  onOpenPlan={() => setShowMasterPlanModal(true)}
+                  onOpenBuilder={() => setShowMasterPlanBuilder(true)}
+                />
               </View>
             </View>
 
@@ -646,7 +628,21 @@ export default function DashboardScreen() {
         {showMasterPlanModal && (
           <MasterPlanModal
             visible={showMasterPlanModal}
+            selectedDate={selectedDate}
             onClose={() => setShowMasterPlanModal(false)}
+            onOpenBuilder={() => {
+              setShowMasterPlanModal(false);
+              setShowMasterPlanBuilder(true);
+            }}
+          />
+        )}
+
+        {/* Asistente / Editor de Plan Maestro */}
+        {showMasterPlanBuilder && (
+          <MasterPlanBuilderModal
+            visible={showMasterPlanBuilder}
+            existingPlan={personalPlan ?? null}
+            onClose={() => setShowMasterPlanBuilder(false)}
           />
         )}
 

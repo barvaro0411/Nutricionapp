@@ -5,6 +5,7 @@ import { getDateKey, getDayRange, getWeekday } from "@/utils/dates";
 import { usePersonalPlan } from "@/hooks/usePersonalPlan";
 import { MealWithItems, parseNutritionReference } from "@/types/meal";
 import { isLiquidFood } from "@/utils/liquidUnits";
+import { resolveDayPlanTargets } from "@/utils/personalPlan";
 
 export function useDailyNutrition(selectedDate: Date = new Date()) {
   const user = useAuthStore((state) => state.user);
@@ -74,24 +75,21 @@ export function useDailyNutrition(selectedDate: Date = new Date()) {
         await Promise.all([goalQuery, mealsQuery]);
       if (goalErr) throw new Error("No se pudieron cargar tus metas.");
       if (!goalData) throw new Error("Completa tus metas para ver el resumen.");
-      let goal = goalData;
-      if (
-        personalPlan &&
-        getWeekday(selectedDate) === 0 &&
-        goalData.calories === personalPlan.dailyGoals.standard.calories &&
-        goalData.protein_g === personalPlan.dailyGoals.standard.proteinG &&
-        goalData.carbs_g === personalPlan.dailyGoals.standard.carbsG &&
-        goalData.fat_g === personalPlan.dailyGoals.standard.fatG
-      ) {
-        const planGoal = personalPlan.dailyGoals.matchDay;
-        goal = {
-          ...goalData,
-          calories: planGoal.calories,
-          protein_g: planGoal.proteinG,
-          carbs_g: planGoal.carbsG,
-          fat_g: planGoal.fatG,
-        };
-      }
+      const resolvedPlanGoal = resolveDayPlanTargets(personalPlan, getWeekday(selectedDate), {
+        calories: goalData.calories,
+        proteinG: goalData.protein_g,
+        carbsG: goalData.carbs_g,
+        fatG: goalData.fat_g,
+      });
+      const goal = resolvedPlanGoal.isMatchDay
+        ? {
+            ...goalData,
+            calories: resolvedPlanGoal.calories,
+            protein_g: resolvedPlanGoal.proteinG,
+            carbs_g: resolvedPlanGoal.carbsG,
+            fat_g: resolvedPlanGoal.fatG,
+          }
+        : goalData;
 
       if (primaryQuery.error) {
         // Fallback defensivo si la migración de la columna 'unit' aún no se ha ejecutado en Supabase

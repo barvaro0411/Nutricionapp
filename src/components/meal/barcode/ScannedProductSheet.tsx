@@ -23,6 +23,7 @@ import {
 export interface ScannedProductSheetProps {
   product: BarcodeProduct;
   restrictions: DietaryRestriction[];
+  customAllergies?: string[];
   portionGrams: string;
   portionUnit: FoodUnit;
   onChangePortionGrams: (val: string) => void;
@@ -35,6 +36,7 @@ export interface ScannedProductSheetProps {
 export function ScannedProductSheet({
   product,
   restrictions,
+  customAllergies = [],
   portionGrams,
   portionUnit,
   onChangePortionGrams,
@@ -56,7 +58,8 @@ export function ScannedProductSheet({
       grams: 100,
       unit: portionUnit || product.unit,
     },
-    restrictions
+    restrictions,
+    customAllergies
   );
 
   return (

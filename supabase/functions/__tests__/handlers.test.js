@@ -115,3 +115,41 @@ test("missing session rejects before reading the request; wrong HTTP method reje
   expect((await handleRequest(new Request("https://test", { method: "POST", body: "{}" }))).status).toBe(401);
   expect((await handleRequest(new Request("https://test"))).status).toBe(405);
 });
+
+test("parse-meal-text includes dietary note without extra RPC quota calls and helper degrades gracefully", async () => {
+  const { formatCompactDietaryNote, loadUserDietaryPreferencesBestEffort } = require("../_shared/dietaryPreferences.ts");
+  const failingClient = {
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => { throw new Error("db unavailable"); } }) }) }),
+  };
+  await expect(loadUserDietaryPreferencesBestEffort(failingClient, "u1")).resolves.toBeNull();
+  const longNote = formatCompactDietaryNote({
+    restrictions: ["lactose_intolerance", "celiac_gluten", "vegan"],
+    customAllergies: Array.from({ length: 15 }, (_, i) => `ingrediente_muy_largo_${i}`),
+  });
+  expect(longNote.length).toBeLessThanOrEqual(220);
+
+  const prevFrom = client.from;
+  try {
+    client.from = () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({
+            data: { dietary_restrictions: ["lactose_intolerance"], custom_allergies: ["huevo"] },
+            error: null,
+          }),
+        }),
+      }),
+    });
+    const output = { meal_type_guess: "desayuno", items: [{ food: "Café con leche", grams: 200, unit: "ml", calories: 90, protein: 4, carbs: 8, fat: 4 }] };
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(output) }] } }] })));
+    const { handleRequest } = require("../parse-meal-text/index.ts");
+    const res = await handleRequest(request({ text: "Desayuné café con leche" }));
+    expect(res.status).toBe(200);
+    expect(client.rpc).toHaveBeenCalledTimes(1);
+    const bodyText = String(fetchMock.mock.calls[0][1].body);
+    expect(bodyText).toContain("Restricciones: Sin lactosa. Alergias/evitar: huevo");
+  } finally {
+    if (prevFrom === undefined) delete client.from;
+    else client.from = prevFrom;
+  }
+});

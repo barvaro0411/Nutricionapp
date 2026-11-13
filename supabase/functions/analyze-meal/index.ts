@@ -9,6 +9,7 @@ import { getGeminiKey } from "../_shared/gemini.ts";
 import { resolveItemUnit } from "../_shared/liquidUnits.ts";
 import { enrichWithUsda } from "../_shared/usdaSearch.ts";
 import { sumNutrition } from "../_shared/nutritionMath.ts";
+import { formatCompactDietaryNote, loadUserDietaryPreferencesBestEffort } from "../_shared/dietaryPreferences.ts";
 import type { VisionProvider } from "./providers/provider.interface.ts";
 
 export async function handleRequest(req: Request) {
@@ -35,12 +36,15 @@ export async function handleRequest(req: Request) {
     if (photo.size > 5 * 1024 * 1024) throw new ApiError(413, "IMAGE_TOO_LARGE", "La foto supera los 5 MB.");
     if (!["image/jpeg", "image/png", "image/webp"].includes(photo.type)) throw new ApiError(400, "INVALID_IMAGE", "Usa una foto JPG, PNG o WebP.");
     await reserveAiRequest(client, user.id);
+    const dietaryNote = mode === "nutrition_label"
+      ? undefined
+      : formatCompactDietaryNote(await loadUserDietaryPreferencesBestEffort(client, user.id));
     const bytes = new Uint8Array(await photo.arrayBuffer());
     const chunks: string[] = [];
     for (let i = 0; i < bytes.length; i += 8192) chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
     const image = btoa(chunks.join(""));
     const analysis = await withAiFallback(providers.map(selected => ({ id: selected.name, managedHealth: true,
-      run: (timeoutMs: number) => selected.analyzeImage(image, photo.type, systemPrompt, client_time_iso, user_note, timeoutMs),
+      run: (timeoutMs: number) => selected.analyzeImage(image, photo.type, systemPrompt, client_time_iso, user_note, timeoutMs, dietaryNote),
     })), { timeoutMs: 36000, perProviderMs: 18000 });
     if (!analysis.data.items.length) throw new ApiError(422, "NO_FOOD_DETECTED", "No se detectaron alimentos. Prueba con otra foto.");
     if (mode === "nutrition_label" && (analysis.data.items.length !== 1 || analysis.data.items[0].grams <= 0)) {

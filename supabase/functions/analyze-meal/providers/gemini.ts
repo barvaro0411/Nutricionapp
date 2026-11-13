@@ -6,11 +6,11 @@ import { ApiError } from "../../_shared/http.ts";
 export class GeminiVisionProvider implements VisionProvider {
   readonly name = Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite";
   constructor(private apiKey: string) {}
-  async analyzeImage(imageBase64: string, mimeType: string, systemPrompt: string, clientTimeIso?: string, userNote?: string, timeoutMs = 18000): Promise<VisionProviderResult> {
+  async analyzeImage(imageBase64: string, mimeType: string, systemPrompt: string, clientTimeIso?: string, userNote?: string, timeoutMs = 18000, dietaryNote?: string): Promise<VisionProviderResult> {
     const result = await callGemini(this.apiKey, {
       contents: [{ role: "user", parts: [
         { text: systemPrompt },
-        { text: JSON.stringify({ client_time_iso: clientTimeIso, user_note: userNote }) },
+        { text: JSON.stringify({ client_time_iso: clientTimeIso, user_note: userNote, ...(dietaryNote ? { dietary_preferences: dietaryNote } : {}) }) },
         { inline_data: { mime_type: mimeType, data: imageBase64 } },
       ] }],
       generationConfig: { response_mime_type: "application/json", temperature: 0.1, maxOutputTokens: 4096 },

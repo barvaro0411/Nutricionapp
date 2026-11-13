@@ -26,6 +26,8 @@ export interface Database {
           current_weight_kg: number | null;
           target_weight_kg?: number | null;
           ai_consent_at?: string | null;
+          dietary_restrictions?: string[] | null;
+          custom_allergies?: string[] | null;
           activity_level: "sedentary" | "light" | "moderate" | "active" | "very_active" | null;
           objective: "lose_weight" | "maintain" | "gain_muscle" | null;
           created_at: string;
@@ -41,6 +43,8 @@ export interface Database {
           current_weight_kg?: number | null;
           target_weight_kg?: number | null;
           ai_consent_at?: string | null;
+          dietary_restrictions?: string[] | null;
+          custom_allergies?: string[] | null;
           activity_level?: "sedentary" | "light" | "moderate" | "active" | "very_active" | null;
           objective?: "lose_weight" | "maintain" | "gain_muscle" | null;
           created_at?: string;
@@ -56,6 +60,8 @@ export interface Database {
           current_weight_kg?: number | null;
           target_weight_kg?: number | null;
           ai_consent_at?: string | null;
+          dietary_restrictions?: string[] | null;
+          custom_allergies?: string[] | null;
           activity_level?: "sedentary" | "light" | "moderate" | "active" | "very_active" | null;
           objective?: "lose_weight" | "maintain" | "gain_muscle" | null;
           updated_at?: string;
@@ -587,6 +593,148 @@ export interface Database {
         };
         Relationships: [];
       };
+      user_recipes: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          description: string | null;
+          meal_type: "desayuno" | "almuerzo" | "cena" | "snack";
+          prep_time_minutes: number;
+          servings: number;
+          calories_per_serving: number;
+          protein_per_serving: number;
+          carbs_per_serving: number;
+          fat_per_serving: number;
+          ingredients: Json;
+          instructions: string[];
+          prompt_context: Json | null;
+          is_favorite: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          description?: string | null;
+          meal_type: "desayuno" | "almuerzo" | "cena" | "snack";
+          prep_time_minutes?: number;
+          servings?: number;
+          calories_per_serving: number;
+          protein_per_serving: number;
+          carbs_per_serving: number;
+          fat_per_serving: number;
+          ingredients: Json;
+          instructions: string[];
+          prompt_context?: Json | null;
+          is_favorite?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          title?: string;
+          description?: string | null;
+          meal_type?: "desayuno" | "almuerzo" | "cena" | "snack";
+          prep_time_minutes?: number;
+          servings?: number;
+          calories_per_serving?: number;
+          protein_per_serving?: number;
+          carbs_per_serving?: number;
+          fat_per_serving?: number;
+          ingredients?: Json;
+          instructions?: string[];
+          prompt_context?: Json | null;
+          is_favorite?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      shopping_list_items: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          normalized_key: string;
+          quantity: number;
+          unit: "g" | "ml" | "unidad";
+          category:
+            | "verduras_frutas"
+            | "proteinas"
+            | "lacteos_huevos"
+            | "despensa_granos"
+            | "condimentos_aceites"
+            | "otros";
+          checked: boolean;
+          source_recipes: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          normalized_key: string;
+          quantity: number;
+          unit?: "g" | "ml" | "unidad";
+          category?:
+            | "verduras_frutas"
+            | "proteinas"
+            | "lacteos_huevos"
+            | "despensa_granos"
+            | "condimentos_aceites"
+            | "otros";
+          checked?: boolean;
+          source_recipes?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          normalized_key?: string;
+          quantity?: number;
+          unit?: "g" | "ml" | "unidad";
+          category?:
+            | "verduras_frutas"
+            | "proteinas"
+            | "lacteos_huevos"
+            | "despensa_granos"
+            | "condimentos_aceites"
+            | "otros";
+          checked?: boolean;
+          source_recipes?: string[];
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      plan_daily_checklists: {
+        Row: {
+          id: string;
+          user_id: string;
+          plan_date: string;
+          checked_items: Json;
+          total_items: number;
+          completed_count: number;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          plan_date: string;
+          checked_items?: Json;
+          total_items?: number;
+          completed_count?: number;
+          updated_at?: string;
+        };
+        Update: {
+          plan_date?: string;
+          checked_items?: Json;
+          total_items?: number;
+          completed_count?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       v_daily_totals: {
@@ -628,6 +776,14 @@ export interface Database {
       delete_own_account: {
         Args: Record<PropertyKey, never>;
         Returns: Json;
+      };
+      upsert_shopping_list_items: {
+        Args: { p_items: Json };
+        Returns: Database["public"]["Tables"]["shopping_list_items"]["Row"][];
+      };
+      save_personal_plan: {
+        Args: { p_plan: Json; p_sync_goals?: boolean };
+        Returns: Database["public"]["Tables"]["personal_plans"]["Row"];
       };
     };
     Enums: {

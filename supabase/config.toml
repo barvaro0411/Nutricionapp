@@ -33,3 +33,11 @@ import_map = "./functions/deno.json"
 [functions.coach-live-session]
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.generate-recipe]
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+[functions.generate-personal-plan]
+verify_jwt = false
+import_map = "./functions/deno.json"
