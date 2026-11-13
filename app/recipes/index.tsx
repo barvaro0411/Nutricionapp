@@ -16,6 +16,7 @@ import {
   ArrowUpRight,
   ChefHat,
   Clock3,
+  Plus,
   ShoppingCart,
   Sparkles,
   Star,
@@ -33,6 +34,7 @@ import { useRecipes, useUserRecipes } from "@/hooks/useRecipes";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { MealType } from "@/types/meal";
 import { RecipeSource } from "@/types/recipe";
+import { showToast } from "@/utils/alerts";
 import { isRecipeCompatible } from "@/utils/foodAlerts";
 
 const normalize = (text: string) =>
@@ -76,7 +78,7 @@ export default function RecipesCatalogScreen() {
     error: userError,
     refetch: refetchUser,
   } = useUserRecipes(selectedType);
-  const { pendingCount } = useShoppingList();
+  const { pendingCount, addRecipeIngredients } = useShoppingList();
 
   const combinedRecipes = useMemo(() => {
     const aiList = userRecipes || [];
@@ -219,7 +221,6 @@ export default function RecipesCatalogScreen() {
           );
         })}
       </View>
-
       <FormField
         label="Buscar recetas"
         placeholder="Ej: pollo, avena, porotos…"
@@ -425,7 +426,6 @@ export default function RecipesCatalogScreen() {
                   <Text style={styles.recipeDescription} numberOfLines={2}>
                     {recipe.description || "Receta personalizada para tus objetivos."}
                   </Text>
-
                   <View style={styles.nutrients}>
                     <Text style={styles.calories}>
                       {Math.round(recipe.caloriesPerServing)}{" "}
@@ -437,10 +437,41 @@ export default function RecipesCatalogScreen() {
                   </View>
 
                   <View style={styles.cardFooter}>
-                    <Text style={styles.details}>
-                      Ver ingredientes y compras
-                    </Text>
-                    <ArrowUpRight size={17} color={colors.primary} />
+                    <View style={styles.detailsRow}>
+                      <Text style={styles.details}>
+                        Ver ingredientes y preparación
+                      </Text>
+                      <ArrowUpRight size={17} color={colors.primary} />
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Agregar ingredientes de ${recipe.title} a la lista de compras`}
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        void addRecipeIngredients({
+                          recipe,
+                          servings: recipe.servings || 1,
+                        })
+                          .then(() => {
+                            showToast({
+                              type: "success",
+                              title: "¡Sumada a Compras!",
+                              message: `Ingredientes de "${recipe.title}" agregados a tu lista.`,
+                            });
+                          })
+                          .catch((err: any) => {
+                            showToast({
+                              type: "error",
+                              title: "Error al sumar ingredientes",
+                              message: err?.message,
+                            });
+                          });
+                      }}
+                      style={styles.addToListBtn}
+                    >
+                      <Plus size={13} color={colors.primary} strokeWidth={2.5} />
+                      <Text style={styles.addToListBtnText}>+ Compras</Text>
+                    </Pressable>
                   </View>
                 </Pressable>
               );
@@ -654,10 +685,42 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8,
+    flexWrap: "wrap",
+    gap: 10,
     paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: colors.cardBorder,
   },
-  details: { flex: 1, fontSize: 12, fontWeight: "600", color: colors.primary },
+  detailsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+    minWidth: 140,
+  },
+  details: { fontSize: 12, fontWeight: "600", color: colors.primary },
+  addToListBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+    borderRadius: 10,
+    backgroundColor: colors.primaryGhost,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
+  addToListBtnActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  addToListBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  addToListBtnTextActive: {
+    color: colors.primaryDark,
+    fontWeight: "800",
+  },
 });

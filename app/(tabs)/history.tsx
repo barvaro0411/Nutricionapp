@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowUpRight, CalendarDays, Download, Plus, TrendingUp } from "lucide-react-native";
+import { ArrowUpRight, CalendarDays, Download, Plus, TrendingUp, Flame } from "lucide-react-native";
 import { useWeeklyStats } from "@/hooks/useWeeklyStats";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useWeightTracker } from "@/hooks/useWeightTracker";
+import { useUserStreak } from "@/hooks/useUserStreak";
 import { WeeklyMacroChart } from "@/components/charts/WeeklyMacroChart";
 import { WeightTrendCard } from "@/components/charts/WeightTrendCard";
 import { PageHeading, StateCard, AppButton } from "@/components/common/AppUI";
@@ -31,6 +32,8 @@ export default function HistoryScreen() {
   const { data, error, isLoading, refetch, isRefetching } = useWeeklyStats(period);
   const { data: today, refetch: refetchToday } = useDailyNutrition();
   const { stats: weightStats, logWeight, updateTargetWeight, isLoggingWeight, refetch: refetchWeight } = useWeightTracker(period === 7 ? 7 : 14);
+  const { data: streakData } = useUserStreak();
+  const currentStreak = streakData?.currentStreak ?? 0;
   const activeMetric = metrics.find(item => item.key === metric)!;
   const selected = data?.days.find(day => day.date === selectedDate) || data?.days[data.days.length - 1];
   const loggedDays = data?.loggedDays || 0;
@@ -63,7 +66,20 @@ export default function HistoryScreen() {
       ) : (
         <>
           <View style={styles.summary}>
-            <View style={styles.summaryHeader}><CalendarDays size={19} color={colors.mint} /><Text style={styles.summaryOverline}>TU CONSTANCIA</Text></View>
+            <View style={styles.summaryHeader}>
+              <View style={styles.summaryTitleRow}>
+                <CalendarDays size={19} color={colors.mint} />
+                <Text style={styles.summaryOverline}>TU CONSTANCIA</Text>
+              </View>
+              {currentStreak > 0 && (
+                <View style={styles.streakPill}>
+                  <Flame size={13} color="#FB923C" fill="#FB923C" />
+                  <Text style={styles.streakPillText}>
+                    {currentStreak} {currentStreak === 1 ? "día seguido" : "días seguidos"}
+                  </Text>
+                </View>
+              )}
+            </View>
             <View style={styles.summaryMetrics}>
               <View style={styles.summaryMetric}><Text style={styles.summaryNumber}>{loggedDays}<Text style={styles.summaryDenominator}> / {period}</Text></Text><Text style={styles.summaryLabel}>días con registros</Text></View>
               <View style={styles.summaryDivider} />
@@ -159,7 +175,32 @@ const styles = StyleSheet.create({
   periodTextActive: { color: colors.primaryDark, fontWeight: "800" },
   periodDate: { color: colors.textSecondary, fontSize: 12 },
   summary: { backgroundColor: colors.forest, borderRadius: 24, padding: 24, marginBottom: 22 },
-  summaryHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 20 },
+  summaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+    gap: 8,
+  },
+  summaryTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  streakPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255, 255, 255, 0.14)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  streakPillText: {
+    color: "#FED7AA",
+    fontSize: 11,
+    fontWeight: "700",
+  },
   summaryOverline: { color: "#CEE1D6", fontSize: 10, fontWeight: "700", letterSpacing: 1.3 },
   summaryMetrics: { flexDirection: "row", alignItems: "center", gap: 24 },
   summaryMetric: { flex: 1 },

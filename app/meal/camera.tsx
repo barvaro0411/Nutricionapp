@@ -14,7 +14,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Camera, Image as ImageIcon, RotateCcw, Sparkles, AlertCircle } from "lucide-react-native";
 import { useMealAnalysis } from "@/hooks/useMealAnalysis";
 import { ScanningOverlay } from "@/components/meal/ScanningOverlay";
-import { colors, layout } from "@/constants/colors";
+import { colors, layout, shadows } from "@/constants/colors";
 import { MealType } from "@/types/meal";
 import { showAlert } from "@/utils/alerts";
 import { PageBackHeader } from "@/components/common/AppUI";
@@ -23,10 +23,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function CameraScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ suggestedMealType?: MealType }>();
+  const params = useLocalSearchParams<{
+    suggestedMealType?: MealType;
+    mode?: "meal" | "nutrition_label";
+  }>();
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [mealType, setMealType] = useState<MealType>(params.suggestedMealType || "almuerzo");
+  const [captureMode, setCaptureMode] = useState<"meal" | "nutrition_label">(
+    params.mode === "nutrition_label" ? "nutrition_label" : "meal"
+  );
   const [note, setNote] = useState("");
   const [showNoteField, setShowNoteField] = useState(false);
 
@@ -35,7 +41,9 @@ export default function CameraScreen() {
   // Inicia el análisis automático de inmediato al capturar
   const triggerAnalysis = async (uri: string, customNote?: string) => {
     const activeNote = customNote !== undefined ? customNote : note;
-    const result = await analyzePhoto(uri, mealType, activeNote.trim() || undefined);
+    const result = await analyzePhoto(uri, mealType, activeNote.trim() || undefined, {
+      mode: captureMode,
+    });
     if (result.success) {
       router.replace("/meal/review");
     }
@@ -102,7 +110,48 @@ export default function CameraScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 20) + 20 }]} keyboardShouldPersistTaps="handled">
       {/* Header superior */}
-      <PageBackHeader title="Cámara IA" backLabel="Volver a añadir alimentos" disabled={analyzing} onBack={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/record")} />
+      <PageBackHeader
+        title={captureMode === "nutrition_label" ? "Lector de Etiqueta IA" : "Cámara IA"}
+        backLabel="Volver a añadir alimentos"
+        disabled={analyzing}
+        onBack={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/record")}
+      />
+
+      {/* Selector de modo: Plato preparado vs Etiqueta nutricional */}
+      <View style={styles.modeToggleRow}>
+        <TouchableOpacity
+          style={[styles.modeToggleBtn, captureMode === "meal" && styles.modeToggleBtnActive]}
+          onPress={() => setCaptureMode("meal")}
+          disabled={analyzing}
+          accessibilityRole="button"
+          accessibilityLabel="Modo plato de comida"
+        >
+          <Text
+            style={[styles.modeToggleText, captureMode === "meal" && styles.modeToggleTextActive]}
+          >
+            🍽️ Plato de comida
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.modeToggleBtn,
+            captureMode === "nutrition_label" && styles.modeToggleBtnActive,
+          ]}
+          onPress={() => setCaptureMode("nutrition_label")}
+          disabled={analyzing}
+          accessibilityRole="button"
+          accessibilityLabel="Modo etiqueta nutricional"
+        >
+          <Text
+            style={[
+              styles.modeToggleText,
+              captureMode === "nutrition_label" && styles.modeToggleTextActive,
+            ]}
+          >
+            🏷️ Etiqueta nutricional
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Selector de horario de comida */}
       <View style={styles.mealTypeRow}>
@@ -307,6 +356,35 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.3,
+  },
+  modeToggleRow: {
+    flexDirection: "row",
+    backgroundColor: "#F1F5F9",
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  modeToggleBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+  },
+  modeToggleBtnActive: {
+    backgroundColor: "#FFFFFF",
+    ...shadows.sm,
+  },
+  modeToggleText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  modeToggleTextActive: {
+    color: colors.text,
+    fontWeight: "800",
   },
   mealTypeRow: {
     flexDirection: "row",

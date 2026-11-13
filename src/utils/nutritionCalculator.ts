@@ -131,3 +131,72 @@ export function recalculateGoalsFromProfile(
     objective: updates?.objective ?? profile.objective,
   });
 }
+
+export interface MacroCalorieCoherence {
+  coherent: boolean;
+  expectedCalories: number;
+  declaredCalories: number;
+  absoluteError: number;
+  relativeError: number;
+}
+
+/**
+ * Calcula las calorías teóricas según los factores de Atwater:
+ * 4 kcal/g proteína + 4 kcal/g carbohidratos + 9 kcal/g grasas
+ */
+export function calculateAtwaterCalories(macros: {
+  protein: number;
+  carbs: number;
+  fat: number;
+}): number {
+  const p = Number.isFinite(macros.protein) ? Math.max(0, macros.protein) : 0;
+  const c = Number.isFinite(macros.carbs) ? Math.max(0, macros.carbs) : 0;
+  const f = Number.isFinite(macros.fat) ? Math.max(0, macros.fat) : 0;
+  return Math.round((4 * p + 4 * c + 9 * f) * 10) / 10;
+}
+
+/**
+ * Valida que las calorías declaradas sean coherentes con 4×P + 4×C + 9×G dentro de una tolerancia.
+ * Usa un margen mínimo absoluto (por defecto 25 kcal) para porciones pequeñas o alimentos con fibra.
+ */
+export function validateMacroCalorieCoherence(
+  item: { calories: number; protein: number; carbs: number; fat: number },
+  toleranceRatio = 0.15,
+  minAbsToleranceKcal = 25
+): MacroCalorieCoherence {
+  const expectedCalories = calculateAtwaterCalories(item);
+  const declaredCalories = Number.isFinite(item.calories) ? Math.max(0, Math.round(item.calories * 10) / 10) : 0;
+  const absoluteError = Math.round(Math.abs(declaredCalories - expectedCalories) * 10) / 10;
+  const denominator = Math.max(expectedCalories, declaredCalories, 1);
+  const relativeError = Math.round((absoluteError / denominator) * 10000) / 10000;
+  const allowedDelta = Math.max(minAbsToleranceKcal, expectedCalories * toleranceRatio);
+  const coherent =
+    (expectedCalories === 0 && declaredCalories <= minAbsToleranceKcal) ||
+    absoluteError <= allowedDelta;
+
+  return {
+    coherent,
+    expectedCalories,
+    declaredCalories,
+    absoluteError,
+    relativeError,
+  };
+}
+
+/**
+ * Si las calorías declaradas se desvían de 4×P + 4×C + 9×G fuera de la tolerancia,
+ * reconcilia las calorías al valor Atwater.
+ */
+export function reconcileMacroCalories<
+  T extends { calories: number; protein: number; carbs: number; fat: number }
+>(item: T, toleranceRatio = 0.15, minAbsToleranceKcal = 25): T & { atwaterAdjusted?: boolean } {
+  const check = validateMacroCalorieCoherence(item, toleranceRatio, minAbsToleranceKcal);
+  if (check.coherent || check.expectedCalories <= 0) {
+    return { ...item };
+  }
+  return {
+    ...item,
+    calories: check.expectedCalories,
+    atwaterAdjusted: true,
+  };
+}

@@ -7,6 +7,7 @@ import { ActivityIndicator, View, Text, TouchableOpacity, StyleSheet, Platform }
 import { supabase, configurationError } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
+import { useThemeStore } from "@/stores/useThemeStore";
 import { syncAllScheduledReminders } from "@/services/notificationService";
 import { colors } from "@/constants/colors";
 import { ToastContainer } from "@/components/common/ToastContainer";
@@ -26,6 +27,7 @@ function RootNavigationLayout() {
   const previousUser = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
+    void useThemeStore.getState?.()?.hydrate?.();
     if (configurationError) return;
     let active = true;
     let authEventReceived = false;
@@ -96,7 +98,7 @@ function RootNavigationLayout() {
     if (!initialized || isLoading || error) return;
     const inAuth = segments[0] === "(auth)";
     const inRecovery = segments[0] === "reset-password";
-    const inLegal = segments[0] === "legal";
+    const inLegal = (segments[0] as string) === "legal";
     if (isRecoveringPassword && session) {
       if (!inRecovery) router.replace("/reset-password");
     } else if (!session) {

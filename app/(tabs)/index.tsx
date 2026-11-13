@@ -7,8 +7,9 @@ import {
   loggedAtForDate,
   APP_TIME_ZONE,
 } from "@/utils/dates";
-import { showAlert } from "@/utils/alerts";
+import { showAlert, showToast } from "@/utils/alerts";
 import React, { useState, useEffect, useMemo, Suspense, lazy } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { adjustGoalsForActivity } from "@/utils/nutritionCalculator";
 import {
   View,
@@ -37,11 +38,16 @@ import {
   HelpCircle,
   Plus,
   ArrowUpRight,
+  Moon,
+  Sun,
 } from "lucide-react-native";
+import { useThemeStore } from "@/stores/useThemeStore";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useWaterTracker } from "@/hooks/useWaterTracker";
+import { useYesterdayMeals, YesterdayMealOption } from "@/hooks/useYesterdayMeal";
 import { useActivitySync } from "@/hooks/useActivitySync";
 import { useAdaptiveReminders } from "@/hooks/useAdaptiveReminders";
+import { saveMealToDatabase } from "@/services/mealService";
 import { DailySummary } from "@/components/dashboard/DailySummary";
 import { DayStrip } from "@/components/dashboard/DayStrip";
 import { MealCard } from "@/components/dashboard/MealCard";
@@ -77,7 +83,7 @@ const StreakModal = lazy(() =>
 const AppGuideModal = lazy(() =>
   import("@/components/dashboard/AppGuideModal").then((m) => ({ default: m.AppGuideModal }))
 );
-import { MealType } from "@/types/meal";
+import { MealType, DetectedFoodItem } from "@/types/meal";
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -85,18 +91,23 @@ export default function DashboardScreen() {
   const { width } = useWindowDimensions();
   const wide = width >= 820;
   const compact = width < 380;
+  const user = useAuthStore((state) => state.user);
   const profile = useAuthStore((state) => state.profile);
-  const { data: personalPlan } = usePersonalPlan();
-  const beginMeal = () => {
-    useMealReviewStore.getState().reset();
-    useMealReviewStore.getState().setLoggedAt(loggedAtForDate(selectedDate));
-  };
+  const { isDark, toggleDark } = useThemeStore();
+  const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState<Date>(() =>
     dateForMealRoute(params.date),
   );
   useEffect(() => {
     if (params.date) setSelectedDate(dateForMealRoute(params.date));
   }, [params.date]);
+  const { data: personalPlan } = usePersonalPlan();
+  const { data: yesterdayMeals } = useYesterdayMeals(selectedDate);
+  const [repeatingType, setRepeatingType] = useState<MealType | null>(null);
+  const beginMeal = () => {
+    useMealReviewStore.getState().reset();
+    useMealReviewStore.getState().setLoggedAt(loggedAtForDate(selectedDate));
+  };
   const { showTextVoice, showFavorites, closeTextVoice, closeFavorites } =
     useQuickLogStore();
   const [showTextVoiceModal, setShowTextVoiceModal] = useState(false);
@@ -152,6 +163,60 @@ export default function DashboardScreen() {
       pathname: "/(tabs)/record",
       params: { mealType, date: getDateKey(selectedDate) },
     });
+  };
+
+  const handleRepeatYesterday = async (yesterdayMeal: YesterdayMealOption) => {
+    if (!user) {
+      showAlert("Iniciar sesión", "Inicia sesión para registrar comidas.");
+      return;
+    }
+    setRepeatingType(yesterdayMeal.meal_type);
+    try {
+      const items: DetectedFoodItem[] = yesterdayMeal.items.map((i, idx) => ({
+        id: `repeat_${Date.now()}_${idx}`,
+        food: i.food_name,
+        grams: i.grams,
+        unit: i.unit || "g",
+        calories: i.calories,
+        protein: i.protein,
+        carbs: i.carbs,
+        fat: i.fat,
+        confidence: 1.0,
+        nutrition_reference: i.nutrition_reference,
+      }));
+
+      await saveMealToDatabase({
+        userId: user.id,
+        mealType: yesterdayMeal.meal_type,
+        imagePath: null,
+        items,
+        totals: {
+          calories: yesterdayMeal.total_calories,
+          protein: yesterdayMeal.total_protein,
+          carbs: yesterdayMeal.total_carbs,
+          fat: yesterdayMeal.total_fat,
+        },
+        notes: `Repetido de ayer: ${yesterdayMeal.summaryLabel}`,
+        loggedAt: new Date(loggedAtForDate(selectedDate)),
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
+      showToast({
+        type: "success",
+        title: "¡Guardado en 1 toque!",
+        message: `${yesterdayMeal.summaryLabel} (${Math.round(yesterdayMeal.total_calories)} kcal)`,
+      });
+    } catch (err: any) {
+      showAlert("Error", err?.message || "No se pudo guardar la comida.");
+    } finally {
+      setRepeatingType(null);
+    }
+  };
+
+  const handleCustomizeYesterday = (yesterdayMeal: YesterdayMealOption) => {
+    beginMeal();
+    useMealReviewStore.getState().loadFavoriteCombo(yesterdayMeal, yesterdayMeal.meal_type);
+    router.push("/meal/review");
   };
 
   const handleSuggestMeal = (mealType: MealType) => {
@@ -246,6 +311,21 @@ export default function DashboardScreen() {
             )}
           </View>
           <View style={styles.headerRightActions}>
+            <TouchableOpacity
+              style={styles.helpGuideBtn}
+              onPress={toggleDark}
+              activeOpacity={0.8}
+              accessibilityLabel={
+                isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"
+              }
+              accessibilityRole="button"
+            >
+              {isDark ? (
+                <Sun size={18} color={colors.primary} />
+              ) : (
+                <Moon size={18} color={colors.primary} />
+              )}
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.helpGuideBtn}
               onPress={() => setShowGuideModal(true)}
@@ -400,17 +480,38 @@ export default function DashboardScreen() {
                       meals={data?.meals || []}
                       onAddPress={handleAddMeal}
                       onSuggestMeal={handleSuggestMeal}
+                      yesterdayMeal={yesterdayMeals?.[type]}
+                      onRepeatYesterday={handleRepeatYesterday}
+                      onCustomizeYesterday={handleCustomizeYesterday}
+                      isRepeating={repeatingType === type}
                     />
                   </View>
                 ),
               )}
             </View>
 
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Añadir comida a este día" activeOpacity={0.85}
-              onPress={() => handleAddMeal("almuerzo")} style={styles.addMealAction}>
-              <View style={styles.addMealIcon}><Plus size={21} color="white" /></View>
-              <View style={styles.addMealCopy}><Text style={styles.addMealTitle}>Añadir comida</Text><Text style={styles.addMealDescription}>Busca, escribe o fotografía tu plato</Text></View>
-              <ArrowUpRight size={21} color={colors.primary} />
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Añadir comida a este día"
+              activeOpacity={0.85}
+              onPress={() => {
+                beginMeal();
+                router.push("/(tabs)/record");
+              }}
+              style={styles.addMealAction}
+            >
+              <View style={styles.addMealIcon}>
+                <Plus size={20} color={colors.primary} />
+              </View>
+              <View style={styles.addMealCopy}>
+                <Text style={styles.addMealTitle}>Añadir comida</Text>
+                <Text style={styles.addMealDescription}>
+                  Busca alimentos, usa la cámara IA o dicta con tu voz
+                </Text>
+              </View>
+              <View style={styles.addMealArrowWrap}>
+                <ArrowUpRight size={18} color={colors.primary} />
+              </View>
             </TouchableOpacity>
             <View style={[styles.summaryLayout, wide && styles.summaryWide]}>
               <View style={styles.summaryMain}>
@@ -508,6 +609,7 @@ export default function DashboardScreen() {
                   <>
                     {/* Smart Coach Proactivo (Fase 3) */}
                     <SmartCoachCard
+                      userName={profile?.full_name}
                       consumedCalories={data?.consumed.calories || 0}
                       goalCalories={adjustedGoals.calories}
                       remainingCalories={Math.max(0, adjustedGoals.calories - (data?.consumed.calories || 0))}
@@ -772,11 +874,38 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   dateRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  addMealAction: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, backgroundColor: colors.primaryLight, borderRadius: 18, marginBottom: 20, borderWidth: 1, borderColor: "#D3EADB" },
-  addMealIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  addMealAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    marginTop: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    ...shadows.card,
+  },
+  addMealIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   addMealCopy: { flex: 1, minWidth: 0 },
-  addMealTitle: { color: colors.primaryDark, fontSize: 15, fontWeight: "800" },
-  addMealDescription: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 3 },
+  addMealTitle: { color: colors.text, fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
+  addMealDescription: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  addMealArrowWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   mealsHeading: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 4, marginBottom: 18 },
   mealsDescription: { color: colors.textSecondary, fontSize: 12, marginTop: 5 },
   progressLink: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, borderRadius: 14, backgroundColor: colors.primaryLight },

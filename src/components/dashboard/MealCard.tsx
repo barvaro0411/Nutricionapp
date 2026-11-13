@@ -1,12 +1,26 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Pressable, Image } from "react-native";
-import { Sunrise, Sun, Moon, Apple, Plus, ChevronDown, ChevronUp, Utensils, Check, Sparkles, LucideIcon } from "lucide-react-native";
+import { View, Text, StyleSheet, Pressable, Image, ActivityIndicator } from "react-native";
+import {
+  Sunrise,
+  Sun,
+  Moon,
+  Apple,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  Utensils,
+  Check,
+  Sparkles,
+  RotateCcw,
+  LucideIcon,
+} from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { MealWithItems, MealType } from "@/types/meal";
 import { colors, shadows } from "@/constants/colors";
 import { formatQuantityDisplay, resolveItemUnit } from "@/utils/liquidUnits";
 import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { YesterdayMealOption } from "@/hooks/useYesterdayMeal";
 
 const MEAL_META: Record<MealType, { title: string; Icon: LucideIcon; color: string; bg: string }> = {
   desayuno: { title: "Desayuno", Icon: Sunrise, color: "#D97706", bg: "#FEF3C7" },
@@ -47,9 +61,23 @@ interface MealCardProps {
   onAddPress: (type: MealType) => void;
   onMealPress?: (meal: MealWithItems) => void;
   onSuggestMeal?: (type: MealType) => void;
+  yesterdayMeal?: YesterdayMealOption;
+  onRepeatYesterday?: (yesterdayMeal: YesterdayMealOption) => void;
+  onCustomizeYesterday?: (yesterdayMeal: YesterdayMealOption) => void;
+  isRepeating?: boolean;
 }
 
-export function MealCard({ mealType, meals, onAddPress, onMealPress, onSuggestMeal }: MealCardProps) {
+export function MealCard({
+  mealType,
+  meals,
+  onAddPress,
+  onMealPress,
+  onSuggestMeal,
+  yesterdayMeal,
+  onRepeatYesterday,
+  onCustomizeYesterday,
+  isRepeating = false,
+}: MealCardProps) {
   const meta = MEAL_META[mealType];
   const { Icon } = meta;
   const filteredMeals = meals.filter((meal) => meal.meal_type === mealType);
@@ -117,6 +145,58 @@ export function MealCard({ mealType, meals, onAddPress, onMealPress, onSuggestMe
               </Pressable>
             </View>
           ))}
+        </View>
+      )}
+
+      {/* Atajo de 1 toque: Repetir comida de ayer */}
+      {!hasMeals && yesterdayMeal && (
+        <View style={styles.yesterdayBox}>
+          <View style={styles.yesterdayHeader}>
+            <View style={styles.yesterdayIconBadge}>
+              <RotateCcw size={12} color="#1D4ED8" />
+            </View>
+            <Text style={styles.yesterdayLabel}>¿REPETISTE LO DE AYER?</Text>
+          </View>
+          <Text style={styles.yesterdayTitle} numberOfLines={2}>
+            {yesterdayMeal.summaryLabel}
+          </Text>
+          <Text style={styles.yesterdayNutrients}>
+            {Math.round(yesterdayMeal.total_calories)} kcal · {Math.round(yesterdayMeal.total_protein)}g Prot
+          </Text>
+
+          <View style={styles.yesterdayActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Guardar en un toque: ${yesterdayMeal.summaryLabel}`}
+              disabled={isRepeating}
+              onPress={() => onRepeatYesterday?.(yesterdayMeal)}
+              style={({ pressed }) => [
+                styles.repeatBtn,
+                pressed && { opacity: 0.8 },
+                isRepeating && { opacity: 0.6 },
+              ]}
+            >
+              {isRepeating ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <RotateCcw size={13} color="#FFFFFF" />
+                  <Text style={styles.repeatBtnText}>Guardar en 1 toque</Text>
+                </>
+              )}
+            </Pressable>
+
+            {onCustomizeYesterday && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ajustar porciones antes de guardar"
+                onPress={() => onCustomizeYesterday(yesterdayMeal)}
+                style={({ pressed }) => [styles.customizeBtn, pressed && { opacity: 0.75 }]}
+              >
+                <Text style={styles.customizeBtnText}>Ajustar</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       )}
 
@@ -234,4 +314,79 @@ const styles = StyleSheet.create({
   photoRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 },
   photo: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.surfaceMuted },
   photoLabel: { fontSize: 11, color: colors.textSecondary, flex: 1 },
+  yesterdayBox: {
+    backgroundColor: "#F0F9FF",
+    borderWidth: 1.5,
+    borderColor: "#BAE6FD",
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  yesterdayHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  yesterdayIconBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#E0F2FE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  yesterdayLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#0369A1",
+    letterSpacing: 0.5,
+  },
+  yesterdayTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+    lineHeight: 18,
+  },
+  yesterdayNutrients: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  yesterdayActions: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  repeatBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 38,
+    backgroundColor: "#0284C7",
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  repeatBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  customizeBtn: {
+    minHeight: 38,
+    paddingHorizontal: 12,
+    backgroundColor: "#E0F2FE",
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  customizeBtnText: {
+    color: "#0369A1",
+    fontSize: 12,
+    fontWeight: "700",
+  },
 });

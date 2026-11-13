@@ -39,3 +39,72 @@ export function remainingNutrition(target: Nutrients, consumed: Nutrients, activ
   for (const key of nutrientKeys) remaining[key] = roundNutrient(target[key] + (key === "calories" ? activeCalories : 0) - consumed[key], 6);
   return remaining;
 }
+
+export interface AtwaterValidationResult {
+  coherent: boolean;
+  expectedCalories: number;
+  declaredCalories: number;
+  absoluteError: number;
+  relativeError: number;
+}
+
+/**
+ * Standard Atwater physiological fuel values: 4 kcal/g protein, 4 kcal/g carbs, 9 kcal/g fat.
+ */
+export function atwaterCalories(nutrients: Pick<Nutrients, "protein" | "carbs" | "fat">): number {
+  const { protein, carbs, fat } = nutrients;
+  if (![protein, carbs, fat].every((v) => Number.isFinite(v) && v >= 0)) {
+    throw new Error("Invalid nutritional value");
+  }
+  return roundNutrient(4 * protein + 4 * carbs + 9 * fat, 1);
+}
+
+/**
+ * Validates whether declared calories match 4*P + 4*C + 9*F within tolerance.
+ * Small portions use a floor of `minAbsToleranceKcal` (default 25 kcal) to avoid false positives from fiber/rounding.
+ */
+export function validateAtwaterCoherence(
+  nutrients: Nutrients,
+  toleranceRatio = 0.15,
+  minAbsToleranceKcal = 25
+): AtwaterValidationResult {
+  if (!Number.isFinite(nutrients.calories) || nutrients.calories < 0) {
+    throw new Error("Invalid nutritional value");
+  }
+  const expectedCalories = atwaterCalories(nutrients);
+  const declaredCalories = roundNutrient(nutrients.calories, 1);
+  const absoluteError = roundNutrient(Math.abs(declaredCalories - expectedCalories), 1);
+  const denominator = Math.max(expectedCalories, declaredCalories, 1);
+  const relativeError = roundNutrient(absoluteError / denominator, 4);
+  const allowedDelta = Math.max(minAbsToleranceKcal, expectedCalories * toleranceRatio);
+  const coherent =
+    (expectedCalories === 0 && declaredCalories <= minAbsToleranceKcal) ||
+    absoluteError <= allowedDelta;
+
+  return {
+    coherent,
+    expectedCalories,
+    declaredCalories,
+    absoluteError,
+    relativeError,
+  };
+}
+
+/**
+ * Reconciles AI-estimated calories to Atwater (4P + 4C + 9F) when declared calories deviate beyond tolerance.
+ */
+export function reconcileAtwaterNutrients<T extends Nutrients>(
+  item: T,
+  toleranceRatio = 0.15,
+  minAbsToleranceKcal = 25
+): T & { atwaterAdjusted?: boolean } {
+  const check = validateAtwaterCoherence(item, toleranceRatio, minAbsToleranceKcal);
+  if (check.coherent || check.expectedCalories <= 0) {
+    return { ...item };
+  }
+  return {
+    ...item,
+    calories: check.expectedCalories,
+    atwaterAdjusted: true,
+  };
+}

@@ -60,6 +60,7 @@ interface MealReviewState {
   removeItem: (index: number) => void;
   addItem: (item: DetectedFoodItemInput) => void;
   replaceItem: (index: number, item: DetectedFoodItemInput) => void;
+  reconcileItemCalories: (index: number) => void;
   getTotals: () => MealTotals;
   reset: () => void;
 }
@@ -303,6 +304,24 @@ export const useMealReviewStore = create<MealReviewState>((set, get) => ({
       items[index] = { ...replacement, id: current.id, unit: replacement.unit || "g", confidence: replacement.confidence ?? 1,
         ratioCalories: replacement.calories / amount, ratioProtein: replacement.protein / amount,
         ratioCarbs: replacement.carbs / amount, ratioFat: replacement.fat / amount };
+      return { items };
+    });
+  },
+
+  reconcileItemCalories: (index) => {
+    set((state) => {
+      const current = state.items[index];
+      if (!current) return state;
+      const expectedCalories =
+        Math.round((4 * current.protein + 4 * current.carbs + 9 * current.fat) * 10) / 10;
+      if (expectedCalories <= 0) return state;
+      const amount = current.grams > 0 ? current.grams : 100;
+      const items = [...state.items];
+      items[index] = {
+        ...current,
+        calories: expectedCalories,
+        ratioCalories: expectedCalories / amount,
+      };
       return { items };
     });
   },

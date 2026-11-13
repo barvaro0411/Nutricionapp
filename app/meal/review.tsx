@@ -1,5 +1,5 @@
 import { showAlert, showToast } from "@/utils/alerts";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -34,6 +34,12 @@ import { parseQuantityInput, resolveItemUnit } from "@/utils/liquidUnits";
 import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
 import { DietaryRestriction } from "@/types/profile";
 import { evaluateFoodAlerts } from "@/utils/foodAlerts";
+import {
+  getAllUserFoodCorrections,
+  normalizeFoodKey,
+  recordUserFoodCorrection,
+  UserFoodCorrection,
+} from "@/services/userFoodCorrectionsService";
 
 function collectMealDietaryWarnings(
   items: Parameters<typeof evaluateFoodAlerts>[0][],
@@ -80,6 +86,7 @@ export default function MealReviewScreen() {
     removeItem,
     addItem,
     replaceItem,
+    reconcileItemCalories,
     loadFavoriteCombo,
     addComboItems,
     getTotals,
@@ -96,6 +103,17 @@ export default function MealReviewScreen() {
   const [manualDraft, setManualDraft] = useState<ManualFoodDraft>(EMPTY_MANUAL_FOOD_DRAFT);
   const [inputValues, setInputValues] = useState<Record<number, string>>({});
   const [inputErrors, setInputErrors] = useState<Record<number, string>>({});
+  const [userCorrections, setUserCorrections] = useState<Record<string, UserFoodCorrection>>({});
+  const [editedItemIds, setEditedItemIds] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    void getAllUserFoodCorrections(user?.id).then(setUserCorrections);
+  }, [user?.id]);
+
+  const markItemEdited = (index: number) => {
+    const id = items[index]?.id || String(index);
+    setEditedItemIds((prev) => ({ ...prev, [id]: true }));
+  };
 
   const totals = getTotals();
   const clearQuantityInput = (index: number) => {
@@ -157,6 +175,14 @@ export default function MealReviewScreen() {
         queryClient.invalidateQueries({ queryKey: ["weeklyStats"] }),
         queryClient.invalidateQueries({ queryKey: ["userStreak"] }),
       ]);
+
+      // Guardar correcciones personales en el dispositivo para recordar porciones futuras (Ley 21.719)
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (editedItemIds[item.id || String(i)]) {
+          void recordUserFoodCorrection(item, user.id);
+        }
+      }
 
       if ((result as any)?.offline) {
         showToast({
@@ -321,6 +347,7 @@ export default function MealReviewScreen() {
             customAllergies={customAllergies}
             inputValue={inputValues[index]}
             inputError={inputErrors[index]}
+            rememberedGrams={userCorrections[normalizeFoodKey(item.food)]?.preferredGrams}
             onRemove={(idx) => {
               removeItem(idx);
               setInputValues({});
@@ -329,13 +356,18 @@ export default function MealReviewScreen() {
             }}
             onOpenUsda={(id) => setUsdaTarget(id)}
             onOpenVariants={(idx) => setActiveVariantIndex(idx)}
-            onApplyDrinkVariant={(idx, target) => applyDrinkVariant(idx, target)}
+            onApplyDrinkVariant={(idx, target) => {
+              applyDrinkVariant(idx, target);
+              markItemEdited(idx);
+            }}
             onUpdateUnit={(idx, unit) => {
               updateItemUnit(idx, unit);
+              markItemEdited(idx);
               setInputErrors((prev) => ({ ...prev, [idx]: "" }));
             }}
             onAdjustDelta={(idx, delta) => {
               adjustItemGramsDelta(idx, delta);
+              markItemEdited(idx);
               clearQuantityInput(idx);
             }}
             onChangeQuantity={(idx, val, parsedValue, newUnit, errorMsg) => {
@@ -344,6 +376,7 @@ export default function MealReviewScreen() {
                 setInputErrors((prev) => ({ ...prev, [idx]: errorMsg }));
               } else {
                 updateItemGrams(idx, parsedValue);
+                markItemEdited(idx);
                 const currentUnit = resolveItemUnit(item);
                 if (newUnit !== currentUnit) {
                   updateItemUnit(idx, newUnit);
@@ -360,12 +393,17 @@ export default function MealReviewScreen() {
             }}
             onSelectPortion={(idx, portion) => {
               updateItemGrams(idx, portion);
+              markItemEdited(idx);
               setInputValues((prev) => {
                 const next = { ...prev };
                 delete next[idx];
                 return next;
               });
               setInputErrors((prev) => ({ ...prev, [idx]: "" }));
+            }}
+            onReconcileCalories={(idx) => {
+              reconcileItemCalories(idx);
+              markItemEdited(idx);
             }}
           />
         ))}
