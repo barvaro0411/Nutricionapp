@@ -33,9 +33,12 @@ import {
   ShoppingBasket,
   ArrowUpRight,
   Trash2,
+  Moon,
+  Sun,
 } from "lucide-react-native";
 import { StateCard } from "@/components/common/AppUI";
 import { colors } from "@/constants/colors";
+import { useThemeStore } from "@/stores/useThemeStore";
 import { CoachMessageContent } from "@/components/coach/CoachMessageContent";
 import { useCoachSpeech } from "@/hooks/useCoachSpeech";
 import { useCoachLive } from "@/hooks/useCoachLive";
@@ -68,6 +71,7 @@ export default function CoachChatScreen() {
     pendingMessage,
   } = useCoachChat();
   const { user } = useAuthStore();
+  const { isDark, toggleDark } = useThemeStore();
   const queryClient = useQueryClient();
   const { addWater } = useWaterTracker();
 
@@ -373,21 +377,36 @@ export default function CoachChatScreen() {
             Ideas para tu rutina, por texto y voz
           </Text>
         </View>
-        {messages.length > 0 ? (
+        <View style={styles.headerRightGroup}>
           <TouchableOpacity
-            style={styles.clearBtn}
+            style={styles.headerActionBtn}
             accessibilityRole="button"
-            accessibilityLabel="Limpiar conversación"
-            onPress={handleClearHistory}
+            accessibilityLabel={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            onPress={toggleDark}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Trash2 size={18} color={colors.textSecondary} />
+            {isDark ? (
+              <Sun size={18} color={colors.primaryAccent} />
+            ) : (
+              <Moon size={18} color={colors.primary} />
+            )}
           </TouchableOpacity>
-        ) : (
-          <View style={styles.headerIcon}>
-            <Sparkles size={20} color={colors.primary} />
-          </View>
-        )}
+          {messages.length > 0 ? (
+            <TouchableOpacity
+              style={styles.clearBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Limpiar conversación"
+              onPress={handleClearHistory}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Trash2 size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerIcon}>
+              <Sparkles size={20} color={colors.primaryAccent} />
+            </View>
+          )}
+        </View>
       </View>
 
       {live.supported && (
@@ -672,18 +691,35 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   headerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     backgroundColor: colors.primaryLight,
     alignItems: "center",
     justifyContent: "center",
   },
-  clearBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+  headerRightGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerActionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clearBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -704,7 +740,7 @@ const styles = StyleSheet.create({
   },
   companionCard: { flexDirection: "row", alignItems: "center", marginBottom: 16, padding: 12, borderRadius: 22, backgroundColor: colors.primaryGhost, borderWidth: 1, borderColor: colors.cardBorder, gap: 10 },
   companionCopy: { flex: 1, minWidth: 0, gap: 6 },
-  companionEyebrow: { color: colors.primary, fontSize: 9.5, fontWeight: "800", letterSpacing: 1 },
+  companionEyebrow: { color: colors.primaryDark, fontSize: 9.5, fontWeight: "800", letterSpacing: 1 },
   companionTitle: { color: colors.text, fontSize: 16, fontWeight: "800", lineHeight: 21 },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primaryAccent },
@@ -862,7 +898,7 @@ const styles = StyleSheet.create({
   unifiedComposer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1.5,
     borderColor: colors.cardBorder,
     borderRadius: 24,

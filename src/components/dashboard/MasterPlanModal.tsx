@@ -298,17 +298,17 @@ export function MasterPlanModal({
                 <View
                   style={[
                     styles.cyclingCard,
-                    { borderColor: "#FCD34D", backgroundColor: "#FFFBEB" },
+                    { borderColor: colors.warning, backgroundColor: colors.warningLight },
                     isMatchDay && styles.matchCardActiveHighlight,
                   ]}
                 >
                   <View style={styles.cyclingHeader}>
-                    <Zap size={16} color="#D97706" />
-                    <Text style={[styles.cyclingTitle, { color: "#92400E" }]}>
+                    <Zap size={16} color={colors.carbs} />
+                    <Text style={[styles.cyclingTitle, { color: colors.text }]}>
                       Días de carga ({formatWeekdaysLabel(matchWeekdays)})
                     </Text>
-                    <View style={[styles.calBadge, { backgroundColor: "#FEF3C7" }]}>
-                      <Text style={[styles.calBadgeText, { color: "#B45309" }]}>
+                    <View style={[styles.calBadge, { backgroundColor: colors.card }]}>
+                      <Text style={[styles.calBadgeText, { color: colors.carbs }]}>
                         {plan.dailyGoals.matchDay.calories} kcal
                       </Text>
                     </View>
@@ -333,12 +333,12 @@ export function MasterPlanModal({
                       );
                     })}
                   </View>
-                  <Text style={[styles.cyclingSubtitle, { color: "#B45309" }]}>
+                  <Text style={[styles.cyclingSubtitle, { color: colors.textSecondary }]}>
                     {plan.dailyGoals.matchDay.focus}
                   </Text>
                   <View style={styles.macrosRow}>
                     <Text style={styles.macroTag}>{plan.dailyGoals.matchDay.proteinG}g P</Text>
-                    <Text style={[styles.macroTag, { color: "#D97706", fontWeight: "700" }]}>
+                    <Text style={[styles.macroTag, { color: colors.carbs, fontWeight: "700" }]}>
                       {plan.dailyGoals.matchDay.carbsG}g Carbos
                     </Text>
                     <Text style={styles.macroTag}>{plan.dailyGoals.matchDay.fatG}g G</Text>
@@ -864,20 +864,20 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.7)",
+    backgroundColor: colors.card,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#FDE68A",
+    borderColor: colors.warning,
   },
   weekdayDotActive: {
-    backgroundColor: "#D97706",
-    borderColor: "#D97706",
+    backgroundColor: colors.carbs,
+    borderColor: colors.carbs,
   },
   weekdayDotText: {
     fontSize: 10,
     fontWeight: "700",
-    color: "#92400E",
+    color: colors.text,
   },
   weekdayDotTextActive: {
     color: "#FFFFFF",
@@ -896,6 +896,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     backgroundColor: colors.waterLight,
+    borderWidth: 1,
+    borderColor: colors.waterTrack,
     padding: 14,
     borderRadius: 16,
     marginBottom: 20,
@@ -907,7 +909,7 @@ const styles = StyleSheet.create({
   },
   waterBoxDesc: {
     fontSize: 11,
-    color: "#0369A1",
+    color: colors.textSecondary,
     marginTop: 2,
   },
   mealList: {

@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { colors } from "@/constants/colors";
 
 /** Guía visual de calibración de porciones chilenas. */
 export function ReviewPortionGuide() {
@@ -26,22 +27,22 @@ export function ReviewPortionGuide() {
 
 const styles = StyleSheet.create({
   portionGuideCard: {
-    backgroundColor: "#F0FDF4",
+    backgroundColor: colors.successLight,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#DCFCE7",
+    borderColor: colors.cardBorder,
     marginBottom: 16,
   },
   portionGuideTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#166534",
+    color: colors.primaryDark,
     marginBottom: 2,
   },
   portionGuideSubtitle: {
     fontSize: 11,
-    color: "#15803D",
+    color: colors.textSecondary,
     marginBottom: 10,
   },
   portionPillsRow: {
@@ -50,7 +51,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   portionPill: {
-    backgroundColor: "#DCFCE7",
+    backgroundColor: colors.primaryLight,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 10,
@@ -58,6 +59,6 @@ const styles = StyleSheet.create({
   portionPillText: {
     fontSize: 10,
     fontWeight: "600",
-    color: "#14532D",
+    color: colors.text,
   },
 });

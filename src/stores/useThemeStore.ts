@@ -93,14 +93,33 @@ export function applyWebThemeVariables(isDark: boolean): void {
       color: ${p.text};
     }
     body {
-      transition: background-color 0.2s ease, color 0.2s ease;
+      transition: background-color 0.22s ease, color 0.22s ease;
+    }
+    ::selection {
+      background: ${p.primary};
+      color: #FFFFFF;
     }
     input::placeholder, textarea::placeholder {
       color: ${p.textMuted};
     }
     button:focus-visible, [role="button"]:focus-visible, [role="tab"]:focus-visible {
-      outline: 2px solid ${p.primary};
+      outline: 2px solid ${p.primaryAccent};
       outline-offset: 2px;
+    }
+    /* Scrollbars discretas adaptadas al tema activo */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: ${p.background};
+    }
+    ::-webkit-scrollbar-thumb {
+      background: ${p.cardBorder};
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: ${p.cardBorderHover};
     }
   `;
 }

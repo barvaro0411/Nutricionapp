@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   },
   modeToggleRow: {
     flexDirection: "row",
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 14,
     padding: 4,
     marginBottom: 14,
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   modeToggleBtnActive: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     ...shadows.sm,
   },
   modeToggleText: {
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flex: 1,
     paddingVertical: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.cardBorder,
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   welcomeCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 24,
     padding: 28,
     alignItems: "center",
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     paddingVertical: 13,
     borderRadius: 14,
     borderWidth: 1,
@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
   },
   noteInput: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     borderRadius: 12,
@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginTop: 14,
     borderWidth: 1,
-    borderColor: "#FECACA",
+    borderColor: colors.danger,
   },
   errorHeader: {
     flexDirection: "row",
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   errorText: {
-    color: "#991B1B",
+    color: colors.text,
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 12,

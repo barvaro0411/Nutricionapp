@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
   },
   methodBadge: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.surfaceMuted,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,

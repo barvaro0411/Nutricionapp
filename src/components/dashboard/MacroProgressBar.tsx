@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   macroCard: {
     flex: 1,
     minWidth: 0,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 18,
     padding: 12,
     borderWidth: 1,
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   },
   track: {
     height: 6,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 3,
     overflow: "hidden",
     marginBottom: 8,

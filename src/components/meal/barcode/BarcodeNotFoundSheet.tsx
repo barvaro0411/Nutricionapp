@@ -190,11 +190,11 @@ export function BarcodeNotFoundSheet({
 
 const styles = StyleSheet.create({
   notFoundCard: {
-    backgroundColor: "#FFFBEB",
+    backgroundColor: colors.warningLight,
     borderRadius: 20,
     padding: 18,
     borderWidth: 1,
-    borderColor: "#FDE68A",
+    borderColor: colors.warning,
     marginBottom: 16,
   },
   titleRow: {
@@ -206,16 +206,16 @@ const styles = StyleSheet.create({
   notFoundTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#92400E",
+    color: colors.text,
   },
   notFoundDesc: {
     fontSize: 13,
-    color: "#B45309",
+    color: colors.textSecondary,
     marginBottom: 12,
     lineHeight: 18,
   },
   labelScanBtn: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: colors.protein,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   },
   unitToggle: {
     flexDirection: "row",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 10,
     padding: 2,
     borderWidth: 1,
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
   customMacroHeader: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#92400E",
+    color: colors.text,
     marginVertical: 6,
   },
   macroInputsRow: {
@@ -285,12 +285,12 @@ const styles = StyleSheet.create({
   },
   macroInputLbl: {
     fontSize: 11,
-    color: "#92400E",
+    color: colors.textSecondary,
     marginBottom: 4,
     fontWeight: "600",
   },
   saveCustomBtn: {
-    backgroundColor: "#D97706",
+    backgroundColor: colors.carbs,
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: "center",

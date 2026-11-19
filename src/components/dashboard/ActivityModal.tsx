@@ -142,9 +142,9 @@ const styles = StyleSheet.create({
   appleHealthBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FDF2F8", // Pink 50
+    backgroundColor: colors.dangerLight,
     borderWidth: 1.5,
-    borderColor: "#FBCFE8", // Pink 200
+    borderColor: colors.danger,
     borderRadius: 16,
     padding: 14,
     marginBottom: 18,
@@ -156,17 +156,17 @@ const styles = StyleSheet.create({
   appleHealthTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#BE185D", // Pink 700
+    color: colors.danger,
   },
   appleHealthDesc: {
     fontSize: 11,
-    color: "#9D174D",
+    color: colors.textSecondary,
     marginTop: 2,
   },
   appleHealthAction: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#BE185D",
+    color: colors.danger,
   },
   inputGroup: {
     marginBottom: 16,

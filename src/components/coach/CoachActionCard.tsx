@@ -23,7 +23,7 @@ export function CoachActionCard({ action, onConfirm, onUndo }: CoachActionCardPr
       <View style={styles.headerRow}>
         <View style={[styles.iconWrap, isWater ? styles.waterIconWrap : styles.mealIconWrap]}>
           {isWater ? (
-            <Droplets size={16} color="#0284C7" />
+            <Droplets size={16} color={colors.water} />
           ) : (
             <Utensils size={16} color={colors.primaryDark} />
           )}
@@ -86,7 +86,7 @@ export function CoachActionCard({ action, onConfirm, onUndo }: CoachActionCardPr
       {/* Status Badge */}
       {isConfirmed && (
         <View style={styles.statusBadgeConfirmed}>
-          <CheckCircle2 size={13} color="#15803D" />
+          <CheckCircle2 size={13} color={colors.primaryDark} />
           <Text style={styles.statusBadgeTextConfirmed}>
             {isWater ? "Registrado en tu consumo de hoy" : "Guardado en tu diario de hoy"}
           </Text>
@@ -95,7 +95,7 @@ export function CoachActionCard({ action, onConfirm, onUndo }: CoachActionCardPr
 
       {isUndone && (
         <View style={styles.statusBadgeUndone}>
-          <RotateCcw size={13} color="#B45309" />
+          <RotateCcw size={13} color={colors.warning} />
           <Text style={styles.statusBadgeTextUndone}>Registro deshecho</Text>
         </View>
       )}
@@ -176,7 +176,7 @@ export function CoachActionCard({ action, onConfirm, onUndo }: CoachActionCardPr
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.background,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   waterIconWrap: {
-    backgroundColor: "#E0F2FE",
+    backgroundColor: colors.waterLight,
   },
   mealIconWrap: {
     backgroundColor: colors.primaryLight,
@@ -216,10 +216,12 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   mealItemsList: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 12,
     padding: 10,
     gap: 6,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
   mealItemRow: {
     flexDirection: "row",
@@ -251,7 +253,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
+    borderTopColor: colors.cardBorder,
     paddingTop: 8,
     marginTop: 4,
   },
@@ -273,41 +275,47 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "#DCFCE7",
+    backgroundColor: colors.successLight,
     paddingVertical: 5,
     paddingHorizontal: 8,
     borderRadius: 8,
     alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
   statusBadgeTextConfirmed: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#15803D",
+    color: colors.primaryDark,
   },
   statusBadgeUndone: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "#FEF3C7",
+    backgroundColor: colors.warningLight,
     paddingVertical: 5,
     paddingHorizontal: 8,
     borderRadius: 8,
     alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
   statusBadgeTextUndone: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#B45309",
+    color: colors.warning,
   },
   statusBadgeError: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "#FEE2E2",
+    backgroundColor: colors.dangerLight,
     paddingVertical: 5,
     paddingHorizontal: 8,
     borderRadius: 8,
     alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: colors.danger,
   },
   statusBadgeTextError: {
     fontSize: 11,

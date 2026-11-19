@@ -805,7 +805,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
     borderWidth: 1.5,
-    borderColor: "#C7D2FE",
+    borderColor: colors.protein,
     marginBottom: 26,
   },
   proCardHeader: {

@@ -60,7 +60,7 @@ export function CoachBuddy({ mood = "ready" }: { mood?: BuddyMood }) {
       { rotate: progress.interpolate({ inputRange: [0, 1], outputRange: ["-3deg", "3deg"] }) },
     ] }}>
       <Svg width={86} height={88} viewBox="0 0 100 100">
-        <Ellipse cx="50" cy="90" rx="25" ry="4" fill="#C7E7D5" />
+        <Ellipse cx="50" cy="90" rx="25" ry="4" fill="rgba(47, 173, 119, 0.25)" />
         <Path d="M50 28C27 23 15 41 20 62C24 80 40 88 50 88C65 88 81 77 82 59C83 38 72 26 50 28Z" fill="#2FAD77" />
         <Path d="M50 30C44 13 61 5 75 9C72 22 64 30 50 30Z" fill="#97DCAA" />
         <Path d="M50 30C48 19 37 11 27 13C27 23 36 31 50 30Z" fill="#65C88A" />

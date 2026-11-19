@@ -113,13 +113,13 @@ export default function ProfileSetupScreen() {
     const bmi = Math.round((parsedWeight / (heightM * heightM)) * 10) / 10;
     let bmiCategory = { label: "Saludable", color: colors.primaryDark, bg: colors.primaryLight };
     if (bmi < 18.5) {
-      bmiCategory = { label: "Bajo peso", color: "#B45309", bg: "#FEF3C7" };
+      bmiCategory = { label: "Bajo peso", color: colors.warning, bg: colors.warningLight };
     } else if (bmi < 25) {
       bmiCategory = { label: "Saludable", color: colors.primaryDark, bg: colors.primaryLight };
     } else if (bmi < 30) {
-      bmiCategory = { label: "Sobrepeso leve", color: "#B45309", bg: "#FEF3C7" };
+      bmiCategory = { label: "Sobrepeso leve", color: colors.warning, bg: colors.warningLight };
     } else {
-      bmiCategory = { label: "Obesidad", color: colors.danger, bg: "#FEE2E2" };
+      bmiCategory = { label: "Obesidad", color: colors.danger, bg: colors.dangerLight };
     }
 
     const bmr = calculateBMR(parsedWeight, parsedHeight, parsedAge, gender);

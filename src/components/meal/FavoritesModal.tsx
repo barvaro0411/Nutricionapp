@@ -454,15 +454,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   comboBadge: {
-    backgroundColor: "#E0E7FF",
+    backgroundColor: colors.proteinLight,
   },
   comboBadgeText: {
     fontSize: 10,
     fontWeight: "700",
-    color: "#3730A3",
+    color: colors.protein,
   },
   singleBadge: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.surfaceMuted,
   },
   singleBadgeText: {
     fontSize: 10,

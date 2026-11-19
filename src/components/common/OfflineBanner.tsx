@@ -11,6 +11,7 @@ import {
 } from "@/services/offlineService";
 import { updateAccessTokens } from "@/services/offlineQueueStore";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { colors } from "@/constants/colors";
 
 export function OfflineBanner() {
   const { isOffline, setIsOffline, pendingSyncCount } = useOfflineStore();
@@ -134,9 +135,9 @@ export function OfflineBanner() {
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: "#FEF3C7", // Amber 100
+    backgroundColor: colors.warningLight,
     borderBottomWidth: 1,
-    borderColor: "#FCD34D", // Amber 300
+    borderColor: colors.warning,
     paddingHorizontal: 16,
     paddingVertical: 10,
     flexDirection: "row",
@@ -144,9 +145,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   syncBanner: {
-    backgroundColor: "#DCFCE7", // Green 100
+    backgroundColor: colors.successLight,
     borderBottomWidth: 1,
-    borderColor: "#86EFAC", // Green 300
+    borderColor: colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 10,
     flexDirection: "row",
@@ -156,7 +157,7 @@ const styles = StyleSheet.create({
   syncText: {
     fontSize: 12.5,
     fontWeight: "700",
-    color: "#15803D",
+    color: colors.primaryDark,
   },
   textContainer: {
     flex: 1,
@@ -164,15 +165,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#92400E", // Amber 800
+    color: colors.text,
   },
   subtitle: {
     fontSize: 11,
-    color: "#B45309", // Amber 700
+    color: colors.warning,
     marginTop: 1,
   },
   retryBtn: {
-    backgroundColor: "#D97706",
+    backgroundColor: colors.warning,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,

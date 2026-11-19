@@ -612,12 +612,12 @@ const styles = StyleSheet.create({
   },
   cardHeaderRight: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   aiBadge: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: colors.proteinLight,
     paddingHorizontal: 7,
     paddingVertical: 2.5,
     borderRadius: 6,
   },
-  aiBadgeText: { fontSize: 10, fontWeight: "800", color: "#4F46E5" },
+  aiBadgeText: { fontSize: 10, fontWeight: "800", color: colors.protein },
   recipeBadge: { paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6 },
   recipeBadgeSuccess: { backgroundColor: colors.successLight },
   recipeBadgeWarning: { backgroundColor: colors.warningLight },
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   iconAi: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: colors.proteinLight,
   },
   time: { flexDirection: "row", alignItems: "center", gap: 5 },
   timeText: { fontSize: 11, color: colors.textSecondary },

@@ -283,9 +283,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: colors.proteinLight,
     borderWidth: 1,
-    borderColor: "#C7D2FE",
+    borderColor: colors.protein,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 20,
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   proBadgeText: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#4338CA",
+    color: colors.protein,
     letterSpacing: 0.8,
   },
   title: {
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#86EFAC",
+    borderColor: colors.primary,
   },
   softAltBtnText: {
     fontSize: 11.5,

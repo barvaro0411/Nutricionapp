@@ -656,8 +656,8 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   dietaryWarningBanner: {
-    backgroundColor: "#FEF3C7",
-    borderColor: "#F59E0B",
+    backgroundColor: colors.warningLight,
+    borderColor: colors.warning,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
@@ -667,7 +667,7 @@ const styles = StyleSheet.create({
   dietaryWarningText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#92400E",
+    color: colors.warning,
     lineHeight: 16,
   },
   bottomBar: {

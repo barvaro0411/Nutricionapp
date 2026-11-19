@@ -25,7 +25,7 @@ export default function TabLayout() {
           backgroundColor: colors.background,
           elevation: 0,
           shadowOpacity: 0,
-          borderBottomWidth: 0,
+          borderBottomWidth: 1,
           borderBottomColor: colors.cardBorder,
         },
         headerTitleStyle: {
@@ -119,6 +119,6 @@ const styles = StyleSheet.create({
   brandIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center" },
   brandText: { fontSize: 17, fontWeight: "800", letterSpacing: -0.5, color: colors.text },
   brandTagline: { fontSize: 9, color: colors.textSecondary, marginTop: 2 },
-  profileShortcut: { width: 44, height: 44, borderRadius: 15, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center", marginRight: 16, borderWidth: 1, borderColor: "#D3EADB" },
+  profileShortcut: { width: 44, height: 44, borderRadius: 15, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center", marginRight: 16, borderWidth: 1, borderColor: colors.cardBorder },
   profileInitial: { color: colors.primaryDark, fontSize: 16, fontWeight: "800" },
 });

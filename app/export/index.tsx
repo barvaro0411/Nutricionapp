@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   },
   waterText: {
     fontSize: 13,
-    color: "#0369A1",
+    color: colors.water,
     fontWeight: "600",
   },
   actionsContainer: {
