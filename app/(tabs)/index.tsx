@@ -83,7 +83,12 @@ const StreakModal = lazy(() =>
 const AppGuideModal = lazy(() =>
   import("@/components/dashboard/AppGuideModal").then((m) => ({ default: m.AppGuideModal }))
 );
-import { MealType, DetectedFoodItem } from "@/types/meal";
+const SavedMealDetailModal = lazy(() =>
+  import("@/components/dashboard/SavedMealDetailModal").then((m) => ({
+    default: m.SavedMealDetailModal,
+  }))
+);
+import { MealType, DetectedFoodItem, MealWithItems } from "@/types/meal";
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -117,6 +122,7 @@ export default function DashboardScreen() {
   const [showMasterPlanBuilder, setShowMasterPlanBuilder] = useState(false);
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [editingMeal, setEditingMeal] = useState<MealWithItems | null>(null);
   const [showDays, setShowDays] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>("almuerzo");
 
@@ -484,6 +490,7 @@ export default function DashboardScreen() {
                       mealType={type}
                       meals={data?.meals || []}
                       onAddPress={handleAddMeal}
+                      onMealPress={(meal) => setEditingMeal(meal)}
                       onSuggestMeal={handleSuggestMeal}
                       yesterdayMeal={yesterdayMeals?.[type]}
                       onRepeatYesterday={handleRepeatYesterday}
@@ -669,9 +676,9 @@ export default function DashboardScreen() {
                       <ChefHat size={18} color={colors.carbs} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.recipesBannerTitle}>Recetas</Text>
+                      <Text style={styles.recipesBannerTitle}>Recetas y Plan</Text>
                       <Text style={styles.recipesBannerDesc}>
-                        Chilenas y lista feria
+                        Plan semanal y feria
                       </Text>
                     </View>
                     <ChevronRight size={16} color={colors.textMuted} />
@@ -749,6 +756,24 @@ export default function DashboardScreen() {
             visible={showMasterPlanBuilder}
             existingPlan={personalPlan ?? null}
             onClose={() => setShowMasterPlanBuilder(false)}
+          />
+        )}
+
+        {/* Modal para editar o eliminar una comida ya guardada */}
+        {editingMeal && (
+          <SavedMealDetailModal
+            meal={editingMeal}
+            visible={!!editingMeal}
+            onClose={() => setEditingMeal(null)}
+            onChanged={async () => {
+              await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] }),
+                queryClient.invalidateQueries({ queryKey: ["weeklyStats"] }),
+                queryClient.invalidateQueries({ queryKey: ["qualityAndWaterStats"] }),
+                queryClient.invalidateQueries({ queryKey: ["recentMeals"] }),
+                queryClient.invalidateQueries({ queryKey: ["userStreak"] }),
+              ]);
+            }}
           />
         )}
 

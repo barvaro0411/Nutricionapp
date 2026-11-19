@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  addItemsToShoppingList,
   addManualShoppingItem,
   addRecipeToShoppingList,
   clearCheckedShoppingItems,
@@ -15,6 +16,7 @@ import {
   ShoppingCategory,
   ShoppingListItem,
   ShoppingUnit,
+  UpsertShoppingItemInput,
 } from "@/types/recipe";
 
 export interface ShoppingCategoryGroup {
@@ -36,6 +38,14 @@ export function useShoppingList() {
   const addRecipeMutation = useMutation({
     mutationFn: ({ recipe, servings }: { recipe: Recipe; servings?: number }) =>
       addRecipeToShoppingList(userId, recipe, servings),
+    onSuccess: (next) => {
+      queryClient.setQueryData(queryKey, next);
+    },
+  });
+
+  const addBulkMutation = useMutation({
+    mutationFn: (bulkItems: UpsertShoppingItemInput[]) =>
+      addItemsToShoppingList(userId, bulkItems),
     onSuccess: (next) => {
       queryClient.setQueryData(queryKey, next);
     },
@@ -118,12 +128,16 @@ export function useShoppingList() {
     error: listQuery.error,
     refetch: listQuery.refetch,
     addRecipeIngredients: addRecipeMutation.mutateAsync,
+    addBulkItems: addBulkMutation.mutateAsync,
     addManualItem: addManualMutation.mutateAsync,
     toggleItem: (itemId: string, checked: boolean) =>
       toggleMutation.mutate({ itemId, checked }),
     clearChecked: clearCheckedMutation.mutateAsync,
     removeItem: removeMutation.mutateAsync,
-    isAdding: addRecipeMutation.isPending || addManualMutation.isPending,
+    isAdding:
+      addRecipeMutation.isPending ||
+      addBulkMutation.isPending ||
+      addManualMutation.isPending,
     isMutating:
       toggleMutation.isPending ||
       clearCheckedMutation.isPending ||

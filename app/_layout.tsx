@@ -135,6 +135,7 @@ function RootNavigationLayout() {
       <Stack.Screen name="meal/camera" options={{ presentation: "fullScreenModal" }} />
       <Stack.Screen name="meal/barcode" options={{ presentation: "modal" }} />
       <Stack.Screen name="meal/menu-assistant" options={{ presentation: "modal" }} />
+      <Stack.Screen name="recipes/planner" options={{ presentation: "modal" }} />
       <Stack.Screen name="coach/index" options={{ presentation: "modal" }} />
       <Stack.Screen name="legal/index" options={{ presentation: "modal" }} />
     </Stack>

@@ -1,5 +1,7 @@
 import { supabase } from "@/services/supabase";
+import { removeMealPhoto } from "@/services/storageService";
 import { DetectedFoodItem, DetectedFoodItemSchema, MealTotals, MealType } from "@/types/meal";
+import { computeMealItemsTotals, EditableMealItem } from "@/utils/mealEditUtils";
 import { Json } from "@/types/database.types";
 import { randomUUID } from "expo-crypto";
 import {
@@ -100,5 +102,102 @@ export async function saveMealToDatabase(params: SaveMealParams) {
     }
 
     throw err;
+  }
+}
+
+export interface UpdateSavedMealParams {
+  userId: string;
+  mealId: string;
+  mealType: MealType;
+  loggedAtIso: string;
+  items: EditableMealItem[];
+  removedItemIds?: string[];
+}
+
+export async function updateSavedMeal(params: UpdateSavedMealParams) {
+  const { userId, mealId, mealType, loggedAtIso, items, removedItemIds = [] } = params;
+  if (!userId || !mealId) throw new Error("Falta información de la comida.");
+  if (!items.length) {
+    throw new Error("Debe quedar al menos un alimento o elimina la comida completa.");
+  }
+
+  for (const item of items) {
+    if (!Number.isFinite(item.grams) || item.grams <= 0 || item.grams > 20000) {
+      throw new Error(`Cantidad inválida para ${item.food_name}.`);
+    }
+  }
+
+  if (removedItemIds.length > 0) {
+    const { error: delItemsErr } = await supabase
+      .from("meal_items")
+      .delete()
+      .eq("meal_id", mealId)
+      .in("id", removedItemIds);
+    if (delItemsErr) {
+      throw new Error("No se pudieron quitar los alimentos eliminados.");
+    }
+  }
+
+  for (const item of items) {
+    const { error: itemErr } = await supabase
+      .from("meal_items")
+      .update({
+        grams: item.grams,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fat: item.fat,
+      })
+      .eq("id", item.id)
+      .eq("meal_id", mealId);
+
+    if (itemErr) {
+      throw new Error(`No se pudo actualizar ${item.food_name}.`);
+    }
+  }
+
+  const totals = computeMealItemsTotals(items);
+  const { data, error: mealErr } = await supabase
+    .from("meals")
+    .update({
+      meal_type: mealType,
+      logged_at: loggedAtIso,
+      total_calories: totals.calories,
+      total_protein: totals.protein,
+      total_carbs: totals.carbs,
+      total_fat: totals.fat,
+    })
+    .eq("id", mealId)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (mealErr || !data) {
+    throw new Error("No se pudieron guardar los cambios de la comida.");
+  }
+
+  return data;
+}
+
+export async function deleteSavedMeal(params: {
+  userId: string;
+  mealId: string;
+  imagePath?: string | null;
+}) {
+  const { userId, mealId, imagePath } = params;
+  if (!userId || !mealId) throw new Error("Falta información de la comida.");
+
+  const { error } = await supabase
+    .from("meals")
+    .delete()
+    .eq("id", mealId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error("No se pudo eliminar la comida.");
+  }
+
+  if (imagePath) {
+    await removeMealPhoto(imagePath).catch(() => undefined);
   }
 }

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowLeft,
   ArrowUpRight,
+  CalendarDays,
   ChefHat,
   Clock3,
   Plus,
@@ -154,6 +155,16 @@ export default function RecipesCatalogScreen() {
         </Pressable>
 
         <View style={styles.topRightBtns}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Abrir planificador semanal"
+            style={styles.shoppingBtn}
+            onPress={() => router.push("/recipes/planner" as any)}
+          >
+            <CalendarDays size={16} color={colors.primaryDark} />
+            <Text style={styles.shoppingBtnText}>Plan Semanal</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Abrir lista de compras"
@@ -518,6 +529,7 @@ const styles = StyleSheet.create({
   backText: { fontSize: 13, fontWeight: "600", color: colors.primary },
   topRightBtns: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 8,
   },

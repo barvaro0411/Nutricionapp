@@ -12,6 +12,7 @@ import {
   Check,
   Sparkles,
   RotateCcw,
+  Pencil,
   LucideIcon,
 } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
@@ -130,7 +131,8 @@ export function MealCard({
             <View key={meal.id} style={styles.mealBlock}>
               {meal.image_path && <MealPhoto key={meal.image_path} path={meal.image_path} />}
               <Pressable disabled={!onMealPress} accessibilityRole={onMealPress ? "button" : undefined}
-                accessibilityLabel={onMealPress ? `Ver registro de ${meta.title}` : undefined}
+                accessibilityLabel={onMealPress ? `Editar registro de ${meta.title}` : undefined}
+                style={({ pressed }) => [pressed && onMealPress && { opacity: 0.78 }]}
                 onPress={() => onMealPress?.(meal)}>
                 {meal.items.map((item) => (
                   <View key={item.id} style={styles.itemRow}>
@@ -152,6 +154,12 @@ export function MealCard({
                     </View>
                   </View>
                 ))}
+                {onMealPress && (
+                  <View style={styles.editMealHintRow}>
+                    <Pencil size={11} color={colors.primaryDark} />
+                    <Text style={styles.editMealHintText}>Toca para editar porción o borrar</Text>
+                  </View>
+                )}
               </Pressable>
             </View>
           ))}
@@ -324,6 +332,22 @@ const styles = StyleSheet.create({
   photoRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 },
   photo: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.surfaceMuted },
   photoLabel: { fontSize: 11, color: colors.textSecondary, flex: 1 },
+  editMealHintRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 6,
+    alignSelf: "flex-end",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: colors.primaryGhost,
+  },
+  editMealHintText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.primaryDark,
+  },
   yesterdayBox: {
     backgroundColor: colors.waterLight,
     borderWidth: 1.5,
