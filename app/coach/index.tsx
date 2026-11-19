@@ -75,7 +75,7 @@ export default function CoachChatScreen() {
   const [actionOverrides, setActionOverrides] = useState<Record<string, CoachActionData>>({});
   const [isActionProcessing, setIsActionProcessing] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
-  const hasAutoSentRef = useRef(false);
+  const lastSentPromptRef = useRef<string | null>(null);
   const speech = useCoachSpeech();
   const live = useCoachLive();
 
@@ -306,12 +306,16 @@ export default function CoachChatScreen() {
 
   // Auto-envío inmediato si se redirigió con una sugerencia desde el Dashboard
   useEffect(() => {
-    if (initialPrompt && typeof initialPrompt === "string" && !hasAutoSentRef.current) {
-      hasAutoSentRef.current = true;
-      router.replace("/coach");
+    if (
+      initialPrompt &&
+      typeof initialPrompt === "string" &&
+      lastSentPromptRef.current !== initialPrompt
+    ) {
+      lastSentPromptRef.current = initialPrompt;
+      router.setParams({ initialPrompt: undefined });
       void handleSend(initialPrompt);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo se ejecuta una vez al montar con initialPrompt
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo se ejecuta al recibir un nuevo initialPrompt
   }, [initialPrompt]);
 
   const handleClearHistory = () => {
@@ -336,8 +340,10 @@ export default function CoachChatScreen() {
     );
   };
 
+  const dailyClosingPrompt =
+    "Hazme el cierre de mi día según mis comidas y agua registradas hoy, felicitándome por mis avances y dándome un consejo práctico para mañana.";
+
   const quickPrompts = [
-    { title: "¿Cómo estuvo mi día?", description: "Balance y cierre del día", prompt: "Hazme el cierre de mi día según mis comidas y agua registradas hoy, felicitándome por mis avances y dándome un consejo práctico para mañana.", Icon: Sparkles },
     { title: "Ideas para cenar", description: "Según tus registros", prompt: "¿Qué puedo cenar con las calorías que me faltan hoy?", Icon: Utensils },
     { title: "Mi proteína", description: "Revisa tu meta de hoy", prompt: "¿Cómo voy con mi meta de proteína de hoy?", Icon: Target },
     { title: "Una colación", description: "Opciones con proteína", prompt: "Recomiéndame un snack chileno alto en proteína", Icon: Apple },
@@ -436,6 +442,27 @@ export default function CoachChatScreen() {
 
         {messages.length < 3 && !isLoading && !error && (
           <View style={styles.promptsContainer}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="¿Cómo estuvo mi día? Pedir balance y cierre del día al Coach IA"
+              disabled={isBusy || live.active}
+              onPress={() => handleSend(dailyClosingPrompt)}
+              style={[
+                styles.closingPromptBanner,
+                (isBusy || live.active) && styles.sendButtonDisabled,
+              ]}
+            >
+              <View style={styles.closingPromptIcon}>
+                <Sparkles size={18} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.closingPromptTitle}>¿Cómo estuvo mi día?</Text>
+                <Text style={styles.closingPromptDesc}>
+                  Revisa tus macros, logros de hoy y un consejo para mañana
+                </Text>
+              </View>
+              <ArrowUpRight size={18} color={colors.primary} />
+            </TouchableOpacity>
             <Text style={styles.promptsTitle}>Empieza con una idea</Text>
             <View style={styles.promptsRow}>
               {quickPrompts.map(({ title, description, prompt, Icon }) => (
@@ -675,13 +702,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
-  companionCard: { flexDirection: "row", alignItems: "center", marginBottom: 16, padding: 10, borderRadius: 22, backgroundColor: "#EDF8F1", borderWidth: 1, borderColor: "#D5EBDD", gap: 8 },
-  companionCopy: { flex: 1, minWidth: 0, gap: 7 },
-  companionEyebrow: { color: "#39845A", fontSize: 9, fontWeight: "800", letterSpacing: 1 },
-  companionTitle: { color: "#214B35", fontSize: 16, fontWeight: "800", lineHeight: 21 },
+  companionCard: { flexDirection: "row", alignItems: "center", marginBottom: 16, padding: 12, borderRadius: 22, backgroundColor: colors.primaryGhost, borderWidth: 1, borderColor: colors.cardBorder, gap: 10 },
+  companionCopy: { flex: 1, minWidth: 0, gap: 6 },
+  companionEyebrow: { color: colors.primary, fontSize: 9.5, fontWeight: "800", letterSpacing: 1 },
+  companionTitle: { color: colors.text, fontSize: 16, fontWeight: "800", lineHeight: 21 },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#2FAD77" },
-  companionStatus: { flex: 1, color: "#44735A", fontSize: 11, lineHeight: 16 },
+  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primaryAccent },
+  companionStatus: { flex: 1, color: colors.textSecondary, fontSize: 11, lineHeight: 16 },
   messagesList: {
     flex: 1,
   },
@@ -868,8 +895,8 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   voiceBar: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderColor: colors.cardBorder },
-  voiceButton: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 64, padding: 12, backgroundColor: colors.primaryLight, borderRadius: 18, borderWidth: 1, borderColor: "#D3EADB" },
-  voiceButtonActive: { backgroundColor: "#FFF5F5", borderColor: "#ECCFD2" },
+  voiceButton: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 64, padding: 12, backgroundColor: colors.primaryLight, borderRadius: 18, borderWidth: 1, borderColor: colors.cardBorder },
+  voiceButtonActive: { backgroundColor: colors.dangerLight, borderColor: colors.danger },
   voiceIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   voiceIconActive: { backgroundColor: colors.dangerLight },
   voiceCopy: { flex: 1, minWidth: 0 },
@@ -878,7 +905,37 @@ const styles = StyleSheet.create({
   voiceError: { color: colors.textSecondary, paddingHorizontal: 16, paddingVertical: 8, fontSize: 13 },
   liveDraft: { borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 16, backgroundColor: colors.primaryLight, padding: 14, gap: 6, marginBottom: 12 },
   draftText: { color: colors.text, fontSize: 14, lineHeight: 21 },
-  retryCard: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#FFF7E8", borderTopWidth: 1, borderColor: "#F1DFC1" },
-  retryText: { flex: 1, color: "#6D532D", fontSize: 12, lineHeight: 18 },
+  retryCard: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.warningLight, borderTopWidth: 1, borderColor: colors.cardBorder },
+  retryText: { flex: 1, color: colors.text, fontSize: 12, lineHeight: 18 },
   retryButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: 10 },
+  closingPromptBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.primaryGhost,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 14,
+  },
+  closingPromptIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closingPromptTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  closingPromptDesc: {
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    marginTop: 2,
+    lineHeight: 16,
+  },
 });

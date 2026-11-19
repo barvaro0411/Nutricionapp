@@ -11,9 +11,11 @@ describe("Shopping List Utils (Feria & Supermercado)", () => {
   it("classifies Chilean ingredients into the correct grocery categories", () => {
     expect(classifyGroceryCategory("Palta Hass")).toBe("feria");
     expect(classifyGroceryCategory("Tomate en cubos")).toBe("feria");
+    expect(classifyGroceryCategory("Cochayuyo")).toBe("feria");
     expect(classifyGroceryCategory("Pechuga de pollo cocida")).toBe("carnes");
     expect(classifyGroceryCategory("Huevos revueltos")).toBe("carnes");
     expect(classifyGroceryCategory("Quesillo")).toBe("lacteos");
+    expect(classifyGroceryCategory("Queso gauda")).toBe("lacteos");
     expect(classifyGroceryCategory("Yogur proteico natural")).toBe("lacteos");
     expect(classifyGroceryCategory("Avena tradicional")).toBe("abarrotes");
     expect(classifyGroceryCategory("Pan marraqueta")).toBe("abarrotes");

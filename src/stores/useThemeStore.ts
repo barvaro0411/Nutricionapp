@@ -40,6 +40,12 @@ export function applyWebThemeVariables(isDark: boolean): void {
   root.setAttribute("data-theme", isDark ? "dark" : "light");
   root.style.colorScheme = isDark ? "dark" : "light";
 
+  // Actualizar meta theme-color para barra superior en PWA (iOS/Android)
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) {
+    metaTheme.setAttribute("content", isDark ? darkPalette.background : lightPalette.primary);
+  }
+
   let styleEl = document.getElementById("nutricion-theme-variables") as HTMLStyleElement | null;
   if (!styleEl) {
     styleEl = document.createElement("style");
@@ -82,40 +88,19 @@ export function applyWebThemeVariables(isDark: boolean): void {
       --c-success: ${p.success};
       --c-success-light: ${p.successLight};
     }
-    body {
+    html, body, #root {
       background-color: ${p.background} !important;
       color: ${p.text};
+    }
+    body {
       transition: background-color 0.2s ease, color 0.2s ease;
     }
-    ${
-      isDark
-        ? `
-    /* Adaptación suave de superficies secundarias fijas en modo bosque nocturno */
-    html[data-theme="dark"] [style*="background-color: rgb(255, 255, 255)"],
-    html[data-theme="dark"] [style*="background-color: rgba(255, 255, 255, 1)"] {
-      background-color: ${darkPalette.card} !important;
+    input::placeholder, textarea::placeholder {
+      color: ${p.textMuted};
     }
-    html[data-theme="dark"] [style*="background-color: rgb(248, 250, 252)"],
-    html[data-theme="dark"] [style*="background-color: rgb(241, 245, 249)"],
-    html[data-theme="dark"] [style*="background-color: rgb(246, 248, 245)"] {
-      background-color: ${darkPalette.surfaceMuted} !important;
-    }
-    html[data-theme="dark"] [style*="border-top-color: rgb(241, 245, 249)"],
-    html[data-theme="dark"] [style*="border-bottom-color: rgb(241, 245, 249)"],
-    html[data-theme="dark"] [style*="border-color: rgb(226, 232, 240)"] {
-      border-color: ${darkPalette.cardBorder} !important;
-    }
-    html[data-theme="dark"] [style*="color: rgb(15, 23, 42)"],
-    html[data-theme="dark"] [style*="color: rgb(30, 41, 59)"],
-    html[data-theme="dark"] [style*="color: rgb(23, 53, 44)"] {
-      color: ${darkPalette.text} !important;
-    }
-    html[data-theme="dark"] [style*="color: rgb(71, 85, 105)"],
-    html[data-theme="dark"] [style*="color: rgb(100, 116, 139)"] {
-      color: ${darkPalette.textSecondary} !important;
-    }
-    `
-        : ""
+    button:focus-visible, [role="button"]:focus-visible, [role="tab"]:focus-visible {
+      outline: 2px solid ${p.primary};
+      outline-offset: 2px;
     }
   `;
 }
@@ -189,6 +174,23 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   },
 }));
 
-if (typeof window !== "undefined" && typeof document !== "undefined") {
+// Auto-hidratar y escuchar cambios de preferencia del sistema en navegador
+if (
+  typeof window !== "undefined" &&
+  typeof document !== "undefined" &&
+  (typeof process === "undefined" || !process.env?.JEST_WORKER_ID)
+) {
   void useThemeStore.getState().hydrate();
+  if (typeof window.matchMedia === "function") {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onSystemChange = () => {
+      const state = useThemeStore.getState();
+      if (state.mode === "system") {
+        const nextDark = media.matches;
+        applyWebThemeVariables(nextDark);
+        useThemeStore.setState({ isDark: nextDark });
+      }
+    };
+    media.addEventListener?.("change", onSystemChange);
+  }
 }

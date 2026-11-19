@@ -93,8 +93,8 @@ export function SmartCoachCard({
   if (mealCount === 0) {
     insight = {
       tag: "Inicio del Día",
-      tagColor: "#059669",
-      tagBg: "#ECFDF5",
+      tagColor: colors.primaryDark,
+      tagBg: colors.successLight,
       title: "Comienza tu día con buen balance",
       message:
         "Aún no registras comidas hoy. Un desayuno balanceado con proteína y fibra (huevos, avena o marraqueta con palta) te dará energía sostenida.",
@@ -103,8 +103,8 @@ export function SmartCoachCard({
   } else if (remainingCalories < -100) {
     insight = {
       tag: "Recuperación",
-      tagColor: "#DC2626",
-      tagBg: "#FEF2F2",
+      tagColor: colors.danger,
+      tagBg: colors.dangerLight,
       title: "Superaste tu presupuesto calórico",
       message: `Te pasaste por ${Math.round(Math.abs(remainingCalories))} kcal. No te preocupes: la consistencia semanal manda. Bebe agua, haz una caminata ligera y mantén la calma.`,
       prompt: "¿Cómo balancear mis siguientes comidas tras superar las calorías?",
@@ -113,8 +113,8 @@ export function SmartCoachCard({
     const diff = Math.max(0, Math.round(remainingProtein));
     insight = {
       tag: "Desbalance de Macros",
-      tagColor: "#B45309",
-      tagBg: "#FEF3C7",
+      tagColor: colors.carbs,
+      tagBg: colors.warningLight,
       title: "Pocas calorías y proteína pendiente",
       message: `Llevas el ${Math.round(calPct)}% de tus calorías pero solo el ${Math.round(proteinPct)}% de tu proteína (faltan ${diff}g). Prioriza fuentes proteicas magras como pechuga de pollo, claras, atún o yogur proteico.`,
       prompt: `Llevo el ${Math.round(calPct)}% de mis calorías pero me faltan ${diff}g de proteína. ¿Qué alimentos magros y saciantes me recomiendas para el resto del día?`,
@@ -122,8 +122,8 @@ export function SmartCoachCard({
   } else if (remainingCalories <= 350 && remainingCalories >= 0 && mealCount < 4) {
     insight = {
       tag: "Cena Ligera",
-      tagColor: "#EA580C",
-      tagBg: "#FFF7ED",
+      tagColor: colors.warning,
+      tagBg: colors.warningLight,
       title: "Presupuesto ajustado para la cena",
       message: `Te quedan ${Math.round(remainingCalories)} kcal disponibles. Te sugerimos una cena saciante de bajo aporte calórico: ensalada con atún o sopa de verduras.`,
       prompt: `Tengo solo ${Math.round(remainingCalories)} kcal restantes. ¿Qué cena chilena ligera y saciante me recomiendas?`,
@@ -132,8 +132,8 @@ export function SmartCoachCard({
     const diff = Math.max(0, Math.round(remainingProtein));
     insight = {
       tag: "Proteína",
-      tagColor: "#D97706",
-      tagBg: "#FEF3C7",
+      tagColor: colors.carbs,
+      tagBg: colors.warningLight,
       title: "Atención a tu meta de proteína",
       message: `Llevas ${Math.round(consumedProtein)}g de los ${Math.round(goalProtein)}g objetivo (faltan ${diff}g). Una porción de pechuga, atún o 2 huevos te ayudarán a completarla.`,
       prompt: `Me faltan ${diff}g de proteína hoy. ¿Qué alimentos rápidos me recomiendas comer?`,
@@ -141,8 +141,8 @@ export function SmartCoachCard({
   } else if (waterMl < targetWaterMl * 0.4 && currentHour >= 14) {
     insight = {
       tag: "Hidratación",
-      tagColor: "#0284C7",
-      tagBg: "#F0F9FF",
+      tagColor: colors.water,
+      tagBg: colors.waterLight,
       title: "Hidratación pendiente",
       message: `Llevas ${waterMl} ml de tu meta de ${targetWaterMl} ml. La deshidratación reduce tu energía y causa falsa sensación de hambre. ¡Toma un vaso ahora!`,
       prompt: "¿Cuánta agua debería beber diariamente y qué beneficios tiene para mi objetivo?",
@@ -150,8 +150,8 @@ export function SmartCoachCard({
   } else {
     insight = {
       tag: "Ritmo Óptimo",
-      tagColor: "#10B981",
-      tagBg: "#ECFDF5",
+      tagColor: colors.primaryDark,
+      tagBg: colors.successLight,
       title: "¡Vas con excelente balance hoy!",
       message: `Llevas ${Math.round(consumedCalories)} de ${Math.round(goalCalories)} kcal y ${Math.round(consumedProtein)}g de proteína. Continúa así para cerrar tu día en verde.`,
       prompt: "¿Cómo evaluarías mis comidas de hoy y qué snack ligero me recomiendas?",

@@ -1,5 +1,6 @@
 import { Recipe } from "@/services/recipeService";
 import { isLiquidFood, formatQuantityDisplay } from "@/utils/liquidUnits";
+import { colors } from "@/constants/colors";
 
 export type GroceryCategory = "feria" | "carnes" | "lacteos" | "abarrotes";
 
@@ -18,32 +19,32 @@ export const GROCERY_CATEGORIES: GroceryCategoryMeta[] = [
     title: "Feria Libre (Frutas y Verduras)",
     subtitle: "Productos frescos de estación",
     emoji: "🥬",
-    badgeBg: "#ECFDF5",
-    badgeColor: "#047857",
+    badgeBg: colors.successLight,
+    badgeColor: colors.primaryDark,
   },
   {
     key: "carnes",
     title: "Carnes, Pescados y Huevos",
     subtitle: "Proteínas principales",
     emoji: "🥩",
-    badgeBg: "#FEF2F2",
-    badgeColor: "#B91C1C",
+    badgeBg: colors.dangerLight,
+    badgeColor: colors.danger,
   },
   {
     key: "lacteos",
     title: "Lácteos y Refrigerados",
     subtitle: "Leches, yogures y quesos",
     emoji: "🥛",
-    badgeBg: "#EFF6FF",
-    badgeColor: "#1D4ED8",
+    badgeBg: colors.waterLight,
+    badgeColor: colors.water,
   },
   {
     key: "abarrotes",
     title: "Abarrotes y Despensa",
     subtitle: "Granos, panes, frutos secos y aliños",
     emoji: "🌾",
-    badgeBg: "#FFFBEB",
-    badgeColor: "#B45309",
+    badgeBg: colors.carbsLight,
+    badgeColor: colors.carbs,
   },
 ];
 
@@ -81,7 +82,7 @@ export function classifyGroceryCategory(foodName: string): GroceryCategory {
 
   // 1. Lácteos y refrigerados (evaluar antes por ej. "leche de vaca", "queso fresco")
   if (
-    /\b(leche|yogur|yogurt|queso|quesillo|chacarero|ricota|ricotta|mantequilla|crema|kefir|tofu|tempeh|margarina)\b/i.test(
+    /\b(leche|yogur|yogurt|queso|quesillo|chanco|gauda|parmesano|mozzarella|ricota|ricotta|mantequilla|crema|kefir|tofu|tempeh|margarina)\b/i.test(
       norm
     ) &&
     !/\b(coco|almendra|soya|avena)\b/i.test(norm)
@@ -100,7 +101,7 @@ export function classifyGroceryCategory(foodName: string): GroceryCategory {
 
   // 3. Feria Libre (Frutas, verduras, tubérculos y hierbas frescas)
   if (
-    /\b(palta|tomate|lechuga|espinaca|acelga|rucula|repollo|kale|apio|pepino|zanahoria|zapallo|italiano|betarraga|cebolla|cebollin|ajo|pimenton|aji|brocoli|coliflor|esparrago|poroto verde|porotos verdes|choclo|arveja|champinon|seta|papa|papas|camote|cilantro|perejil|albahaca|menta|jengibre|limon|naranja|mandarina|pomelo|manzana|platano|banana|frutilla|arandano|frambuesa|mora|berries|kiwi|pera|durazno|damasco|ciruela|uva|melon|sandia|pina|mango|palmito| cochayuyo)\b/i.test(
+    /\b(palta|tomate|lechuga|espinaca|acelga|rucula|repollo|kale|apio|pepino|zanahoria|zapallo|italiano|betarraga|cebolla|cebollin|ajo|pimenton|aji|brocoli|coliflor|esparrago|poroto verde|porotos verdes|choclo|arveja|champinon|seta|papa|papas|camote|cilantro|perejil|albahaca|menta|jengibre|limon|naranja|mandarina|pomelo|manzana|platano|banana|frutilla|arandano|frambuesa|mora|berries|kiwi|pera|durazno|damasco|ciruela|uva|melon|sandia|pina|mango|palmito|cochayuyo)\b/i.test(
       norm
     )
   ) {

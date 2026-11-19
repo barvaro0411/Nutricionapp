@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, Image, ActivityIndicator } from "react-native";
 import {
   Sunrise,
@@ -23,10 +23,10 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { YesterdayMealOption } from "@/hooks/useYesterdayMeal";
 
 const MEAL_META: Record<MealType, { title: string; Icon: LucideIcon; color: string; bg: string }> = {
-  desayuno: { title: "Desayuno", Icon: Sunrise, color: "#D97706", bg: "#FEF3C7" },
-  almuerzo: { title: "Almuerzo", Icon: Sun, color: "#059669", bg: "#ECFDF5" },
-  cena: { title: "Once / Cena", Icon: Moon, color: "#4F46E5", bg: "#EEF2FF" },
-  snack: { title: "Colación", Icon: Apple, color: "#0284C7", bg: "#F0F9FF" },
+  desayuno: { title: "Desayuno", Icon: Sunrise, color: colors.carbs, bg: colors.carbsLight },
+  almuerzo: { title: "Almuerzo", Icon: Sun, color: colors.primary, bg: colors.primaryLight },
+  cena: { title: "Once / Cena", Icon: Moon, color: colors.protein, bg: colors.proteinLight },
+  snack: { title: "Colación", Icon: Apple, color: colors.fat, bg: colors.fatLight },
 };
 
 /** A photo belongs to the whole meal, rather than to any one ingredient. */
@@ -83,6 +83,16 @@ export function MealCard({
   const filteredMeals = meals.filter((meal) => meal.meal_type === mealType);
   const hasMeals = filteredMeals.length > 0;
   const [expanded, setExpanded] = useState(hasMeals);
+  const prevHasMealsRef = useRef(hasMeals);
+
+  useEffect(() => {
+    if (!prevHasMealsRef.current && hasMeals) {
+      setExpanded(true);
+    } else if (prevHasMealsRef.current && !hasMeals) {
+      setExpanded(false);
+    }
+    prevHasMealsRef.current = hasMeals;
+  }, [hasMeals]);
   const totals = filteredMeals.reduce((sum, meal) => ({
     calories: sum.calories + meal.total_calories,
     protein: sum.protein + meal.total_protein,
@@ -153,7 +163,7 @@ export function MealCard({
         <View style={styles.yesterdayBox}>
           <View style={styles.yesterdayHeader}>
             <View style={styles.yesterdayIconBadge}>
-              <RotateCcw size={12} color="#1D4ED8" />
+              <RotateCcw size={12} color={colors.water} />
             </View>
             <Text style={styles.yesterdayLabel}>¿REPETISTE LO DE AYER?</Text>
           </View>
@@ -208,7 +218,7 @@ export function MealCard({
             onPress={() => onSuggestMeal(mealType)}
             style={({ pressed }) => [styles.suggestButton, pressed && { opacity: 0.75 }]}
           >
-            <Sparkles size={14} color="#D97706" />
+            <Sparkles size={14} color={colors.carbs} />
             <Text style={styles.suggestText}>Sugerir con IA</Text>
           </Pressable>
           <Pressable
@@ -253,12 +263,12 @@ const styles = StyleSheet.create({
   calUnit: { fontSize: 9, color: colors.primaryDark, marginTop: 1 },
   itemsList: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.cardBorder, gap: 10 },
   mealBlock: { gap: 8 },
-  itemRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 10, borderRadius: 14, backgroundColor: "#F7F9F7", marginBottom: 7 },
-  foodIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#EBF1EB", alignItems: "center", justifyContent: "center" },
+  itemRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 10, borderRadius: 14, backgroundColor: colors.surfaceMuted, marginBottom: 7 },
+  foodIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.cardBorder, alignItems: "center", justifyContent: "center" },
   itemDetails: { flex: 1, minWidth: 0, gap: 7 },
   itemName: { fontSize: 13, lineHeight: 19, color: colors.text, fontWeight: "600" },
   itemBottom: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
-  quantityTag: { backgroundColor: "#EAF0EA", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  quantityTag: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.cardBorder, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
   itemGrams: { fontSize: 11, color: colors.textSecondary, fontWeight: "600" },
   itemCalories: { fontSize: 12, fontWeight: "700", color: colors.text, marginLeft: "auto" },
   addButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, minHeight: 48, backgroundColor: colors.primaryLight, borderRadius: 14, marginTop: 12 },
@@ -272,7 +282,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: "#DCFCE7",
+    borderColor: colors.cardBorder,
   },
   verifiedText: {
     color: colors.primaryDark,
@@ -291,14 +301,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     minHeight: 44,
-    backgroundColor: "#FFFBEB",
+    backgroundColor: colors.carbsLight,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#FEF3C7",
+    borderColor: colors.cardBorder,
   },
   suggestText: {
     fontSize: 12,
-    color: "#B45309",
+    color: colors.carbs,
     fontWeight: "700",
   },
   addButtonCompact: {
@@ -315,9 +325,9 @@ const styles = StyleSheet.create({
   photo: { width: 64, height: 64, borderRadius: 12, backgroundColor: colors.surfaceMuted },
   photoLabel: { fontSize: 11, color: colors.textSecondary, flex: 1 },
   yesterdayBox: {
-    backgroundColor: "#F0F9FF",
+    backgroundColor: colors.waterLight,
     borderWidth: 1.5,
-    borderColor: "#BAE6FD",
+    borderColor: colors.waterTrack,
     borderRadius: 16,
     padding: 12,
     marginTop: 10,
@@ -333,14 +343,14 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "#E0F2FE",
+    backgroundColor: colors.waterTrack,
     alignItems: "center",
     justifyContent: "center",
   },
   yesterdayLabel: {
     fontSize: 10,
     fontWeight: "800",
-    color: "#0369A1",
+    color: colors.water,
     letterSpacing: 0.5,
   },
   yesterdayTitle: {
@@ -367,7 +377,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     minHeight: 38,
-    backgroundColor: "#0284C7",
+    backgroundColor: colors.water,
     paddingHorizontal: 12,
     borderRadius: 10,
   },
@@ -379,13 +389,13 @@ const styles = StyleSheet.create({
   customizeBtn: {
     minHeight: 38,
     paddingHorizontal: 12,
-    backgroundColor: "#E0F2FE",
+    backgroundColor: colors.waterTrack,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   customizeBtnText: {
-    color: "#0369A1",
+    color: colors.water,
     fontSize: 12,
     fontWeight: "700",
   },

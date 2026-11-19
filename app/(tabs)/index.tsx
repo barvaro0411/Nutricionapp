@@ -193,7 +193,12 @@ export default function DashboardScreen() {
         loggedAt: new Date(loggedAtForDate(selectedDate)),
       });
 
-      await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] }),
+        queryClient.invalidateQueries({ queryKey: ["weeklyStats"] }),
+        queryClient.invalidateQueries({ queryKey: ["recentMeals"] }),
+        queryClient.invalidateQueries({ queryKey: ["userStreak"] }),
+      ]);
       showToast({
         type: "success",
         title: "¡Guardado en 1 toque!",
@@ -506,123 +511,122 @@ export default function DashboardScreen() {
                 <ArrowUpRight size={18} color={colors.primary} />
               </View>
             </TouchableOpacity>
-            <View style={[styles.summaryLayout, wide && styles.summaryWide]}>
-              <View style={styles.summaryMain}>
-                {/* Barra de atajos de registro rápido */}
-                <View style={styles.quickActionsBar}>
-                  <TouchableOpacity
-                    style={styles.quickActionBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel="Registrar con foto"
-                    onPress={() => {
-                      beginMeal();
-                      router.push("/meal/camera");
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View
-                      style={[
-                        styles.quickActionIconWrap,
-                        { backgroundColor: colors.primaryLight },
-                      ]}
-                    >
-                      <Camera size={18} color={colors.primary} />
-                    </View>
-                    <Text style={styles.quickActionText}>Foto IA</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.quickActionBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel="Registrar con texto o voz"
-                    onPress={() => {
-                      beginMeal();
-                      setShowTextVoiceModal(true);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View
-                      style={[
-                        styles.quickActionIconWrap,
-                        { backgroundColor: "#EEF2FF" },
-                      ]}
-                    >
-                      <Mic size={18} color="#6366F1" />
-                    </View>
-                    <Text style={styles.quickActionText}>Texto/Voz</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.quickActionBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel="Registrar con código de barras"
-                    onPress={() => {
-                      beginMeal();
-                      router.push("/meal/barcode");
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View
-                      style={[
-                        styles.quickActionIconWrap,
-                        { backgroundColor: "#F0F9FF" },
-                      ]}
-                    >
-                      <Barcode size={18} color="#0EA5E9" />
-                    </View>
-                    <Text style={styles.quickActionText}>Código</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.quickActionBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel="Registrar comida frecuente"
-                    onPress={() => {
-                      beginMeal();
-                      setShowFavoritesModal(true);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View
-                      style={[
-                        styles.quickActionIconWrap,
-                        { backgroundColor: "#FEF3C7" },
-                      ]}
-                    >
-                      <Star size={18} color="#F59E0B" />
-                    </View>
-                    <Text style={styles.quickActionText}>Frecuentes</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <View
-                style={[styles.summarySide, wide && styles.summarySideWide]}
+            {/* Barra de atajos de registro rápido */}
+            <View style={styles.quickActionsBar}>
+              <TouchableOpacity
+                style={styles.quickActionBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar con foto"
+                onPress={() => {
+                  beginMeal();
+                  router.push("/meal/camera");
+                }}
+                activeOpacity={0.8}
               >
-                {isToday && (
-                  <>
-                    {/* Smart Coach Proactivo (Fase 3) */}
-                    <SmartCoachCard
-                      userName={profile?.full_name}
-                      consumedCalories={data?.consumed.calories || 0}
-                      goalCalories={adjustedGoals.calories}
-                      remainingCalories={Math.max(0, adjustedGoals.calories - (data?.consumed.calories || 0))}
-                      consumedProtein={data?.consumed.protein || 0}
-                      goalProtein={adjustedGoals.proteinG}
-                      remainingProtein={Math.max(0, adjustedGoals.proteinG - (data?.consumed.protein || 0))}
-                      waterMl={totalMl}
-                      targetWaterMl={targetMl}
-                      mealCount={data?.meals.length || 0}
-                      onAskCoach={(prompt) => {
-                        router.push({
-                          pathname: "/coach",
-                          params: { initialPrompt: prompt },
-                        });
-                      }}
-                    />
-                  </>
-                )}
+                <View
+                  style={[
+                    styles.quickActionIconWrap,
+                    { backgroundColor: colors.primaryLight },
+                  ]}
+                >
+                  <Camera size={18} color={colors.primary} />
+                </View>
+                <Text style={styles.quickActionText}>Foto IA</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickActionBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar con texto o voz"
+                onPress={() => {
+                  beginMeal();
+                  setShowTextVoiceModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <View
+                  style={[
+                    styles.quickActionIconWrap,
+                    { backgroundColor: colors.proteinLight },
+                  ]}
+                >
+                  <Mic size={18} color={colors.protein} />
+                </View>
+                <Text style={styles.quickActionText}>Texto/Voz</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickActionBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar con código de barras"
+                onPress={() => {
+                  beginMeal();
+                  router.push("/meal/barcode");
+                }}
+                activeOpacity={0.8}
+              >
+                <View
+                  style={[
+                    styles.quickActionIconWrap,
+                    { backgroundColor: colors.fatLight },
+                  ]}
+                >
+                  <Barcode size={18} color={colors.fat} />
+                </View>
+                <Text style={styles.quickActionText}>Código</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickActionBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar comida frecuente"
+                onPress={() => {
+                  beginMeal();
+                  setShowFavoritesModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <View
+                  style={[
+                    styles.quickActionIconWrap,
+                    { backgroundColor: colors.carbsLight },
+                  ]}
+                >
+                  <Star size={18} color={colors.carbs} />
+                </View>
+                <Text style={styles.quickActionText}>Frecuentes</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.summaryLayout, wide && isToday && styles.summaryWide]}>
+              {isToday && (
+                <View style={styles.summaryMain}>
+                  {/* Smart Coach Proactivo + Audio-Cierre del Día */}
+                  <SmartCoachCard
+                    userName={profile?.full_name}
+                    consumedCalories={data?.consumed.calories || 0}
+                    goalCalories={adjustedGoals.calories}
+                    remainingCalories={adjustedGoals.calories - (data?.consumed.calories || 0)}
+                    consumedProtein={data?.consumed.protein || 0}
+                    goalProtein={adjustedGoals.proteinG}
+                    remainingProtein={adjustedGoals.proteinG - (data?.consumed.protein || 0)}
+                    waterMl={totalMl}
+                    targetWaterMl={targetMl}
+                    mealCount={data?.meals.length || 0}
+                    onAskCoach={(prompt) => {
+                      router.push({
+                        pathname: "/coach",
+                        params: { initialPrompt: prompt },
+                      });
+                    }}
+                  />
+                </View>
+              )}
+              <View
+                style={[styles.summarySide, wide && isToday && styles.summarySideWide]}
+              >
                 {/* Banner Destacado: Coach Nutricional IA y Recetas (Fase 3) */}
-                <View style={[styles.assistantBannersRow, (compact || wide) && styles.assistantBannersStack]}>
+                <View style={[styles.assistantBannersRow, (compact || (wide && isToday)) && styles.assistantBannersStack]}>
                   <TouchableOpacity
                     style={styles.coachBanner}
                     accessibilityRole="button"
@@ -652,15 +656,15 @@ export default function DashboardScreen() {
                     <View
                       style={[
                         styles.bannerIconBadge,
-                        { backgroundColor: "#FEF3C7" },
+                        { backgroundColor: colors.carbsLight },
                       ]}
                     >
-                      <ChefHat size={18} color="#D97706" />
+                      <ChefHat size={18} color={colors.carbs} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.recipesBannerTitle}>Recetas</Text>
                       <Text style={styles.recipesBannerDesc}>
-                        Chilenas fitness
+                        Chilenas y lista feria
                       </Text>
                     </View>
                     <ChevronRight size={16} color={colors.textMuted} />
@@ -820,7 +824,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#DCFCE7",
+    borderColor: colors.cardBorder,
   },
   greetingWrap: {
     flex: 1,
@@ -850,7 +854,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#DCFCE7",
+    borderColor: colors.cardBorder,
   },
   headerPlanDot: {
     width: 6,
@@ -865,7 +869,7 @@ const styles = StyleSheet.create({
     maxWidth: 240,
   },
   dateSelector: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 24,
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -883,10 +887,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     padding: 16,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 24,
     marginTop: 16,
-    marginBottom: 20,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     ...shadows.card,
@@ -969,7 +973,7 @@ const styles = StyleSheet.create({
     minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     padding: 12,
     borderRadius: 18,
     borderWidth: 1,
@@ -1002,7 +1006,7 @@ const styles = StyleSheet.create({
     minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     padding: 12,
     borderRadius: 18,
     borderWidth: 1,
@@ -1024,7 +1028,7 @@ const styles = StyleSheet.create({
   masterPlanBanner: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     padding: 14,
     borderRadius: 20,
     borderWidth: 1,
@@ -1066,11 +1070,11 @@ const styles = StyleSheet.create({
   quickActionsBar: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   quickActionBtn: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 18,
     paddingVertical: 12,
     alignItems: "center",

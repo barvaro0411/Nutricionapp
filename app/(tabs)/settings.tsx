@@ -167,13 +167,13 @@ export default function SettingsScreen() {
     const heightM = heightCm / 100;
     bmi = Math.round((currentWeight / (heightM * heightM)) * 10) / 10;
     if (bmi < 18.5) {
-      bmiCategory = { label: "Bajo peso", color: "#B45309", bg: "#FEF3C7" };
+      bmiCategory = { label: "Bajo peso", color: colors.warning, bg: colors.warningLight };
     } else if (bmi < 25) {
       bmiCategory = { label: "Rango saludable", color: colors.primaryDark, bg: colors.primaryLight };
     } else if (bmi < 30) {
-      bmiCategory = { label: "Sobrepeso leve", color: "#B45309", bg: "#FEF3C7" };
+      bmiCategory = { label: "Sobrepeso leve", color: colors.warning, bg: colors.warningLight };
     } else {
-      bmiCategory = { label: "Obesidad", color: colors.danger, bg: "#FEE2E2" };
+      bmiCategory = { label: "Obesidad", color: colors.danger, bg: colors.dangerLight };
     }
   }
 
@@ -463,48 +463,48 @@ export default function SettingsScreen() {
         {/* Grilla de Macros */}
         <View style={styles.macroPillsGrid}>
           {/* Calorías */}
-          <View style={[styles.macroPill, { backgroundColor: "#FFF1F2" }]}>
+          <View style={[styles.macroPill, { backgroundColor: colors.dangerLight }]}>
             <View style={styles.macroPillHeader}>
-              <Flame size={14} color="#E11D48" />
-              <Text style={[styles.macroPillLabel, { color: "#9F1239" }]}>Calorías</Text>
+              <Flame size={14} color={colors.danger} />
+              <Text style={[styles.macroPillLabel, { color: colors.danger }]}>Calorías</Text>
             </View>
-            <Text style={[styles.macroPillValue, { color: "#881337" }]}>
+            <Text style={[styles.macroPillValue, { color: colors.text }]}>
               {caloriesGoal}
             </Text>
             <Text style={styles.macroPillUnit}>kcal / día</Text>
           </View>
 
           {/* Proteínas */}
-          <View style={[styles.macroPill, { backgroundColor: "#EFF6FF" }]}>
+          <View style={[styles.macroPill, { backgroundColor: colors.proteinLight }]}>
             <View style={styles.macroPillHeader}>
-              <Utensils size={14} color="#2563EB" />
-              <Text style={[styles.macroPillLabel, { color: "#1E40AF" }]}>Proteína</Text>
+              <Utensils size={14} color={colors.protein} />
+              <Text style={[styles.macroPillLabel, { color: colors.protein }]}>Proteína</Text>
             </View>
-            <Text style={[styles.macroPillValue, { color: "#1E3A8A" }]}>
+            <Text style={[styles.macroPillValue, { color: colors.text }]}>
               {proteinGoal}g
             </Text>
             <Text style={styles.macroPillUnit}>diarios</Text>
           </View>
 
           {/* Carbohidratos */}
-          <View style={[styles.macroPill, { backgroundColor: "#FEF3C7" }]}>
+          <View style={[styles.macroPill, { backgroundColor: colors.carbsLight }]}>
             <View style={styles.macroPillHeader}>
-              <Sparkles size={14} color="#D97706" />
-              <Text style={[styles.macroPillLabel, { color: "#92400E" }]}>Carbos</Text>
+              <Sparkles size={14} color={colors.carbs} />
+              <Text style={[styles.macroPillLabel, { color: colors.carbs }]}>Carbos</Text>
             </View>
-            <Text style={[styles.macroPillValue, { color: "#78350F" }]}>
+            <Text style={[styles.macroPillValue, { color: colors.text }]}>
               {carbsGoal}g
             </Text>
             <Text style={styles.macroPillUnit}>diarios</Text>
           </View>
 
           {/* Grasas */}
-          <View style={[styles.macroPill, { backgroundColor: "#ECFDF5" }]}>
+          <View style={[styles.macroPill, { backgroundColor: colors.fatLight }]}>
             <View style={styles.macroPillHeader}>
-              <Droplets size={14} color="#059669" />
-              <Text style={[styles.macroPillLabel, { color: "#065F46" }]}>Grasas</Text>
+              <Droplets size={14} color={colors.fat} />
+              <Text style={[styles.macroPillLabel, { color: colors.fat }]}>Grasas</Text>
             </View>
-            <Text style={[styles.macroPillValue, { color: "#064E3B" }]}>
+            <Text style={[styles.macroPillValue, { color: colors.text }]}>
               {fatGoal}g
             </Text>
             <Text style={styles.macroPillUnit}>diarias</Text>
@@ -514,7 +514,7 @@ export default function SettingsScreen() {
         {/* Fila de Hidratación recomendada */}
         <View style={styles.waterRow}>
           <View style={styles.waterIconCircle}>
-            <Droplets size={16} color="#0284C7" />
+            <Droplets size={16} color={colors.water} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.waterTitle}>Meta diaria de agua</Text>
@@ -836,7 +836,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: colors.proteinLight,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -961,8 +961,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   metricCardInteractive: {
-    borderColor: "#D1FAE5",
-    backgroundColor: "#FCFDFD",
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryGhost,
   },
   metricCardHeader: {
     flexDirection: "row",
@@ -1098,9 +1098,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "#F0F9FF",
+    backgroundColor: colors.waterLight,
     borderWidth: 1,
-    borderColor: "#BAE6FD",
+    borderColor: colors.waterTrack,
     padding: 12,
     borderRadius: 14,
     marginTop: 4,
@@ -1109,18 +1109,18 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#E0F2FE",
+    backgroundColor: colors.waterTrack,
     alignItems: "center",
     justifyContent: "center",
   },
   waterTitle: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#0369A1",
+    color: colors.water,
   },
   waterSub: {
     fontSize: 11,
-    color: "#075985",
+    color: colors.textSecondary,
     marginTop: 1,
   },
   actions: {
@@ -1228,7 +1228,7 @@ const styles = StyleSheet.create({
   },
   dietaryCardActive: {
     borderColor: colors.primary,
-    backgroundColor: "#F0FDF4",
+    backgroundColor: colors.primaryGhost,
   },
   dietaryTop: {
     flexDirection: "row",
@@ -1294,7 +1294,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    marginBottom: 8,
+    marginBottom: 24,
     gap: 12,
   },
   themeOptionsRow: {

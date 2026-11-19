@@ -57,7 +57,7 @@ export default function HistoryScreen() {
             </Pressable>
           ))}
         </View>
-        <Text style={styles.periodDate}>{data ? formatDate(data.days[0].date) + " – " + formatDate(data.days[data.days.length - 1].date) : "Cargando periodo…"}</Text>
+        <Text style={styles.periodDate}>{data?.days?.length ? formatDate(data.days[0].date) + " – " + formatDate(data.days[data.days.length - 1].date) : "Cargando periodo…"}</Text>
       </View>
       {isLoading ? (
         <View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /><Text style={styles.muted}>Preparando tu progreso…</Text></View>
@@ -85,7 +85,7 @@ export default function HistoryScreen() {
               <View style={styles.summaryDivider} />
               <View style={styles.summaryMetric}><Text style={styles.summaryNumber}>{data?.totalMeals || 0}</Text><Text style={styles.summaryLabel}>comidas guardadas</Text></View>
             </View>
-            <View style={styles.consistencyTrack}><View style={[styles.consistencyFill, { width: `${loggedDays / period * 100}%` }]} /></View>
+            <View style={styles.consistencyTrack}><View style={[styles.consistencyFill, { width: `${Math.min(100, (loggedDays / period) * 100)}%` }]} /></View>
             <Text style={styles.summaryNote}>{loggedDays ? "Cada comida registrada te ayuda a entender mejor tu rutina." : "Empieza con una comida. Tu progreso se construye día a día."}</Text>
           </View>
           <WeightTrendCard

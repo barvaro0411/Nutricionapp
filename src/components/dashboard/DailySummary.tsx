@@ -110,8 +110,10 @@ export function DailySummary(props: DailySummaryProps) {
           onPress={onExercisePress}
           style={({ pressed }) => [styles.exercise, pressed && { opacity: 0.7 }]}
         >
-          <Flame size={16} color={colors.primary} />
-          <Text style={styles.exerciseText}>Actividad</Text>
+          <Flame size={15} color={colors.primary} />
+          <Text style={styles.exerciseText}>
+            {burnedCalories > 0 ? `+${number(burnedCalories)} kcal` : "Actividad"}
+          </Text>
         </Pressable>
       </View>
       <View style={wide ? styles.bodyWide : undefined}>
@@ -137,7 +139,7 @@ export function DailySummary(props: DailySummaryProps) {
                   cx={size / 2}
                   cy={size / 2}
                   r={radius}
-                  stroke="#E3F0E7"
+                  stroke={colors.surfaceMuted}
                   strokeWidth={7}
                   fill="none"
                 />
@@ -176,7 +178,7 @@ export function DailySummary(props: DailySummaryProps) {
 
               {over > 0 ? (
                 <View style={styles.overPill}>
-                  <Text style={styles.pillLabel}>SOBRE META</Text>
+                  <Text style={styles.overPillLabel}>SOBRE META</Text>
                   <Text style={styles.overPillValue}>
                     +{number(over)} <Text style={styles.pillUnit}>kcal</Text>
                   </Text>
@@ -230,15 +232,15 @@ export function DailySummary(props: DailySummaryProps) {
               goal={adjustedGoals.proteinG}
               color={colors.protein}
               lightColor={colors.proteinLight}
-              borderColor="#E0E7FF"
+              borderColor={colors.cardBorder}
             />
             <Nutrient
               label="Carbos"
               consumed={props.carbs}
               goal={adjustedGoals.carbsG}
-              color="#D97706"
+              color={colors.carbs}
               lightColor={colors.carbsLight}
-              borderColor="#FEF3C7"
+              borderColor={colors.cardBorder}
             />
             <Nutrient
               label="Grasas"
@@ -246,7 +248,7 @@ export function DailySummary(props: DailySummaryProps) {
               goal={adjustedGoals.fatG}
               color={colors.fat}
               lightColor={colors.fatLight}
-              borderColor="#E0F2FE"
+              borderColor={colors.cardBorder}
             />
           </View>
         </View>
@@ -272,7 +274,7 @@ const styles = StyleSheet.create({
   energyRow: { flexDirection: "row", alignItems: "center", gap: 16 },
   ring: { alignItems: "center", justifyContent: "center" },
   ringCopy: { position: "absolute", alignItems: "center", maxWidth: "80%" },
-  calories: { fontSize: 27, lineHeight: 32, fontWeight: "800", letterSpacing: -0.8, color: colors.forest },
+  calories: { fontSize: 27, lineHeight: 32, fontWeight: "800", letterSpacing: -0.8, color: colors.text },
   calorieUnit: { fontSize: 9.5, lineHeight: 12, color: colors.textSecondary, marginTop: 2, textAlign: "center" },
   energyDetails: { flex: 1, minWidth: 0, gap: 5 },
   goalRow: {
@@ -287,26 +289,32 @@ const styles = StyleSheet.create({
   goalValue: { fontSize: 21, lineHeight: 26, fontWeight: "800", color: colors.text },
   availablePill: {
     backgroundColor: colors.primaryLight,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#BAE6C9",
+    borderColor: colors.cardBorder,
     alignItems: "flex-end",
   },
   overPill: {
     backgroundColor: colors.warningLight,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#FDE68A",
+    borderColor: colors.warning,
     alignItems: "flex-end",
   },
   pillLabel: {
     fontSize: 8.5,
     fontWeight: "800",
     color: colors.primaryDark,
+    letterSpacing: 0.5,
+  },
+  overPillLabel: {
+    fontSize: 8.5,
+    fontWeight: "800",
+    color: colors.warning,
     letterSpacing: 0.5,
   },
   availablePillValue: {
@@ -318,7 +326,7 @@ const styles = StyleSheet.create({
   overPillValue: {
     fontSize: 15,
     fontWeight: "900",
-    color: "#B45309",
+    color: colors.warning,
     letterSpacing: -0.3,
   },
   pillUnit: {
@@ -382,7 +390,7 @@ const styles = StyleSheet.create({
   nutrientPct: { fontSize: 10, fontWeight: "800" },
   nutrientValue: { fontSize: 14.5, lineHeight: 18, fontWeight: "800", color: colors.text, marginTop: 2 },
   nutrientGoal: { fontSize: 10, fontWeight: "600", color: colors.textSecondary },
-  nutrientTrack: { height: 5, backgroundColor: "rgba(0,0,0,0.06)", borderRadius: 2.5, overflow: "hidden", marginTop: 5 },
+  nutrientTrack: { height: 5, backgroundColor: colors.surfaceMuted, borderRadius: 2.5, overflow: "hidden", marginTop: 5 },
 
   exercise: {
     minHeight: 38,

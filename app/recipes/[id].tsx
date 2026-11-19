@@ -509,22 +509,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   compatibilityBannerSuccess: {
-    backgroundColor: "#F0FDF4",
-    borderColor: "#BBF7D0",
+    backgroundColor: colors.successLight,
+    borderColor: colors.cardBorder,
   },
   compatibilityBannerWarning: {
-    backgroundColor: "#FEFCE8",
-    borderColor: "#FEF08A",
+    backgroundColor: colors.warningLight,
+    borderColor: colors.warning,
   },
   compatibilityBannerTitle: {
     fontSize: 14,
     fontWeight: "700",
   },
   compatibilityBannerTitleSuccess: {
-    color: "#166534",
+    color: colors.primaryDark,
   },
   compatibilityBannerTitleWarning: {
-    color: "#854D0E",
+    color: colors.warning,
   },
   compatibilityAlertsList: {
     marginTop: 6,
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
   },
   compatibilityAlertText: {
     fontSize: 13,
-    color: "#A16207",
+    color: colors.text,
     lineHeight: 18,
   },
   logConfigCard: {

@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: colors.background,
   },
-  inputFocused: { borderColor: colors.primary, backgroundColor: "#FFFFFF" },
+  inputFocused: { borderColor: colors.primary, backgroundColor: colors.card },
   input: {
     flex: 1,
     minWidth: 0,

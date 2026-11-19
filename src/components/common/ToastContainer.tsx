@@ -15,32 +15,32 @@ const getToastConfig = (type: ToastType) => {
   switch (type) {
     case "success":
       return {
-        icon: <CheckCircle2 size={20} color="#10B981" />,
-        borderColor: "#A7F3D0",
-        badgeBg: "#ECFDF5",
-        accentColor: "#10B981",
+        icon: <CheckCircle2 size={20} color={colors.success} />,
+        borderColor: colors.primary,
+        badgeBg: colors.successLight,
+        accentColor: colors.success,
       };
     case "error":
       return {
-        icon: <AlertCircle size={20} color="#EF4444" />,
-        borderColor: "#FECACA",
-        badgeBg: "#FEE2E2",
-        accentColor: "#EF4444",
+        icon: <AlertCircle size={20} color={colors.danger} />,
+        borderColor: colors.danger,
+        badgeBg: colors.dangerLight,
+        accentColor: colors.danger,
       };
     case "warning":
       return {
-        icon: <AlertTriangle size={20} color="#F59E0B" />,
-        borderColor: "#FDE68A",
-        badgeBg: "#FEF3C7",
-        accentColor: "#F59E0B",
+        icon: <AlertTriangle size={20} color={colors.warning} />,
+        borderColor: colors.warning,
+        badgeBg: colors.warningLight,
+        accentColor: colors.warning,
       };
     case "info":
     default:
       return {
-        icon: <Info size={20} color="#6366F1" />,
-        borderColor: "#C7D2FE",
-        badgeBg: "#EEF2FF",
-        accentColor: "#6366F1",
+        icon: <Info size={20} color={colors.protein} />,
+        borderColor: colors.protein,
+        badgeBg: colors.proteinLight,
+        accentColor: colors.protein,
       };
   }
 };
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,

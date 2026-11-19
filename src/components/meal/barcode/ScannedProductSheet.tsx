@@ -280,7 +280,7 @@ export function ScannedProductSheet({
 
 const styles = StyleSheet.create({
   resultCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 22,
     padding: 20,
     borderWidth: 1,
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: "#DCFCE7",
+    borderColor: colors.cardBorder,
   },
   sourceBadgeText: {
     fontSize: 11,
@@ -347,47 +347,47 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   dietAlertPill: {
-    backgroundColor: "#FEF3C7",
+    backgroundColor: colors.warningLight,
     borderWidth: 1,
-    borderColor: "#FDE68A",
+    borderColor: colors.cardBorder,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
     alignSelf: "flex-start",
   },
   dietAlertPillDanger: {
-    backgroundColor: "#FEE2E2",
-    borderColor: "#FECACA",
+    backgroundColor: colors.dangerLight,
+    borderColor: colors.danger,
   },
   dietAlertText: {
     fontSize: 10,
     fontWeight: "700",
-    color: "#92400E",
+    color: colors.warning,
   },
   dietAlertTextDanger: {
-    color: "#991B1B",
+    color: colors.danger,
   },
   substituteTipBox: {
     marginTop: 8,
-    backgroundColor: "#F0FDF4",
+    backgroundColor: colors.successLight,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderWidth: 1,
-    borderColor: "#BBF7D0",
+    borderColor: colors.cardBorder,
   },
   substituteTipText: {
     fontSize: 11.5,
     fontWeight: "600",
-    color: "#166534",
+    color: colors.primaryDark,
     lineHeight: 16,
   },
   portionSection: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: colors.cardBorder,
     marginBottom: 14,
   },
   portionHeaderRow: {
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   },
   unitToggle: {
     flexDirection: "row",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 10,
     padding: 2,
     borderWidth: 1,
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   portionInput: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     height: 40,
     width: 120,
     borderRadius: 12,
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#86EFAC",
+    borderColor: colors.primary,
   },
   containerChipText: {
     fontSize: 11,
@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   portionChip: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     paddingHorizontal: 11,
     paddingVertical: 7,
     borderRadius: 10,
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   },
   portionChipActive: {
     backgroundColor: colors.primaryLight,
-    borderColor: "#86EFAC",
+    borderColor: colors.primary,
   },
   portionChipText: {
     fontSize: 11,
@@ -505,11 +505,11 @@ const styles = StyleSheet.create({
   nutritionPreview: {
     flexDirection: "row",
     justifyContent: "space-between",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: colors.cardBorder,
     marginBottom: 16,
   },
   nutriCol: {

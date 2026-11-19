@@ -634,13 +634,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 10,
     borderRadius: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
   itemRowChecked: {
     backgroundColor: colors.primaryGhost,
-    borderColor: "#BBF7D0",
+    borderColor: colors.primary,
     opacity: 0.78,
   },
   checkbox: {

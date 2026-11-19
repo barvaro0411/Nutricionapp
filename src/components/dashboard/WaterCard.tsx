@@ -158,7 +158,7 @@ export function WaterCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 22,
     padding: 16,
     borderWidth: 1,
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E0F2FE",
+    borderColor: colors.waterTrack,
   },
   headerCopy: { flex: 1, minWidth: 0 },
   overline: {
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#BAE6FD",
+    borderColor: colors.waterTrack,
   },
   pctText: {
     fontSize: 11.5,
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   waterMessageWarning: {
-    color: "#B45309",
+    color: colors.warning,
   },
   waterDescription: {
     fontSize: 11,
@@ -285,15 +285,17 @@ const styles = StyleSheet.create({
   },
   pillBtn: {
     flex: 1,
+    minWidth: 96,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 10,
     paddingHorizontal: 10,
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: colors.waterLight,
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: colors.waterTrack,
     gap: 8,
   },
   pillText: {
@@ -310,9 +312,10 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   pctBadgeWarning: {
-    backgroundColor: "#FEF3C7",
+    backgroundColor: colors.warningLight,
+    borderColor: colors.warning,
   },
   pctTextWarning: {
-    color: "#92400E",
+    color: colors.warning,
   },
 });

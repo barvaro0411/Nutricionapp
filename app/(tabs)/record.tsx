@@ -63,7 +63,9 @@ export default function RecordScreen() {
   const [showTextVoiceModal, setShowTextVoiceModal] = useState(false);
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
-  const [pendingAiAction, setPendingAiAction] = useState<"camera" | "voice" | null>(null);
+  const [pendingAiAction, setPendingAiAction] = useState<
+    "camera" | "nutrition_label" | "voice" | null
+  >(null);
 
   useEffect(() => {
     if (params.mealType) setSelectedMealType(params.mealType);
@@ -146,7 +148,7 @@ export default function RecordScreen() {
             }}
           >
             <View style={styles.yesterdayIconWrap}>
-              <RotateCcw size={18} color="#1D4ED8" />
+              <RotateCcw size={18} color={colors.water} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.yesterdayOverline}>REPETIR DE AYER · 1 TOQUE</Text>
@@ -157,7 +159,7 @@ export default function RecordScreen() {
                 {Math.round(yesterdayMealForType.total_calories)} kcal · {Math.round(yesterdayMealForType.total_protein)}g Prot · Cargar en 1 toque
               </Text>
             </View>
-            <ChevronRight size={18} color="#1D4ED8" />
+            <ChevronRight size={18} color={colors.water} />
           </TouchableOpacity>
         )}
 
@@ -175,7 +177,7 @@ export default function RecordScreen() {
             }}
           >
             <View style={styles.habitualIconWrap}>
-              <Star size={18} color="#B45309" />
+              <Star size={18} color={colors.carbs} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.habitualOverline}>SUGERENCIA HABITUAL · 1 TOQUE</Text>
@@ -186,7 +188,7 @@ export default function RecordScreen() {
                 {Math.round(habitualFavorite.total_calories)} kcal · {Math.round(habitualFavorite.total_protein)}g Prot · Toca para revisar y guardar
               </Text>
             </View>
-            <ChevronRight size={18} color="#B45309" />
+            <ChevronRight size={18} color={colors.carbs} />
           </TouchableOpacity>
         )}
 
@@ -249,7 +251,7 @@ export default function RecordScreen() {
           onPress={() => {
             beginMeal();
             if (!hasConsent) {
-              setPendingAiAction("camera");
+              setPendingAiAction("nutrition_label");
               return;
             }
             router.push({
@@ -259,7 +261,7 @@ export default function RecordScreen() {
           }}
           activeOpacity={0.85}
         >
-          <View style={[styles.iconCircle, { backgroundColor: "#FDF2F8" }]}>
+          <View style={[styles.iconCircle, { backgroundColor: colors.dangerLight }]}>
             <FileText size={22} color="#DB2777" />
           </View>
           <View style={styles.methodInfo}>
@@ -292,8 +294,8 @@ export default function RecordScreen() {
           }}
           activeOpacity={0.85}
         >
-          <View style={[styles.iconCircle, { backgroundColor: "#EEF2FF" }]}>
-            <Mic size={24} color="#6366F1" />
+          <View style={[styles.iconCircle, { backgroundColor: colors.proteinLight }]}>
+            <Mic size={24} color={colors.protein} />
           </View>
           <View style={styles.methodInfo}>
             <Text style={styles.methodTitle}>Escribir o dictar</Text>
@@ -315,8 +317,8 @@ export default function RecordScreen() {
           }}
           activeOpacity={0.85}
         >
-          <View style={[styles.iconCircle, { backgroundColor: "#F0F9FF" }]}>
-            <Barcode size={24} color="#0EA5E9" />
+          <View style={[styles.iconCircle, { backgroundColor: colors.fatLight }]}>
+            <Barcode size={24} color={colors.fat} />
           </View>
           <View style={styles.methodInfo}>
             <Text style={styles.methodTitle}>Código de Barras</Text>
@@ -338,8 +340,8 @@ export default function RecordScreen() {
           }}
           activeOpacity={0.85}
         >
-          <View style={[styles.iconCircle, { backgroundColor: "#FEF3C7" }]}>
-            <Star size={24} color="#F59E0B" />
+          <View style={[styles.iconCircle, { backgroundColor: colors.carbsLight }]}>
+            <Star size={24} color={colors.carbs} />
           </View>
           <View style={styles.methodInfo}>
             <Text style={styles.methodTitle}>Comidas Frecuentes</Text>
@@ -383,6 +385,11 @@ export default function RecordScreen() {
             router.push({
               pathname: "/meal/camera",
               params: { suggestedMealType: selectedMealType },
+            });
+          } else if (action === "nutrition_label") {
+            router.push({
+              pathname: "/meal/camera",
+              params: { suggestedMealType: selectedMealType, mode: "nutrition_label" },
             });
           } else if (action === "voice") {
             setShowTextVoiceModal(true);
@@ -442,9 +449,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "#FFFBEB",
+    backgroundColor: colors.carbsLight,
     borderWidth: 1.5,
-    borderColor: "#FDE68A",
+    borderColor: colors.cardBorder,
     borderRadius: 18,
     padding: 14,
     marginBottom: 18,
@@ -453,14 +460,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: "#FEF3C7",
+    backgroundColor: colors.warningLight,
     alignItems: "center",
     justifyContent: "center",
   },
   habitualOverline: {
     fontSize: 9.5,
     fontWeight: "800",
-    color: "#B45309",
+    color: colors.carbs,
     letterSpacing: 0.8,
     marginBottom: 2,
   },
@@ -478,9 +485,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: colors.waterLight,
     borderWidth: 1.5,
-    borderColor: "#BFDBFE",
+    borderColor: colors.waterTrack,
     borderRadius: 18,
     padding: 14,
     marginBottom: 14,
@@ -489,14 +496,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: "#DBEAFE",
+    backgroundColor: colors.waterTrack,
     alignItems: "center",
     justifyContent: "center",
   },
   yesterdayOverline: {
     fontSize: 9.5,
     fontWeight: "800",
-    color: "#1D4ED8",
+    color: colors.water,
     letterSpacing: 0.8,
     marginBottom: 2,
   },
@@ -518,7 +525,7 @@ const styles = StyleSheet.create({
   catalogBadgeText: { color: colors.mint, fontSize: 9, fontWeight: "700", letterSpacing: 1 },
   searchTitle: { fontSize: 23, fontWeight: "800", color: "white", letterSpacing: -0.5 },
   searchDescription: { fontSize: 13, lineHeight: 20, color: "#CEE1D6", marginTop: 8, marginBottom: 18 },
-  searchField: { minHeight: 52, backgroundColor: "white", borderRadius: 14, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  searchField: { minHeight: 52, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 14, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10 },
   searchPlaceholder: { flex: 1, color: colors.textSecondary, fontSize: 13 },
   manualCard: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: colors.cardBorder, backgroundColor: colors.card, padding: 16, borderRadius: 18, marginBottom: 24 },
   otherMethodsTitle: { fontSize: 13, color: colors.textSecondary, fontWeight: "600", marginBottom: 12 },
@@ -572,7 +579,7 @@ const styles = StyleSheet.create({
   },
   methodCardFeatured: {
     borderColor: colors.primary,
-    backgroundColor: "#F0FDF4",
+    backgroundColor: colors.primaryGhost,
     borderWidth: 2,
   },
   iconCircle: {

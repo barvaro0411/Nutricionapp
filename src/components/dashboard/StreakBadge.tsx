@@ -2,6 +2,7 @@ import React from "react";
 import { TouchableOpacity, Text, StyleSheet, View } from "react-native";
 import { Flame } from "lucide-react-native";
 import { useUserStreak } from "@/hooks/useUserStreak";
+import { colors } from "@/constants/colors";
 
 interface StreakBadgeProps {
   onPress: () => void;
@@ -68,16 +69,16 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   containerActive: {
-    backgroundColor: "#FFF7ED", // orange-50
-    borderColor: "#FDBA74", // orange-300
+    backgroundColor: colors.carbsLight,
+    borderColor: colors.warning,
   },
   containerPending: {
-    backgroundColor: "#FEF3C7", // amber-50
-    borderColor: "#FCD34D", // amber-300
+    backgroundColor: colors.warningLight,
+    borderColor: colors.warning,
   },
   containerZero: {
-    backgroundColor: "#F3F4F6", // gray-100
-    borderColor: "#E5E7EB", // gray-200
+    backgroundColor: colors.card,
+    borderColor: colors.cardBorder,
   },
   iconWrap: {
     width: 26,
@@ -87,13 +88,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   iconWrapActive: {
-    backgroundColor: "#FFEDD5", // orange-100
+    backgroundColor: colors.warningLight,
   },
   iconWrapPending: {
-    backgroundColor: "#FEF9C3", // yellow-100
+    backgroundColor: colors.carbsLight,
   },
   iconWrapZero: {
-    backgroundColor: "#E5E7EB",
+    backgroundColor: colors.surfaceMuted,
   },
   label: {
     fontSize: 12.5,
@@ -101,12 +102,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   labelActive: {
-    color: "#C2410C", // orange-700
+    color: colors.carbs,
   },
   labelPending: {
-    color: "#B45309", // amber-700
+    color: colors.warning,
   },
   labelZero: {
-    color: "#6B7280", // gray-500
+    color: colors.textSecondary,
   },
 });

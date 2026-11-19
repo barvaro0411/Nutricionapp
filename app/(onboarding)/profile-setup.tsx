@@ -596,9 +596,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   liveCard: {
-    backgroundColor: "#F0FDF4",
+    backgroundColor: colors.primaryGhost,
     borderWidth: 1.5,
-    borderColor: "#BBF7D0",
+    borderColor: colors.cardBorder,
     borderRadius: 20,
     padding: 16,
     marginBottom: 24,
@@ -637,7 +637,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#DCFCE7",
+    borderColor: colors.cardBorder,
   },
   liveMetricItem: {
     flex: 1,
@@ -723,7 +723,7 @@ const styles = StyleSheet.create({
   },
   genderCardActive: {
     borderColor: colors.primary,
-    backgroundColor: "#F0FDF4",
+    backgroundColor: colors.primaryGhost,
   },
   genderEmoji: {
     fontSize: 22,
@@ -764,8 +764,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   measureCardHighlight: {
-    borderColor: "#A7F3D0",
-    backgroundColor: "#FCFDFD",
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryGhost,
   },
   measureCardLabel: {
     fontSize: 10,
@@ -816,7 +816,7 @@ const styles = StyleSheet.create({
   },
   cardOptionActive: {
     borderColor: colors.primary,
-    backgroundColor: "#F0FDF4",
+    backgroundColor: colors.primaryGhost,
   },
   cardEmoji: {
     fontSize: 22,

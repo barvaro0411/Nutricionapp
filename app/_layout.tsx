@@ -117,9 +117,19 @@ function RootNavigationLayout() {
     <StatusBar style="auto" />
     <ToastContainer />
     <PwaUpdateBanner />
-    <Stack initialRouteName="(tabs)" screenOptions={{ headerShown: false }}>
+    <Stack initialRouteName="(tabs)" screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="meal/review" options={{ presentation: "modal", title: "Confirmar comida", headerShown: true }} />
+      <Stack.Screen
+        name="meal/review"
+        options={{
+          presentation: "modal",
+          title: "Confirmar comida",
+          headerShown: true,
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+          headerTitleStyle: { color: colors.text, fontWeight: "700" },
+        }}
+      />
       <Stack.Screen name="meal/camera" options={{ presentation: "fullScreenModal" }} />
       <Stack.Screen name="meal/barcode" options={{ presentation: "modal" }} />
       <Stack.Screen name="coach/index" options={{ presentation: "modal" }} />
