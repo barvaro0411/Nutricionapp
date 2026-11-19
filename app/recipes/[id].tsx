@@ -1,73 +1,78 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useRecipeDetail } from "@/hooks/useRecipes";
-import { useMealReviewStore } from "@/stores/useMealReviewStore";
-import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
-import { isRecipeCompatible } from "@/utils/foodAlerts";
-import { colors, layout } from "@/constants/colors";
-import { DetectedFoodItem, MealType } from "@/types/meal";
-import { isLiquidFood, formatQuantityDisplay } from "@/utils/liquidUnits";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Minus, Plus, Utensils, ShoppingBasket, Check } from "lucide-react-native";
-import { useShoppingListStore } from "@/stores/useShoppingListStore";
-import { ShoppingListModal } from "@/components/recipes/ShoppingListModal";
-import { showToast } from "@/utils/alerts";
+import { Minus, Plus, ShoppingCart, Sparkles, Star, Trash2, Utensils } from "lucide-react-native";
+import { colors, layout } from "@/constants/colors";
+import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
+import {
+  useDeleteUserRecipe,
+  useRecipeDetail,
+  useToggleRecipeFavorite,
+} from "@/hooks/useRecipes";
+import { useShoppingList } from "@/hooks/useShoppingList";
+import { useMealReviewStore } from "@/stores/useMealReviewStore";
+import { DetectedFoodItem, MealType } from "@/types/meal";
+import { RecipeSource } from "@/types/recipe";
+import { showAlert, showToast } from "@/utils/alerts";
+import { isRecipeCompatible } from "@/utils/foodAlerts";
+import { formatQuantityDisplay, isLiquidFood } from "@/utils/liquidUnits";
+import { formatShoppingQuantity } from "@/utils/shoppingList";
 
 export default function RecipeDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: recipe, isLoading, error } = useRecipeDetail(id || "");
+  const { id, source } = useLocalSearchParams<{ id: string; source?: RecipeSource }>();
+  const { data: recipe, isLoading, error } = useRecipeDetail(id || "", source);
   const { initializeReview } = useMealReviewStore();
-  const { restrictions } = useDietaryPreferences();
-  const { plannedRecipes, hydrate, addOrUpdateRecipe } = useShoppingListStore();
+  const { restrictions, customAllergies } = useDietaryPreferences();
+  const { addRecipeIngredients, isAdding: isAddingShopping } = useShoppingList();
+  const toggleFavorite = useToggleRecipeFavorite();
+  const deleteMutation = useDeleteUserRecipe();
 
-  const [servingsToLog, setServingsToLog] = React.useState(1);
-  const [selectedMealType, setSelectedMealType] = React.useState<MealType>("almuerzo");
-  const [showShoppingModal, setShowShoppingModal] = React.useState(false);
+  const [plannedServings, setPlannedServings] = useState(1);
+  const [selectedMealType, setSelectedMealType] = useState<MealType>("almuerzo");
+  const [addedToShopping, setAddedToShopping] = useState(false);
 
-  React.useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
-
-  React.useEffect(() => {
-    if (recipe?.mealType) {
+  useEffect(() => {
+    if (recipe) {
+      setPlannedServings(recipe.servings || 1);
       setSelectedMealType(recipe.mealType);
+      setAddedToShopping(false);
     }
-  }, [recipe?.mealType]);
+  }, [recipe]);
 
   const compatibility = React.useMemo(() => {
-    if (!recipe || restrictions.length === 0) return null;
-    return isRecipeCompatible(recipe, restrictions);
-  }, [recipe, restrictions]);
+    if (!recipe || (restrictions.length === 0 && customAllergies.length === 0)) return null;
+    return isRecipeCompatible(recipe, restrictions, customAllergies);
+  }, [recipe, restrictions, customAllergies]);
+
+  const baseServings = recipe?.servings && recipe.servings > 0 ? recipe.servings : 1;
+  const scaleFactor = plannedServings / baseServings;
 
   const handleLogRecipe = () => {
     if (!recipe) return;
 
-    const baseServings = Math.max(1, recipe.servings || 1);
-    const factor = servingsToLog / baseServings;
-
     // Convertir ingredientes al formato de items de comida escalados por porción
     const detectedItems: DetectedFoodItem[] = recipe.ingredients.map((ing, idx) => {
-      const isLiquid = isLiquidFood(ing.foodName);
+      const isLiquid = ing.unit === "ml" || isLiquidFood(ing.foodName);
       return {
         id: `recipe_ing_${idx}_${Date.now()}`,
         food: ing.foodName,
-        grams: Math.round(ing.grams * factor),
+        grams: Math.round(ing.grams * scaleFactor * 10) / 10,
         unit: isLiquid ? "ml" : "g",
-        calories: Math.round(ing.calories * factor * 10) / 10,
-        protein: Math.round(ing.protein * factor * 10) / 10,
-        carbs: Math.round(ing.carbs * factor * 10) / 10,
-        fat: Math.round(ing.fat * factor * 10) / 10,
+        calories: Math.round(ing.calories * scaleFactor * 10) / 10,
+        protein: Math.round(ing.protein * scaleFactor * 10) / 10,
+        carbs: Math.round(ing.carbs * scaleFactor * 10) / 10,
+        fat: Math.round(ing.fat * scaleFactor * 10) / 10,
         confidence: 1.0,
       };
     });
@@ -83,6 +88,51 @@ export default function RecipeDetailScreen() {
     router.push("/meal/review");
   };
 
+  const handleAddShopping = async () => {
+    if (!recipe || isAddingShopping) return;
+    try {
+      await addRecipeIngredients({ recipe, servings: plannedServings });
+      setAddedToShopping(true);
+      showToast({
+        type: "success",
+        title: "Ingredientes agregados",
+        message: `${recipe.title} (${plannedServings} ${plannedServings === 1 ? "porción" : "porciones"})`,
+      });
+    } catch (err: any) {
+      showToast({
+        type: "error",
+        title: "Error al agregar compras",
+        message: err?.message,
+      });
+    }
+  };
+
+  const handleDelete = () => {
+    if (!recipe || recipe.source !== "ai") return;
+    showAlert(
+      "Eliminar receta",
+      `¿Seguro que deseas eliminar "${recipe.title}" de tus recetas?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: () => {
+            void deleteMutation
+              .mutateAsync(recipe.id)
+              .then(() => {
+                showToast({ type: "success", title: "Receta eliminada" });
+                router.replace("/recipes");
+              })
+              .catch((err: any) =>
+                showToast({ type: "error", title: "Error", message: err?.message })
+              );
+          },
+        },
+      ]
+    );
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -91,21 +141,83 @@ export default function RecipeDetailScreen() {
     );
   }
 
-  if (!recipe || error) return <View style={styles.loadingContainer}><Text>{error?.message || "Receta no disponible."}</Text><TouchableOpacity onPress={() => router.back()}><Text>Volver</Text></TouchableOpacity></View>;
+  if (!recipe || error) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>{error?.message || "Receta no disponible."}</Text>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.backBtnText}>Volver</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 20) + 30 }]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 20) + 30 },
+      ]}
+    >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver al catálogo de recetas" style={styles.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/recipes")}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Volver al catálogo de recetas"
+          style={styles.backBtn}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/recipes"))}
+        >
           <Text style={styles.backBtnText}>‹ Catálogo</Text>
         </TouchableOpacity>
-        <View style={styles.mealBadge}>
-          <Text style={styles.mealBadgeText}>{recipe.mealType.toUpperCase()}</Text>
+
+        <View style={styles.headerRight}>
+          {recipe.source === "ai" && (
+            <>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={recipe.isFavorite ? "Quitar de favoritas" : "Marcar como favorita"}
+                style={styles.iconActionBtn}
+                onPress={() =>
+                  void toggleFavorite.mutateAsync({
+                    recipeId: recipe.id,
+                    isFavorite: !recipe.isFavorite,
+                  })
+                }
+              >
+                <Star
+                  size={18}
+                  color={recipe.isFavorite ? "#F59E0B" : colors.textSecondary}
+                  fill={recipe.isFavorite ? "#F59E0B" : "transparent"}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Eliminar receta"
+                style={styles.iconActionBtn}
+                onPress={handleDelete}
+              >
+                <Trash2 size={18} color={colors.danger} />
+              </TouchableOpacity>
+            </>
+          )}
+          <View style={styles.mealBadge}>
+            <Text style={styles.mealBadgeText}>{recipe.mealType.toUpperCase()}</Text>
+          </View>
         </View>
       </View>
 
+      <View style={styles.metaLine}>
+        {recipe.source === "ai" && (
+          <View style={styles.aiPill}>
+            <Sparkles size={12} color="#4F46E5" />
+            <Text style={styles.aiPillText}>Generada con IA</Text>
+          </View>
+        )}
+        <Text style={styles.prepTime}>⏱️ {recipe.prepTimeMinutes} min · {recipe.servings} {recipe.servings === 1 ? "porción base" : "porciones base"}</Text>
+      </View>
+
       <Text accessibilityRole="header" style={styles.title}>{recipe.title}</Text>
-      <Text style={styles.prepTime}>⏱️ Tiempo estimado: {recipe.prepTimeMinutes} minutos</Text>
       {recipe.description && <Text style={styles.description}>{recipe.description}</Text>}
 
       {compatibility && (
@@ -169,17 +281,51 @@ export default function RecipeDetailScreen() {
         </View>
       </View>
 
-      {/* Ingredientes */}
-      <Text style={styles.sectionTitle}>Ingredientes ({recipe.ingredients.length})</Text>
+      {/* Selector de porciones e Ingredientes */}
+      <View style={styles.ingredientsHeader}>
+        <Text style={styles.sectionTitle}>Ingredientes ({recipe.ingredients.length})</Text>
+        <View style={styles.servingsStepper}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Menos porciones"
+            style={styles.stepBtn}
+            onPress={() => setPlannedServings((p) => Math.max(1, p - 1))}
+            disabled={plannedServings <= 1}
+          >
+            <Minus size={14} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.stepLabel}>
+            {plannedServings} {plannedServings === 1 ? "porción" : "porciones"}
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Más porciones"
+            style={styles.stepBtn}
+            onPress={() => setPlannedServings((p) => Math.min(12, p + 1))}
+            disabled={plannedServings >= 12}
+          >
+            <Plus size={14} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <View style={styles.ingredientsCard}>
-        {recipe.ingredients.map((ing) => (
-          <View key={ing.id} style={styles.ingredientRow}>
-            <Text style={styles.ingredientName}>• {ing.foodName}</Text>
-            <Text style={styles.ingredientGrams}>
-              {formatQuantityDisplay(ing.grams, isLiquidFood(ing.foodName) ? "ml" : "g")}
-            </Text>
-          </View>
-        ))}
+        {recipe.ingredients.map((ing) => {
+          const scaledGrams = Math.round(ing.grams * scaleFactor * 10) / 10;
+          const displayText =
+            ing.unit === "unidad" && typeof ing.quantity === "number"
+              ? `${formatShoppingQuantity(Math.round(ing.quantity * scaleFactor * 10) / 10, "unidad")} (${Math.round(scaledGrams)} g)`
+              : formatQuantityDisplay(
+                  scaledGrams,
+                  ing.unit === "ml" || isLiquidFood(ing.foodName) ? "ml" : "g"
+                );
+          return (
+            <View key={ing.id} style={styles.ingredientRow}>
+              <Text style={styles.ingredientName}>• {ing.foodName}</Text>
+              <Text style={styles.ingredientGrams}>{displayText}</Text>
+            </View>
+          );
+        })}
       </View>
 
       {/* Preparación paso a paso */}
@@ -235,27 +381,27 @@ export default function RecipeDetailScreen() {
           <View>
             <Text style={styles.logConfigLabel}>PORCIONES</Text>
             <Text style={styles.servingsCalc}>
-              ~{Math.round(recipe.caloriesPerServing * servingsToLog)} kcal en total
+              ~{Math.round(recipe.caloriesPerServing * plannedServings)} kcal en total
             </Text>
           </View>
 
-          <View style={styles.servingsStepper}>
+          <View style={styles.servingsStepperConfig}>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Restar 0.5 porción"
               style={styles.servingsBtn}
-              onPress={() => setServingsToLog((s) => Math.max(0.5, Math.round((s - 0.5) * 10) / 10))}
+              onPress={() => setPlannedServings((s) => Math.max(0.5, Math.round((s - 0.5) * 10) / 10))}
             >
               <Minus size={15} color={colors.text} />
             </TouchableOpacity>
 
-            <Text style={styles.servingsValue}>{servingsToLog}</Text>
+            <Text style={styles.servingsValue}>{plannedServings}</Text>
 
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Sumar 0.5 porción"
               style={styles.servingsBtn}
-              onPress={() => setServingsToLog((s) => Math.min(6, Math.round((s + 0.5) * 10) / 10))}
+              onPress={() => setPlannedServings((s) => Math.min(12, Math.round((s + 0.5) * 10) / 10))}
             >
               <Plus size={15} color={colors.text} />
             </TouchableOpacity>
@@ -263,115 +409,106 @@ export default function RecipeDetailScreen() {
         </View>
       </View>
 
-      {/* Botón de acción: Registrar en comida */}
-      <TouchableOpacity accessibilityRole="button" style={styles.logButton} onPress={handleLogRecipe}>
-        <Text style={styles.logButtonText}>
-          🍽️ Registrar en mi {selectedMealType === "desayuno" ? "Desayuno" : selectedMealType === "almuerzo" ? "Almuerzo" : selectedMealType === "cena" ? "Once / Cena" : "Colación"}
-        </Text>
+      {/* Acciones: Agregar a Lista de Compras + Registrar comida */}
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Agregar ingredientes a lista de compras"
+        style={[styles.shoppingButton, isAddingShopping && styles.disabledBtn]}
+        onPress={() => void handleAddShopping()}
+        disabled={isAddingShopping}
+      >
+        {isAddingShopping ? (
+          <ActivityIndicator color={colors.primaryDark} size="small" />
+        ) : (
+          <View style={styles.shoppingBtnContent}>
+            <ShoppingCart size={18} color={colors.primaryDark} />
+            <Text style={styles.shoppingButtonText}>
+              Agregar ingredientes a Compras ({plannedServings} {plannedServings === 1 ? "porción" : "porc."})
+            </Text>
+          </View>
+        )}
       </TouchableOpacity>
 
-      {/* Botón de Lista de Compras */}
-      {(() => {
-        const inList = plannedRecipes.some((r) => r.recipe.id === recipe.id);
-        return (
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Agregar ingredientes a mi Lista de Compras"
-            style={[
-              styles.shoppingListBtn,
-              inList && styles.shoppingListBtnActive,
-            ]}
-            onPress={() => {
-              addOrUpdateRecipe(recipe, servingsToLog);
-              showToast({
-                type: "success",
-                title: "¡Ingredientes en tu Lista!",
-                message: `Se sumaron ${servingsToLog} porciones de "${recipe.title}" para la feria y supermercado.`,
-              });
-              setShowShoppingModal(true);
-            }}
-          >
-            {inList ? (
-              <Check size={17} color={colors.primaryDark} strokeWidth={3} />
-            ) : (
-              <ShoppingBasket size={17} color={colors.primary} />
-            )}
-            <Text style={styles.shoppingListBtnText}>
-              {inList
-                ? `En tu Lista de Compras (${servingsToLog} porc.) · Ver lista`
-                : `🛒 Sumar ingredientes a mi Lista de Compras (${servingsToLog} porc.)`}
-            </Text>
-          </TouchableOpacity>
-        );
-      })()}
+      {addedToShopping && (
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={styles.goShoppingLink}
+          onPress={() => router.push("/recipes/shopping-list")}
+        >
+          <Text style={styles.goShoppingText}>✓ Guardado · Ver Lista de Compras →</Text>
+        </TouchableOpacity>
+      )}
 
-      <ShoppingListModal
-        visible={showShoppingModal}
-        onClose={() => setShowShoppingModal(false)}
-      />
+      <TouchableOpacity accessibilityRole="button" style={styles.logButton} onPress={handleLogRecipe}>
+        <Text style={styles.logButtonText}>
+          🍽️ Registrar {plannedServings === 1 ? "1 porción" : `${plannedServings} porciones`} en{" "}
+          {selectedMealType === "desayuno"
+            ? "Desayuno"
+            : selectedMealType === "almuerzo"
+            ? "Almuerzo"
+            : selectedMealType === "cena"
+            ? "Once / Cena"
+            : "Colación"}
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
   content: {
     ...layout.narrowPage,
     paddingTop: Platform.OS === "ios" ? 48 : 20,
     paddingBottom: 50,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
   },
-  backBtn: {
-    minHeight: 44,
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  iconActionBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 6,
   },
-  backBtnText: {
-    fontSize: 16,
-    color: colors.primary,
-    fontWeight: "700",
-  },
+  backBtn: { minHeight: 44, justifyContent: "center", paddingVertical: 6 },
+  backBtnText: { fontSize: 16, color: colors.primary, fontWeight: "700" },
   mealBadge: {
     backgroundColor: colors.primaryLight,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
-  mealBadgeText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: colors.primaryDark,
+  mealBadgeText: { fontSize: 11, fontWeight: "800", color: colors.primaryDark },
+  metaLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: colors.text,
-    marginBottom: 4,
+  aiPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  prepTime: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 10,
-  },
-  description: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-    marginBottom: 20,
-  },
+  aiPillText: { fontSize: 11, fontWeight: "800", color: "#4F46E5" },
+  prepTime: { fontSize: 13, color: colors.textSecondary },
+  title: { fontSize: 24, fontWeight: "800", color: colors.text, marginBottom: 6 },
+  description: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 18 },
   macrosCard: {
     backgroundColor: colors.card,
     borderRadius: 24,
@@ -381,20 +518,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     alignItems: "center",
   },
-  calHero: {
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  calHeroNumber: {
-    fontSize: 34,
-    fontWeight: "900",
-    color: colors.text,
-  },
-  calHeroUnit: {
-    fontSize: 12,
-    color: colors.textMuted,
-    fontWeight: "600",
-  },
+  calHero: { alignItems: "center", marginBottom: 16 },
+  calHeroNumber: { fontSize: 34, fontWeight: "900", color: colors.text },
+  calHeroUnit: { fontSize: 12, color: colors.textMuted, fontWeight: "600" },
   macrosRow: {
     flexDirection: "row",
     width: "100%",
@@ -403,24 +529,37 @@ const styles = StyleSheet.create({
     borderTopColor: colors.cardBorder,
     paddingTop: 14,
   },
-  macroCol: {
+  macroCol: { alignItems: "center" },
+  macroValue: { fontSize: 16, fontWeight: "800" },
+  macroLabel: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  ingredientsHeader: {
+    flexDirection: "row",
     alignItems: "center",
-  },
-  macroValue: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  macroLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: colors.text,
+    justifyContent: "space-between",
+    gap: 10,
     marginBottom: 10,
   },
+  servingsStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  stepBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepLabel: { fontSize: 12, fontWeight: "700", color: colors.text },
+  sectionTitle: { fontSize: 17, fontWeight: "800", color: colors.text, marginBottom: 10 },
   ingredientsCard: {
     backgroundColor: colors.card,
     borderRadius: 18,
@@ -437,33 +576,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.cardBorder,
   },
-  ingredientName: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 14,
-    color: colors.text,
-    fontWeight: "500",
-  },
-  ingredientGrams: {
-    flexShrink: 0,
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: "600",
-  },
+  ingredientName: { flex: 1, minWidth: 0, fontSize: 14, color: colors.text, fontWeight: "500" },
+  ingredientGrams: { flexShrink: 0, fontSize: 13, color: colors.textSecondary, fontWeight: "600" },
   instructionsCard: {
     backgroundColor: colors.card,
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    marginBottom: 28,
+    marginBottom: 24,
   },
-  stepRow: {
-    flexDirection: "row",
-    marginBottom: 14,
-    gap: 12,
-    alignItems: "flex-start",
-  },
+  stepRow: { flexDirection: "row", marginBottom: 14, gap: 12, alignItems: "flex-start" },
   stepNumberBadge: {
     width: 26,
     height: 26,
@@ -472,17 +595,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  stepNumberText: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: colors.primaryDark,
+  stepNumberText: { fontSize: 12, fontWeight: "800", color: colors.primaryDark },
+  stepText: { flex: 1, fontSize: 14, color: colors.text, lineHeight: 20 },
+  shoppingButton: {
+    minHeight: 50,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.mint,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
   },
-  stepText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text,
-    lineHeight: 20,
-  },
+  disabledBtn: { opacity: 0.65 },
+  shoppingBtnContent: { flexDirection: "row", alignItems: "center", gap: 8 },
+  shoppingButtonText: { fontSize: 14, fontWeight: "800", color: colors.primaryDark },
+  goShoppingLink: { alignItems: "center", paddingVertical: 8, marginBottom: 10 },
+  goShoppingText: { fontSize: 13, fontWeight: "700", color: colors.primary },
   logButton: {
     minHeight: 52,
     paddingHorizontal: 16,
@@ -598,7 +729,7 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
     fontWeight: "600",
   },
-  servingsStepper: {
+  servingsStepperConfig: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -622,28 +753,5 @@ const styles = StyleSheet.create({
     color: colors.text,
     minWidth: 28,
     textAlign: "center",
-  },
-  shoppingListBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    minHeight: 50,
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    marginTop: 10,
-    backgroundColor: colors.primaryGhost,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-  },
-  shoppingListBtnActive: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primaryDark,
-  },
-  shoppingListBtnText: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: colors.primaryDark,
   },
 });

@@ -34,10 +34,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
 import { useAiConsent } from "@/hooks/useAiConsent";
+import { DietaryPreferencesSection } from "@/components/common/DietaryPreferencesSection";
 import { useWeightTracker } from "@/hooks/useWeightTracker";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useThemeStore, ThemeMode } from "@/stores/useThemeStore";
-import { DietaryRestriction, DIETARY_RESTRICTION_LABELS } from "@/types/profile";
 import {
   getReminderPreferences,
   toggleReminder,
@@ -54,7 +54,14 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user, profile, signOut, updateProfile, deleteAccount, loading } = useAuth();
   const { isPro, scansRemaining, maxFreeScans } = useSubscription();
-  const { toggleRestriction, hasRestriction } = useDietaryPreferences();
+  const {
+    restrictions,
+    customAllergies,
+    toggleRestriction,
+    addCustomAllergy,
+    removeCustomAllergy,
+    isSaving: isSavingDietary,
+  } = useDietaryPreferences();
   const { hasConsent, setConsent, isUpdating: isUpdatingConsent } = useAiConsent();
   const { stats, logWeight, updateTargetWeight } = useWeightTracker();
   const { data: dailyNutrition } = useDailyNutrition();
@@ -570,35 +577,16 @@ export default function SettingsScreen() {
       {/* 3. SECCIÓN: PREFERENCIAS Y ALÉRGENOS */}
       <Text style={styles.sectionTitle}>Preferencias y Alérgenos</Text>
       <Text style={styles.sectionDescription}>
-        Te alertaremos en el diario de comidas y filtraremos automáticamente recetas compatibles (Ley 20.606).
+        Sincronizado con tu cuenta: te alertaremos al registrar comidas, filtraremos recetas y tu Coach evitará estos ingredientes.
       </Text>
-      <View style={styles.dietaryGrid}>
-        {(Object.keys(DIETARY_RESTRICTION_LABELS) as DietaryRestriction[]).map((key) => {
-          const item = DIETARY_RESTRICTION_LABELS[key];
-          const active = hasRestriction(key);
-          return (
-            <Pressable
-              key={key}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.label}: ${active ? "activo" : "inactivo"}`}
-              accessibilityState={{ selected: active }}
-              style={[styles.dietaryCard, active && styles.dietaryCardActive]}
-              onPress={() => void toggleRestriction(key)}
-            >
-              <View style={styles.dietaryTop}>
-                <Text style={styles.dietaryIcon}>{item.icon}</Text>
-                <View style={[styles.dietaryRadio, active && styles.dietaryRadioActive]}>
-                  {active && <CheckCircle2 size={16} color={colors.primary} />}
-                </View>
-              </View>
-              <Text style={[styles.dietaryLabel, active && styles.dietaryLabelActive]}>
-                {item.label}
-              </Text>
-              <Text style={styles.dietaryDesc}>{item.description}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <DietaryPreferencesSection
+        restrictions={restrictions}
+        customAllergies={customAllergies}
+        onToggleRestriction={toggleRestriction}
+        onAddCustomAllergy={addCustomAllergy}
+        onRemoveCustomAllergy={removeCustomAllergy}
+        disabled={isSavingDietary}
+      />
 
       {/* 4. SECCIÓN: RECORDATORIOS */}
       <Text style={styles.sectionTitle}>Un recordatorio a tiempo</Text>
@@ -1205,68 +1193,11 @@ const styles = StyleSheet.create({
     gap: 9,
     minHeight: 50,
     borderWidth: 1,
-    borderColor: "#ECCFD2",
+    borderColor: colors.danger,
     borderRadius: 14,
     backgroundColor: colors.card,
   },
   logoutText: { fontSize: 14, fontWeight: "600", color: colors.danger },
-  dietaryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 24,
-  },
-  dietaryCard: {
-    flexGrow: 1,
-    flexBasis: "47%",
-    backgroundColor: colors.card,
-    borderWidth: 1.5,
-    borderColor: colors.cardBorder,
-    borderRadius: 16,
-    padding: 12,
-    minWidth: 0,
-  },
-  dietaryCardActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryGhost,
-  },
-  dietaryTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  dietaryIcon: {
-    fontSize: 20,
-  },
-  dietaryRadio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: colors.cardBorder,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.card,
-  },
-  dietaryRadioActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  dietaryLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text,
-    marginBottom: 2,
-  },
-  dietaryLabelActive: {
-    color: colors.primaryDark,
-  },
-  dietaryDesc: {
-    fontSize: 10,
-    lineHeight: 14,
-    color: colors.textSecondary,
-  },
   deleteAccountBtn: {
     flexDirection: "row",
     justifyContent: "center",

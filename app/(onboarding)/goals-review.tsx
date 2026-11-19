@@ -13,9 +13,24 @@ import { ArrowLeft } from "lucide-react-native";
 import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useQueryClient } from "@tanstack/react-query";
-import { GoalsSchema, OnboardingProfileSchema } from "@/types/profile";
+import {
+  GoalsSchema,
+  OnboardingProfileSchema,
+  normalizeCustomAllergies,
+  normalizeDietaryRestrictions,
+} from "@/types/profile";
 import { parseDecimal } from "@/utils/dates";
 import { colors, layout } from "@/constants/colors";
+
+function parseJsonArrayParam(raw?: string): unknown[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function GoalsReviewScreen() {
   const router = useRouter();
@@ -32,9 +47,19 @@ export default function GoalsReviewScreen() {
     proteinG: string;
     carbsG: string;
     fatG: string;
+    dietaryRestrictions?: string;
+    customAllergies?: string;
     fromSettings?: string;
   }>();
   const isFromSettings = params.fromSettings === "true";
+  const hasDietaryParams =
+    params.dietaryRestrictions !== undefined || params.customAllergies !== undefined;
+  const dietaryRestrictions = normalizeDietaryRestrictions(
+    parseJsonArrayParam(params.dietaryRestrictions)
+  );
+  const customAllergies = normalizeCustomAllergies(
+    parseJsonArrayParam(params.customAllergies)
+  );
 
   const [calories, setCalories] = useState(params.calories || "2000");
   const [proteinG, setProteinG] = useState(params.proteinG || "150");
@@ -73,15 +98,40 @@ export default function GoalsReviewScreen() {
         weightKg: parseDecimal(params.weightKg), activityLevel: params.activityLevel, objective: params.objective,
       });
       const { data: updatedProfile, error } = await supabase.rpc("complete_onboarding", {
-        p_profile: { gender: profile.gender, age: profile.age, height_cm: profile.heightCm,
-          current_weight_kg: profile.weightKg, activity_level: profile.activityLevel, objective: profile.objective },
-        p_goals: { calories: Math.round(goals.calories), protein_g: Math.round(goals.proteinG),
-          carbs_g: Math.round(goals.carbsG), fat_g: Math.round(goals.fatG) },
+        p_profile: {
+          gender: profile.gender,
+          age: profile.age,
+          height_cm: profile.heightCm,
+          current_weight_kg: profile.weightKg,
+          activity_level: profile.activityLevel,
+          objective: profile.objective,
+          ...(hasDietaryParams
+            ? {
+                dietary_restrictions: dietaryRestrictions,
+                custom_allergies: customAllergies,
+              }
+            : {}),
+        },
+        p_goals: {
+          calories: Math.round(goals.calories),
+          protein_g: Math.round(goals.proteinG),
+          carbs_g: Math.round(goals.carbsG),
+          fat_g: Math.round(goals.fatG),
+        },
       });
       if (error) throw new Error(error.message);
       setProfile(updatedProfile);
-      await queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] });
-      await queryClient.invalidateQueries({ queryKey: ["personalPlan"] });
+      if (hasDietaryParams) {
+        queryClient.setQueryData(["dietaryPreferences", user.id], {
+          restrictions: dietaryRestrictions,
+          customAllergies,
+        });
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] }),
+        queryClient.invalidateQueries({ queryKey: ["personalPlan"] }),
+        queryClient.invalidateQueries({ queryKey: ["dietaryPreferences"] }),
+      ]);
       // Redirigir a ajustes o al inicio según origen
       if (isFromSettings) {
         router.replace("/(tabs)/settings");

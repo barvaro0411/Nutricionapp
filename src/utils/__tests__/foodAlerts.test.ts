@@ -177,4 +177,53 @@ describe("foodAlerts", () => {
       expect(evaluation.alerts.some((a) => a.type === "low_sugar")).toBe(true);
     });
   });
+
+  describe("custom allergies support", () => {
+    const sampleNutrients = { calories: 180, protein: 8, carbs: 15, fat: 8, grams: 100, unit: "g" as const };
+
+    test("detects custom allergies across accents and Spanish plurals", () => {
+      const eggs = detectDietaryAlerts("Huevos revueltos con tomate", sampleNutrients, [], ["Huevo"]);
+      expect(eggs).toHaveLength(1);
+      expect(eggs[0].type).toBe("custom_allergy");
+      expect(eggs[0].severity).toBe("danger");
+      expect(eggs[0].label).toContain("Huevo");
+
+      const mushrooms = detectDietaryAlerts("Omelette de champinones", sampleNutrients, [], ["Champiñón"]);
+      expect(mushrooms).toHaveLength(1);
+    });
+
+    test("respects explicit sin/libre de exemptions for custom allergies", () => {
+      const eggFree = detectDietaryAlerts("Pan de molde sin huevo", sampleNutrients, [], ["huevo"]);
+      expect(eggFree).toHaveLength(0);
+
+      const soyFree = detectDietaryAlerts("Leche vegetal libre de soya", sampleNutrients, [], ["soya"]);
+      expect(soyFree).toHaveLength(0);
+    });
+
+    test("isRecipeCompatible detects custom allergies in ingredients and deduplicates", () => {
+      const recipe = {
+        title: "Tortilla especial",
+        description: "Preparación casera",
+        ingredients: [
+          { foodName: "Huevo entero" },
+          { foodName: "Clara de huevo" },
+          { foodName: "Espinaca" },
+        ],
+      };
+      const result = isRecipeCompatible(recipe, [], ["Huevo"]);
+      expect(result.compatible).toBe(false);
+      expect(result.alerts).toHaveLength(1);
+      expect(result.alerts[0].type).toBe("custom_allergy");
+    });
+
+    test("evaluateFoodAlerts combines preset restrictions and custom allergies", () => {
+      const evaluation = evaluateFoodAlerts(
+        { ...sampleNutrients, food: "Pan con queso y huevo" },
+        ["lactose_intolerance"],
+        ["huevo"]
+      );
+      expect(evaluation.alerts.some((a) => a.type === "lactose_intolerance")).toBe(true);
+      expect(evaluation.alerts.some((a) => a.type === "custom_allergy")).toBe(true);
+    });
+  });
 });

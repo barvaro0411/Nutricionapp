@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowLeft,
+  ChevronDown,
+  ChevronUp,
   Sparkles,
   Minus,
   Plus,
@@ -19,7 +21,15 @@ import {
 } from "lucide-react-native";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { colors, layout } from "@/constants/colors";
-import { Gender, ActivityLevel, Objective } from "@/types/profile";
+import {
+  Gender,
+  ActivityLevel,
+  Objective,
+  DietaryRestriction,
+  normalizeCustomAllergies,
+} from "@/types/profile";
+import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
+import { DietaryPreferencesSection } from "@/components/common/DietaryPreferencesSection";
 import { parseDecimal } from "@/utils/dates";
 import { calculateBMR, calculateTDEE, calculateNutritionGoals } from "@/utils/nutritionCalculator";
 
@@ -28,6 +38,8 @@ export default function ProfileSetupScreen() {
   const params = useLocalSearchParams<{ fromSettings?: string }>();
   const isFromSettings = params.fromSettings === "true";
   const { profile } = useAuthStore();
+  const { restrictions: savedRestrictions, customAllergies: savedCustomAllergies } =
+    useDietaryPreferences();
 
   const [gender, setGender] = useState<Gender>(profile?.gender || "male");
   const [age, setAge] = useState(profile?.age ? String(profile.age) : "28");
@@ -37,7 +49,39 @@ export default function ProfileSetupScreen() {
     profile?.activity_level || "moderate"
   );
   const [objective, setObjective] = useState<Objective>(profile?.objective || "lose_weight");
+  const [draftRestrictions, setDraftRestrictions] = useState<DietaryRestriction[]>(savedRestrictions);
+  const [draftCustomAllergies, setDraftCustomAllergies] = useState<string[]>(savedCustomAllergies);
+  const [showDietary, setShowDietary] = useState(
+    savedRestrictions.length > 0 || savedCustomAllergies.length > 0
+  );
+  const dietaryTouchedRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (dietaryTouchedRef.current) return;
+    setDraftRestrictions(savedRestrictions);
+    setDraftCustomAllergies(savedCustomAllergies);
+    if (savedRestrictions.length > 0 || savedCustomAllergies.length > 0) {
+      setShowDietary(true);
+    }
+  }, [savedRestrictions, savedCustomAllergies]);
+
+  const toggleDraftRestriction = (restriction: DietaryRestriction) => {
+    dietaryTouchedRef.current = true;
+    setDraftRestrictions((prev) =>
+      prev.includes(restriction) ? prev.filter((item) => item !== restriction) : [...prev, restriction]
+    );
+  };
+
+  const addDraftCustomAllergy = (term: string) => {
+    dietaryTouchedRef.current = true;
+    setDraftCustomAllergies((prev) => normalizeCustomAllergies([...prev, term]));
+  };
+
+  const removeDraftCustomAllergy = (term: string) => {
+    dietaryTouchedRef.current = true;
+    setDraftCustomAllergies((prev) => prev.filter((item) => item !== term));
+  };
 
   // Steppers para ajustes rápidos táctiles
   const handleAdjustValue = (
@@ -141,6 +185,8 @@ export default function ProfileSetupScreen() {
         proteinG: calculatedGoals.proteinG.toString(),
         carbsG: calculatedGoals.carbsG.toString(),
         fatG: calculatedGoals.fatG.toString(),
+        dietaryRestrictions: JSON.stringify(draftRestrictions),
+        customAllergies: JSON.stringify(draftCustomAllergies),
         fromSettings: isFromSettings ? "true" : undefined,
       },
     });
@@ -522,6 +568,43 @@ export default function ProfileSetupScreen() {
         })}
       </View>
 
+      {/* Preferencias alimentarias y alergias (opcional) */}
+      <View style={styles.section}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Configurar preferencias alimentarias y alergias opcionales"
+          accessibilityState={{ expanded: showDietary }}
+          style={styles.dietaryToggleCard}
+          onPress={() => setShowDietary((prev) => !prev)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.cardOptionText}>
+            <Text style={styles.cardOptionTitle}>Preferencias alimentarias y alergias (opcional)</Text>
+            <Text style={styles.cardOptionDesc}>
+              {draftRestrictions.length + draftCustomAllergies.length > 0
+                ? `${draftRestrictions.length + draftCustomAllergies.length} configuradas · El Coach y alertas las respetarán`
+                : "Sin restricciones marcadas · Toca si deseas personalizarlas"}
+            </Text>
+          </View>
+          {showDietary ? (
+            <ChevronUp size={18} color={colors.textSecondary} />
+          ) : (
+            <ChevronDown size={18} color={colors.textSecondary} />
+          )}
+        </TouchableOpacity>
+        {showDietary && (
+          <View style={styles.dietaryBody}>
+            <DietaryPreferencesSection
+              restrictions={draftRestrictions}
+              customAllergies={draftCustomAllergies}
+              onToggleRestriction={toggleDraftRestriction}
+              onAddCustomAllergy={addDraftCustomAllergy}
+              onRemoveCustomAllergy={removeDraftCustomAllergy}
+            />
+          </View>
+        )}
+      </View>
+
       {/* Botón de Acción Principal */}
       <TouchableOpacity
         accessibilityRole="button"
@@ -866,6 +949,19 @@ const styles = StyleSheet.create({
   cardOptionRadioActive: {
     borderColor: colors.primary,
     backgroundColor: colors.primary,
+  },
+  dietaryToggleCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.card,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    gap: 10,
+  },
+  dietaryBody: {
+    marginTop: 12,
   },
   continueButton: {
     backgroundColor: colors.primary,

@@ -213,3 +213,63 @@ test('Sunday factual calculations preserve match-day goals and over-target balan
   tableData.meals[0].total_protein = 140.1;
   expect((await loadCoachContext(client, owner, new Date('2026-10-11T16:00:00Z'), 'nutrition')).remaining.protein).toBe(-0.1);
 });
+
+test('coach context includes dietaryPreferences when set and omits when empty', async () => {
+  const prevProfiles = tableData.profiles;
+  try {
+    const { loadCoachContext } = require('../_shared/coachContext.ts');
+    const emptyLoaded = await loadCoachContext(client, owner, new Date('2026-10-11T16:00:00Z'), 'full');
+    expect(emptyLoaded.context.dietaryPreferences).toBeUndefined();
+
+    tableData.profiles = {
+      objective: 'health',
+      current_weight_kg: 75,
+      height_cm: 175,
+      dietary_restrictions: ['celiac_gluten', 'vegan'],
+      custom_allergies: ['kiwi', 'soya'],
+    };
+    fetchMock.mockResolvedValue(groqReply('Te propongo una cena vegana y sin gluten.'));
+    const response = await require('../nutrition-coach/index.ts').handleRequest(request({ message: '¿Qué puedo cenar hoy?' }));
+    expect(response.status).toBe(200);
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.messages[0].content).toContain('dietaryPreferences');
+    const context = JSON.parse(sent.messages[0].content.split('Contexto JSON: ')[1]);
+    expect(context.dietaryPreferences).toEqual({
+      restrictions: ['celiac_gluten', 'vegan'],
+      customAllergies: ['kiwi', 'soya'],
+    });
+  } finally {
+    tableData.profiles = prevProfiles;
+  }
+});
+
+test('vision providers pass compact dietary_preferences without altering Groq system prompt', async () => {
+  const { CHILEAN_MEAL_VISION_PROMPT, GROQ_MEAL_VISION_PROMPT } = require('../analyze-meal/prompts/mealVisionPrompt.ts');
+  const { GroqVisionProvider } = require('../analyze-meal/providers/groq.ts');
+  const { GeminiVisionProvider } = require('../analyze-meal/providers/gemini.ts');
+
+  const validMealJson = JSON.stringify({
+    meal_type_guess: 'almuerzo',
+    items: [{ food: 'Pollo grillado', grams: 150, calories: 240, protein: 45, carbs: 0, fat: 5 }],
+  });
+  fetchMock
+    .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: validMealJson } }] }), { headers: { 'Content-Type': 'application/json' } }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: validMealJson }] } }] }), { headers: { 'Content-Type': 'application/json' } }));
+
+  const groq = new GroqVisionProvider('groq-key');
+  await groq.analyzeImage('aGVsbG8=', 'image/jpeg', CHILEAN_MEAL_VISION_PROMPT, '2026-11-12T12:00:00Z', 'almuerzo', 15000, 'Restricciones: Sin lactosa');
+  const groqSent = JSON.parse(fetchMock.mock.calls[0][1].body);
+  expect(groqSent.messages[0].content).toBe(GROQ_MEAL_VISION_PROMPT);
+  expect(JSON.parse(groqSent.messages[1].content[0].text)).toEqual({
+    client_time_iso: '2026-11-12T12:00:00Z',
+    user_note: 'almuerzo',
+    dietary_preferences: 'Restricciones: Sin lactosa',
+  });
+
+  const gemini = new GeminiVisionProvider('gemini-key');
+  await gemini.analyzeImage('aGVsbG8=', 'image/jpeg', CHILEAN_MEAL_VISION_PROMPT, '2026-11-12T12:00:00Z', undefined, 15000, undefined);
+  const geminiSent = JSON.parse(fetchMock.mock.calls[1][1].body);
+  expect(JSON.parse(geminiSent.contents[0].parts[1].text)).toEqual({
+    client_time_iso: '2026-11-12T12:00:00Z',
+  });
+});

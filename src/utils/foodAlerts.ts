@@ -10,7 +10,7 @@ export interface FoodWarningStamp {
 }
 
 export interface FoodDietaryAlert {
-  type: DietaryRestriction;
+  type: DietaryRestriction | "custom_allergy";
   severity: "warning" | "danger";
   label: string;
   message: string;
@@ -21,6 +21,45 @@ const normalize = (text: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildCustomAllergyPattern(rawAllergy: string): string | null {
+  const cleaned = normalize(rawAllergy).trim().replace(/\s+/g, " ");
+  if (cleaned.length < 2) return null;
+
+  const variants = new Set<string>([cleaned]);
+  if (!cleaned.includes(" ")) {
+    variants.add(`${cleaned}s`);
+    variants.add(`${cleaned}es`);
+    if (cleaned.endsWith("es") && cleaned.length > 4) {
+      variants.add(cleaned.slice(0, -2));
+    }
+    if (cleaned.endsWith("s") && cleaned.length > 3) {
+      variants.add(cleaned.slice(0, -1));
+    }
+    if (cleaned.endsWith("z") && cleaned.length > 3) {
+      variants.add(`${cleaned.slice(0, -1)}ces`);
+    }
+    if (cleaned.endsWith("ces") && cleaned.length > 5) {
+      variants.add(`${cleaned.slice(0, -3)}z`);
+    }
+  }
+
+  return `(?:${Array.from(variants).map(escapeRegExp).join("|")})`;
+}
+
+function matchesCustomAllergy(normalizedFoodText: string, rawAllergy: string): boolean {
+  const pattern = buildCustomAllergyPattern(rawAllergy);
+  if (!pattern) return false;
+
+  const exemptRegex = new RegExp(`\\b(?:sin|libre\\s+de)\\s+${pattern}\\b`, "gi");
+  const withoutExemptions = normalizedFoodText.replace(exemptRegex, " ");
+  const matchRegex = new RegExp(`\\b${pattern}\\b`, "i");
+  return matchRegex.test(withoutExemptions);
+}
 
 /**
  * Detecta sellos nutricionales según los umbrales de la Ley de Etiquetado de Chile (Ley 20.606).
@@ -112,14 +151,17 @@ export function detectFoodWarningLabels(item: {
 export function detectDietaryAlerts(
   foodName: string,
   nutrients: { calories: number; carbs: number; fat: number; grams: number; unit?: string },
-  userRestrictions: DietaryRestriction[] = []
+  userRestrictions: DietaryRestriction[] = [],
+  customAllergies: string[] = []
 ): FoodDietaryAlert[] {
-  if (!userRestrictions || userRestrictions.length === 0) return [];
+  const hasPresets = Boolean(userRestrictions && userRestrictions.length > 0);
+  const hasCustom = Boolean(customAllergies && customAllergies.length > 0);
+  if (!hasPresets && !hasCustom) return [];
 
   const alerts: FoodDietaryAlert[] = [];
   const text = normalize(foodName);
 
-  for (const restriction of userRestrictions) {
+  for (const restriction of userRestrictions || []) {
     switch (restriction) {
       case "lactose_intolerance": {
         const isExempt =
@@ -276,6 +318,19 @@ export function detectDietaryAlerts(
     }
   }
 
+  for (const allergy of customAllergies || []) {
+    const label = allergy.trim();
+    if (!label) continue;
+    if (matchesCustomAllergy(text, label)) {
+      alerts.push({
+        type: "custom_allergy",
+        severity: "danger",
+        label: `Evitar: ${label}`,
+        message: `Coincide con tu alergia o restricción personalizada (${label}).`,
+      });
+    }
+  }
+
   return alerts;
 }
 
@@ -341,14 +396,15 @@ export function evaluateFoodAlerts(
     grams: number;
     unit?: string;
   },
-  userRestrictions: DietaryRestriction[] = []
+  userRestrictions: DietaryRestriction[] = [],
+  customAllergies: string[] = []
 ): {
   stamps: FoodWarningStamp[];
   alerts: FoodDietaryAlert[];
   substituteSuggestion: string | null;
 } {
   const stamps = detectFoodWarningLabels(item);
-  const alerts = detectDietaryAlerts(item.food, item, userRestrictions);
+  const alerts = detectDietaryAlerts(item.food, item, userRestrictions, customAllergies);
   const substituteSuggestion = getHealthySubstituteSuggestion(item.food, stamps);
   return { stamps, alerts, substituteSuggestion };
 }
@@ -362,24 +418,31 @@ export function isRecipeCompatible(
     description?: string | null;
     ingredients: Array<{ foodName: string }>;
   },
-  userRestrictions: DietaryRestriction[] = []
+  userRestrictions: DietaryRestriction[] = [],
+  customAllergies: string[] = []
 ): { compatible: boolean; alerts: FoodDietaryAlert[] } {
-  if (!userRestrictions || userRestrictions.length === 0) {
+  const hasPresets = Boolean(userRestrictions && userRestrictions.length > 0);
+  const hasCustom = Boolean(customAllergies && customAllergies.length > 0);
+  if (!hasPresets && !hasCustom) {
     return { compatible: true, alerts: [] };
   }
 
   const allAlerts: FoodDietaryAlert[] = [];
-  const seenTypes = new Set<string>();
+  const seenKeys = new Set<string>();
+  const alertKey = (alert: FoodDietaryAlert) =>
+    alert.type === "custom_allergy" ? `custom:${normalize(alert.label)}` : alert.type;
 
   // Evaluar título de la receta
   const titleAlerts = detectDietaryAlerts(
     recipe.title,
     { calories: 0, carbs: 0, fat: 0, grams: 100 },
-    userRestrictions
+    userRestrictions,
+    customAllergies
   );
   for (const alert of titleAlerts) {
-    if (!seenTypes.has(alert.type)) {
-      seenTypes.add(alert.type);
+    const key = alertKey(alert);
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
       allAlerts.push(alert);
     }
   }
@@ -389,14 +452,20 @@ export function isRecipeCompatible(
     const ingAlerts = detectDietaryAlerts(
       ing.foodName,
       { calories: 0, carbs: 0, fat: 0, grams: 100 },
-      userRestrictions
+      userRestrictions,
+      customAllergies
     );
     for (const alert of ingAlerts) {
-      if (!seenTypes.has(alert.type)) {
-        seenTypes.add(alert.type);
+      const key = alertKey(alert);
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        const prefix =
+          alert.type === "custom_allergy"
+            ? alert.label
+            : DIETARY_RESTRICTION_LABELS[alert.type].label;
         allAlerts.push({
           ...alert,
-          message: `${DIETARY_RESTRICTION_LABELS[alert.type].label}: Contiene ${ing.foodName}.`,
+          message: `${prefix}: Contiene ${ing.foodName}.`,
         });
       }
     }

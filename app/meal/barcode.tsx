@@ -40,7 +40,7 @@ export default function BarcodeScreen() {
   const { user } = useAuthStore();
   const { addItem } = useMealReviewStore();
   const { analyzeProductPhoto } = useMealAnalysis();
-  const { restrictions } = useDietaryPreferences();
+  const { restrictions, customAllergies } = useDietaryPreferences();
 
   const [activeTab, setActiveTab] = useState<"camera" | "manual">("camera");
   const [scanned, setScanned] = useState(false);
@@ -407,6 +407,7 @@ export default function BarcodeScreen() {
         <ScannedProductSheet
           product={product}
           restrictions={restrictions}
+          customAllergies={customAllergies}
           portionGrams={portionGrams}
           portionUnit={portionUnit}
           onChangePortionGrams={setPortionGrams}

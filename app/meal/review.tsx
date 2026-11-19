@@ -32,6 +32,8 @@ import { MealType, DetectedFoodItemSchema } from "@/types/meal";
 import { parseDecimal, getDateKey, APP_TIME_ZONE } from "@/utils/dates";
 import { parseQuantityInput, resolveItemUnit } from "@/utils/liquidUnits";
 import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
+import { DietaryRestriction } from "@/types/profile";
+import { evaluateFoodAlerts } from "@/utils/foodAlerts";
 import {
   getAllUserFoodCorrections,
   normalizeFoodKey,
@@ -39,13 +41,32 @@ import {
   UserFoodCorrection,
 } from "@/services/userFoodCorrectionsService";
 
+function collectMealDietaryWarnings(
+  items: Parameters<typeof evaluateFoodAlerts>[0][],
+  restrictions: DietaryRestriction[],
+  customAllergies: string[]
+): { food: string; labels: string[] }[] {
+  if (!restrictions.length && !customAllergies.length) return [];
+  const warnings: { food: string; labels: string[] }[] = [];
+  for (const item of items) {
+    const { alerts } = evaluateFoodAlerts(item, restrictions, customAllergies);
+    if (alerts.length > 0) {
+      warnings.push({
+        food: item.food,
+        labels: Array.from(new Set(alerts.map((a) => a.label))),
+      });
+    }
+  }
+  return warnings;
+}
+
 export default function MealReviewScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ manual?: string }>();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { saveFavorite, isSavingFavorite } = useFavoriteMeals();
-  const { restrictions } = useDietaryPreferences();
+  const { restrictions, customAllergies } = useDietaryPreferences();
 
 
   const {
@@ -226,6 +247,8 @@ export default function MealReviewScreen() {
     setShowAddModal(false);
   };
 
+  const mealDietaryWarnings = collectMealDietaryWarnings(items, restrictions, customAllergies);
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -321,6 +344,7 @@ export default function MealReviewScreen() {
             item={item}
             index={index}
             restrictions={restrictions}
+            customAllergies={customAllergies}
             inputValue={inputValues[index]}
             inputError={inputErrors[index]}
             rememberedGrams={userCorrections[normalizeFoodKey(item.food)]?.preferredGrams}
@@ -468,6 +492,18 @@ export default function MealReviewScreen() {
 
       {/* Barra de acción inferior con botones de guardado */}
       <View style={styles.bottomBar}>
+        {items.length > 0 && mealDietaryWarnings.length > 0 && (
+          <View accessibilityRole="alert" style={styles.dietaryWarningBanner}>
+            <Text style={styles.dietaryWarningText} numberOfLines={2}>
+              ⚠️ Precaución alimentaria:{" "}
+              {mealDietaryWarnings
+                .slice(0, 3)
+                .map((w) => `${w.food} (${w.labels.join(", ")})`)
+                .join(" · ")}
+              {mealDietaryWarnings.length > 3 ? ` +${mealDietaryWarnings.length - 3} más` : ""}
+            </Text>
+          </View>
+        )}
         <TouchableOpacity
           style={styles.favStarBtn}
           accessibilityRole="button"
@@ -618,6 +654,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: colors.primary,
+  },
+  dietaryWarningBanner: {
+    backgroundColor: "#FEF3C7",
+    borderColor: "#F59E0B",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  dietaryWarningText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#92400E",
+    lineHeight: 16,
   },
   bottomBar: {
     position: "absolute",

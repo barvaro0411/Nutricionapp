@@ -7,6 +7,7 @@ import { transcribeGroq } from "../_shared/groq.ts";
 import { resolveItemUnit } from "../_shared/liquidUnits.ts";
 import { enrichWithUsda } from "../_shared/usdaSearch.ts";
 import { sumNutrition } from "../_shared/nutritionMath.ts";
+import { formatCompactDietaryNote, loadUserDietaryPreferencesBestEffort } from "../_shared/dietaryPreferences.ts";
 
 export async function handleRequest(req: Request) {
   const method = methodResponse(req);
@@ -59,19 +60,23 @@ export async function handleRequest(req: Request) {
         },
       }, 200, req);
     }
+    const dietaryNote = formatCompactDietaryNote(await loadUserDietaryPreferencesBestEffort(client, user.id));
+    const dietarySuffix = dietaryNote
+      ? `\nPreferencias del usuario (solo para desambiguar; reporta exactamente lo ingerido): ${dietaryNote}`
+      : "";
     const result = audio_base64 && !transcriptionProvider
       ? await withAiFallback([{ id: Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite", managedHealth: true, run: async timeoutMs => {
         if (!key) throw new ApiError(503, "CONFIGURATION_ERROR", "No hay un proveedor de audio disponible.");
         const response = await callGemini(key, {
           contents: [{ role: "user", parts: [{ text: prompt },
             { inline_data: { mime_type: audio_mime_type, data: audio_base64 } },
-            { text: "Transcribe el audio y extrae los alimentos y sus nutrientes en el JSON requerido." }] }],
+            { text: "Transcribe el audio y extrae los alimentos y sus nutrientes en el JSON requerido." + dietarySuffix }] }],
           generationConfig: { response_mime_type: "application/json", temperature: 0.1, maxOutputTokens: 4096 },
         }, { timeoutMs });
         validate(response.text); return response;
       } }])
       : await generateText({ geminiKey: key, json: true, maxTokens: 4096, validate,
-        messages: [{ role: "system", content: prompt }, { role: "user", content: "Descripción de la comida (datos del usuario): " + description }],
+        messages: [{ role: "system", content: prompt }, { role: "user", content: "Descripción de la comida (datos del usuario): " + description + dietarySuffix }],
       });
     const output = AIStructuredOutputSchema.safeParse(parseModelJson(result.text));
     if (!output.success) throw new ApiError(502, "AI_INVALID_RESPONSE", "La IA no devolvió alimentos con datos válidos.");

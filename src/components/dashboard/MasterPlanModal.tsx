@@ -1,72 +1,201 @@
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
   Modal,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
   TouchableOpacity,
+  View,
 } from "react-native";
 import {
-  X,
-  Target,
-  Dumbbell,
-  Clock,
-  Pill,
   CheckCircle2,
-  Circle,
-  Flame,
-  Droplets,
   ChevronDown,
   ChevronUp,
+  Circle,
+  Clock,
+  Droplets,
+  Dumbbell,
+  Flame,
+  Pencil,
+  Pill,
+  Plus,
+  Sparkles,
+  Target,
+  Trash2,
+  X,
+  Zap,
 } from "lucide-react-native";
-import { usePersonalPlan } from "@/hooks/usePersonalPlan";
 import { colors } from "@/constants/colors";
+import {
+  useChecklistHistory,
+  usePersonalPlan,
+  useSavePersonalPlan,
+  useToggleChecklistItem,
+} from "@/hooks/usePersonalPlan";
+import { showToast } from "@/utils/alerts";
+import { getDateKey, getWeekday } from "@/utils/dates";
+import {
+  formatWeekdaysLabel,
+  getMatchDayWeekdays,
+  isConfiguredMatchDay,
+  isHabitChecked,
+  normalizeHabitKey,
+  WEEKDAY_OPTIONS,
+} from "@/utils/personalPlan";
 
 interface MasterPlanModalProps {
   visible: boolean;
+  selectedDate?: Date;
   onClose: () => void;
+  onOpenBuilder?: () => void;
 }
 
-export function MasterPlanModal({ visible, onClose }: MasterPlanModalProps) {
+export function MasterPlanModal({
+  visible,
+  selectedDate = new Date(),
+  onClose,
+  onOpenBuilder,
+}: MasterPlanModalProps) {
   const { data: plan, isLoading, error } = usePersonalPlan();
-  const [activeTab, setActiveTab] = useState<"nutricion" | "rutina" | "habitos">("nutricion");
-  const [checkedHabits, setCheckedHabits] = useState<Record<number, boolean>>({});
-  const [expandedDay, setExpandedDay] = useState<string>("Lunes");
+  const { checkedItemsForDay, adherence, dateKey } = useChecklistHistory(7, selectedDate);
+  const toggleMutation = useToggleChecklistItem(dateKey);
+  const savePlanMutation = useSavePersonalPlan();
 
-  const toggleHabit = (index: number) => {
-    setCheckedHabits((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
+  const [activeTab, setActiveTab] = useState<"nutricion" | "rutina" | "habitos">("nutricion");
+  const [expandedDay, setExpandedDay] = useState<string>("Lunes");
+  const [newHabitText, setNewHabitText] = useState("");
+
+  if (!plan) {
+    return (
+      <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+        <View style={styles.overlay}>
+          <View style={styles.emptyContainer}>
+            <View style={styles.header}>
+              <Text style={styles.title}>
+                {isLoading ? "Cargando plan..." : error ? error.message : "Aún no tienes Plan Maestro"}
+              </Text>
+              <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                <X size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            {!isLoading && !error && (
+              <View style={styles.emptyBody}>
+                <Text style={styles.emptyDesc}>
+                  Crea un plan con IA o plantilla personalizada para organizar tus días de carga, comidas y checklist diario.
+                </Text>
+                {onOpenBuilder && (
+                  <TouchableOpacity style={styles.emptyCreateBtn} onPress={onOpenBuilder}>
+                    <Sparkles size={16} color="#FFFFFF" />
+                    <Text style={styles.emptyCreateBtnText}>Crear mi Plan Maestro</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  const weekday = getWeekday(selectedDate);
+  const matchWeekdays = getMatchDayWeekdays(plan);
+  const isMatchDay = isConfiguredMatchDay(plan, weekday);
+  const checklist = plan.dailyChecklist ?? [];
+
+  const handleAddHabit = async () => {
+    const trimmed = newHabitText.trim();
+    if (trimmed.length < 2) return;
+    if (checklist.some((item) => normalizeHabitKey(item) === normalizeHabitKey(trimmed))) {
+      setNewHabitText("");
+      return;
+    }
+    try {
+      await savePlanMutation.mutateAsync({
+        plan: {
+          ...plan,
+          dailyChecklist: [...checklist, trimmed].slice(0, 25),
+        },
+        syncGoals: false,
+      });
+      setNewHabitText("");
+    } catch (err: any) {
+      showToast({
+        type: "error",
+        title: "No se pudo agregar el hábito",
+        message: err?.message,
+      });
+    }
   };
 
-  if (!plan) return <Modal visible={visible} animationType="slide" transparent>
-    <View style={styles.overlay}><View style={styles.container}>
-      <Text style={styles.title}>{isLoading ? "Cargando plan…" : error ? error.message : "No tienes un plan personal asignado."}</Text>
-      <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={styles.cyclingTitle}>Cerrar</Text></TouchableOpacity>
-    </View></View>
-  </Modal>;
+  const handleDeleteHabit = async (habitToRemove: string) => {
+    try {
+      await savePlanMutation.mutateAsync({
+        plan: {
+          ...plan,
+          dailyChecklist: checklist.filter((item) => item !== habitToRemove),
+        },
+        syncGoals: false,
+      });
+    } catch (err: any) {
+      showToast({
+        type: "error",
+        title: "No se pudo quitar el hábito",
+        message: err?.message,
+      });
+    }
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.container}>
-          {/* Modal Header */}
           <View style={styles.header}>
             <View style={styles.headerTitleWrap}>
-              <View style={styles.planBadge}>
-                <Target size={14} color={colors.primary} />
-                <Text style={styles.planBadgeText}>PLAN MAESTRO ACTIVO</Text>
+              <View style={styles.badgeRow}>
+                <View style={styles.planBadge}>
+                  <Target size={13} color={colors.primary} />
+                  <Text style={styles.planBadgeText}>PLAN MAESTRO ACTIVO</Text>
+                </View>
+                <View
+                  style={[
+                    styles.dayModeBadge,
+                    isMatchDay ? styles.dayModeMatch : styles.dayModeStandard,
+                  ]}
+                >
+                  {isMatchDay && <Zap size={11} color="#B45309" />}
+                  <Text
+                    style={[
+                      styles.dayModeText,
+                      isMatchDay ? styles.dayModeTextMatch : styles.dayModeTextStandard,
+                    ]}
+                  >
+                    {isMatchDay ? "Día de carga" : "Día estándar"}
+                  </Text>
+                </View>
               </View>
               <Text style={styles.title}>Mi plan personal</Text>
               <Text style={styles.subtitle}>{plan.user.objectiveTitle}</Text>
             </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-              <X size={20} color={colors.text} />
-            </TouchableOpacity>
+
+            <View style={styles.headerActions}>
+              {onOpenBuilder && (
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={onOpenBuilder}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Editar o regenerar plan"
+                >
+                  <Pencil size={15} color={colors.primaryDark} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
+                <X size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Selector de Pestañas */}
           <View style={styles.tabsRow}>
             <TouchableOpacity
               style={[styles.tabBtn, activeTab === "nutricion" && styles.tabBtnActive]}
@@ -84,7 +213,7 @@ export function MasterPlanModal({ visible, onClose }: MasterPlanModalProps) {
             >
               <Dumbbell size={16} color={activeTab === "rutina" ? colors.primaryDark : colors.textMuted} />
               <Text style={[styles.tabText, activeTab === "rutina" && styles.tabTextActive]}>
-                Rutina Gym
+                Rutina
               </Text>
             </TouchableOpacity>
 
@@ -94,16 +223,14 @@ export function MasterPlanModal({ visible, onClose }: MasterPlanModalProps) {
             >
               <CheckCircle2 size={16} color={activeTab === "habitos" ? colors.primaryDark : colors.textMuted} />
               <Text style={[styles.tabText, activeTab === "habitos" && styles.tabTextActive]}>
-                Hábitos & Supl.
+                Checklist ({adherence.today.completedCount}/{adherence.today.totalItems})
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Contenido scrolleable */}
           <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
-            {/* Tarjeta Resumen Antropométrico InBody siempre visible */}
             <View style={styles.inbodyCard}>
-              <Text style={styles.inbodyHeader}>MEDICIONES INBODY / PUNTO DE PARTIDA</Text>
+              <Text style={styles.inbodyHeader}>PERFIL Y METAS DEL PLAN</Text>
               <View style={styles.inbodyGrid}>
                 <View style={styles.inbodyItem}>
                   <Text style={styles.inbodyValue}>{plan.user.heightCm} cm</Text>
@@ -111,73 +238,125 @@ export function MasterPlanModal({ visible, onClose }: MasterPlanModalProps) {
                 </View>
                 <View style={styles.inbodyItem}>
                   <Text style={styles.inbodyValue}>{plan.user.currentWeightKg} kg</Text>
-                  <Text style={styles.inbodyLabel}>Peso Actual</Text>
+                  <Text style={styles.inbodyLabel}>Peso inicial</Text>
                 </View>
                 <View style={styles.inbodyItem}>
-                  <Text style={[styles.inbodyValue, { color: colors.primaryDark }]}>{plan.user.bodyFatPct}%</Text>
-                  <Text style={styles.inbodyLabel}>Grasa ({plan.user.targetFatPct} meta)</Text>
+                  <Text style={styles.inbodyValue}>{plan.user.targetWeightKg} kg</Text>
+                  <Text style={styles.inbodyLabel}>Peso meta</Text>
                 </View>
-                <View style={styles.inbodyItem}>
-                  <Text style={styles.inbodyValue}>{plan.user.skeletalMuscleKg} kg</Text>
-                  <Text style={styles.inbodyLabel}>MME (Músculo)</Text>
-                </View>
+                {typeof plan.user.bodyFatPct === "number" && (
+                  <View style={styles.inbodyItem}>
+                    <Text style={[styles.inbodyValue, { color: colors.primaryDark }]}>
+                      {plan.user.bodyFatPct}%
+                    </Text>
+                    <Text style={styles.inbodyLabel}>
+                      Grasa{plan.user.targetFatPct ? ` (${plan.user.targetFatPct})` : ""}
+                    </Text>
+                  </View>
+                )}
               </View>
               <View style={styles.inbodyPills}>
-                <Text style={styles.inbodyPill}>TMB: {plan.user.bmrKcal} kcal</Text>
-                <Text style={styles.inbodyPill}>Peso orientativo: ~{plan.user.targetWeightKg} kg</Text>
-                <Text style={styles.inbodyPill}>Ritmo: {plan.user.weeklyPaceKg}</Text>
+                {typeof plan.user.bmrKcal === "number" && (
+                  <Text style={styles.inbodyPill}>TMB: {plan.user.bmrKcal} kcal</Text>
+                )}
+                {typeof plan.user.skeletalMuscleKg === "number" && (
+                  <Text style={styles.inbodyPill}>MME: {plan.user.skeletalMuscleKg} kg</Text>
+                )}
+                {!!plan.user.weeklyPaceKg && (
+                  <Text style={styles.inbodyPill}>Ritmo: {plan.user.weeklyPaceKg}</Text>
+                )}
               </View>
             </View>
 
-            {/* PESTAÑA 1: NUTRICIÓN */}
             {activeTab === "nutricion" && (
               <>
                 <Text style={styles.sectionTitle}>Ciclado de Calorías y Macronutrientes</Text>
-                
-                {/* Días Estándar L-S */}
-                <View style={styles.cyclingCard}>
+
+                <View
+                  style={[
+                    styles.cyclingCard,
+                    !isMatchDay && styles.cyclingCardActiveHighlight,
+                  ]}
+                >
                   <View style={styles.cyclingHeader}>
                     <Flame size={16} color={colors.primary} />
-                    <Text style={styles.cyclingTitle}>{plan.dailyGoals.standard.days}</Text>
+                    <Text style={styles.cyclingTitle}>
+                      Días estándar ({plan.dailyGoals.standard.days})
+                    </Text>
                     <View style={styles.calBadge}>
                       <Text style={styles.calBadgeText}>{plan.dailyGoals.standard.calories} kcal</Text>
                     </View>
                   </View>
                   <Text style={styles.cyclingSubtitle}>Rango: {plan.dailyGoals.standard.caloriesRange}</Text>
                   <View style={styles.macrosRow}>
-                    <Text style={styles.macroTag}>🥩 {plan.dailyGoals.standard.proteinG}g P</Text>
-                    <Text style={styles.macroTag}>🍚 {plan.dailyGoals.standard.carbsG}g C</Text>
-                    <Text style={styles.macroTag}>🥑 {plan.dailyGoals.standard.fatG}g G</Text>
+                    <Text style={styles.macroTag}>{plan.dailyGoals.standard.proteinG}g P</Text>
+                    <Text style={styles.macroTag}>{plan.dailyGoals.standard.carbsG}g C</Text>
+                    <Text style={styles.macroTag}>{plan.dailyGoals.standard.fatG}g G</Text>
                   </View>
                 </View>
 
-                {/* Domingo Fútbol / Carga */}
-                <View style={[styles.cyclingCard, { borderColor: "#FCD34D", backgroundColor: "#FFFBEB" }]}>
+                <View
+                  style={[
+                    styles.cyclingCard,
+                    { borderColor: "#FCD34D", backgroundColor: "#FFFBEB" },
+                    isMatchDay && styles.matchCardActiveHighlight,
+                  ]}
+                >
                   <View style={styles.cyclingHeader}>
-                    <Flame size={16} color="#D97706" />
-                    <Text style={[styles.cyclingTitle, { color: "#92400E" }]}>{plan.dailyGoals.matchDay.days}</Text>
+                    <Zap size={16} color="#D97706" />
+                    <Text style={[styles.cyclingTitle, { color: "#92400E" }]}>
+                      Días de carga ({formatWeekdaysLabel(matchWeekdays)})
+                    </Text>
                     <View style={[styles.calBadge, { backgroundColor: "#FEF3C7" }]}>
-                      <Text style={[styles.calBadgeText, { color: "#B45309" }]}>{plan.dailyGoals.matchDay.calories} kcal</Text>
+                      <Text style={[styles.calBadgeText, { color: "#B45309" }]}>
+                        {plan.dailyGoals.matchDay.calories} kcal
+                      </Text>
                     </View>
                   </View>
-                  <Text style={[styles.cyclingSubtitle, { color: "#B45309" }]}>{plan.dailyGoals.matchDay.focus}</Text>
+                  <View style={styles.weekdayStrip}>
+                    {WEEKDAY_OPTIONS.map((opt) => {
+                      const active = matchWeekdays.includes(opt.value);
+                      return (
+                        <View
+                          key={opt.value}
+                          style={[styles.weekdayDot, active && styles.weekdayDotActive]}
+                        >
+                          <Text
+                            style={[
+                              styles.weekdayDotText,
+                              active && styles.weekdayDotTextActive,
+                            ]}
+                          >
+                            {opt.short}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                  <Text style={[styles.cyclingSubtitle, { color: "#B45309" }]}>
+                    {plan.dailyGoals.matchDay.focus}
+                  </Text>
                   <View style={styles.macrosRow}>
-                    <Text style={styles.macroTag}>🥩 {plan.dailyGoals.matchDay.proteinG}g P</Text>
-                    <Text style={[styles.macroTag, { color: "#D97706", fontWeight: "700" }]}>⚡ {plan.dailyGoals.matchDay.carbsG}g Carbos</Text>
-                    <Text style={styles.macroTag}>🥑 {plan.dailyGoals.matchDay.fatG}g G</Text>
+                    <Text style={styles.macroTag}>{plan.dailyGoals.matchDay.proteinG}g P</Text>
+                    <Text style={[styles.macroTag, { color: "#D97706", fontWeight: "700" }]}>
+                      {plan.dailyGoals.matchDay.carbsG}g Carbos
+                    </Text>
+                    <Text style={styles.macroTag}>{plan.dailyGoals.matchDay.fatG}g G</Text>
                   </View>
                 </View>
 
-                {/* Hidratación Deportiva */}
                 <View style={styles.waterBox}>
                   <Droplets size={20} color={colors.water} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.waterBoxTitle}>Meta de Agua: {plan.dailyGoals.waterRangeL} / día</Text>
-                    <Text style={styles.waterBoxDesc}>Base de 3.200 ml; aumentar en días de calor o sudoración alta en bicicleta y fútbol.</Text>
+                    <Text style={styles.waterBoxTitle}>
+                      Meta de Agua: {plan.dailyGoals.waterRangeL} / día
+                    </Text>
+                    <Text style={styles.waterBoxDesc}>
+                      Base recomendada de {plan.dailyGoals.waterMl} ml; aumenta en días de calor o entrenamiento intenso.
+                    </Text>
                   </View>
                 </View>
 
-                {/* Horarios de Comida */}
                 <Text style={styles.sectionTitle}>Horarios y Distribución de Comidas</Text>
                 <View style={styles.mealList}>
                   {plan.mealSchedule.map((meal, idx) => (
@@ -199,7 +378,6 @@ export function MasterPlanModal({ visible, onClose }: MasterPlanModalProps) {
               </>
             )}
 
-            {/* PESTAÑA 2: RUTINA DE GYM */}
             {activeTab === "rutina" && (
               <>
                 <Text style={styles.sectionTitle}>Estructura Semanal de Entrenamiento</Text>
@@ -222,25 +400,40 @@ export function MasterPlanModal({ visible, onClose }: MasterPlanModalProps) {
                           <Text style={styles.routineActivityText}>{item.activity}</Text>
                           <Text style={styles.routineGoalText}>{item.goal}</Text>
                         </View>
-                        {item.exercises && (
-                          isExpanded ? <ChevronUp size={20} color={colors.textMuted} /> : <ChevronDown size={20} color={colors.textMuted} />
-                        )}
+                        {item.exercises &&
+                          (isExpanded ? (
+                            <ChevronUp size={20} color={colors.textMuted} />
+                          ) : (
+                            <ChevronDown size={20} color={colors.textMuted} />
+                          ))}
                       </TouchableOpacity>
 
                       {isExpanded && item.exercises && (
                         <View style={styles.exerciseList}>
                           <View style={styles.exerciseListHeader}>
                             <Text style={[styles.exerciseColH, { flex: 2 }]}>Ejercicio</Text>
-                            <Text style={[styles.exerciseColH, { width: 70, textAlign: "center" }]}>Series x Reps</Text>
-                            <Text style={[styles.exerciseColH, { width: 45, textAlign: "center" }]}>RIR</Text>
-                            <Text style={[styles.exerciseColH, { width: 65, textAlign: "right" }]}>Descanso</Text>
+                            <Text style={[styles.exerciseColH, { width: 70, textAlign: "center" }]}>
+                              Series x Reps
+                            </Text>
+                            <Text style={[styles.exerciseColH, { width: 45, textAlign: "center" }]}>
+                              RIR
+                            </Text>
+                            <Text style={[styles.exerciseColH, { width: 65, textAlign: "right" }]}>
+                              Descanso
+                            </Text>
                           </View>
                           {item.exercises.map((ex, exIdx) => (
                             <View key={exIdx} style={styles.exerciseRow}>
                               <Text style={[styles.exerciseName, { flex: 2 }]}>{ex.name}</Text>
-                              <Text style={[styles.exerciseSets, { width: 70, textAlign: "center" }]}>{ex.setsReps}</Text>
-                              <Text style={[styles.exerciseRir, { width: 45, textAlign: "center" }]}>{ex.rir}</Text>
-                              <Text style={[styles.exerciseRest, { width: 65, textAlign: "right" }]}>{ex.rest}</Text>
+                              <Text style={[styles.exerciseSets, { width: 70, textAlign: "center" }]}>
+                                {ex.setsReps}
+                              </Text>
+                              <Text style={[styles.exerciseRir, { width: 45, textAlign: "center" }]}>
+                                {ex.rir}
+                              </Text>
+                              <Text style={[styles.exerciseRest, { width: 65, textAlign: "right" }]}>
+                                {ex.rest}
+                              </Text>
                             </View>
                           ))}
                         </View>
@@ -251,48 +444,127 @@ export function MasterPlanModal({ visible, onClose }: MasterPlanModalProps) {
               </>
             )}
 
-            {/* PESTAÑA 3: HÁBITOS & SUPLEMENTOS */}
             {activeTab === "habitos" && (
               <>
-                <Text style={styles.sectionTitle}>Checklist Diario de Cumplimiento</Text>
-                <View style={styles.checklistCard}>
-                  {plan.dailyChecklist.map((habit, idx) => {
-                    const isChecked = !!checkedHabits[idx];
-                    return (
-                      <TouchableOpacity
-                        key={idx}
-                        style={styles.habitRow}
-                        onPress={() => toggleHabit(idx)}
-                        activeOpacity={0.7}
-                      >
-                        {isChecked ? (
-                          <CheckCircle2 size={22} color={colors.primary} />
-                        ) : (
-                          <Circle size={22} color={colors.textMuted} />
-                        )}
-                        <Text style={[styles.habitText, isChecked && styles.habitTextChecked]}>
-                          {habit}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                <View style={styles.adherenceCard}>
+                  <View style={styles.adherenceHeader}>
+                    <Text style={styles.adherenceTitle}>Adherencia últimos 7 días</Text>
+                    <Text style={styles.adherencePct}>{adherence.weeklyAveragePct}% promedio</Text>
+                  </View>
+                  <View style={styles.adherenceStrip}>
+                    {adherence.days.map((day) => {
+                      const d = new Date(`${day.dateKey}T12:00:00Z`);
+                      const weekdayOpt = WEEKDAY_OPTIONS.find((w) => w.value === d.getUTCDay());
+                      const isCurrentDay = day.dateKey === dateKey;
+                      const done = day.totalItems > 0 && day.pct >= 80;
+                      const partial = day.totalItems > 0 && day.pct > 0 && day.pct < 80;
+                      return (
+                        <View
+                          key={day.dateKey}
+                          style={[styles.adherenceDay, isCurrentDay && styles.adherenceDayCurrent]}
+                        >
+                          <View
+                            style={[
+                              styles.adherenceBubble,
+                              done && styles.adherenceBubbleDone,
+                              partial && styles.adherenceBubblePartial,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.adherenceBubbleText,
+                                done && styles.adherenceBubbleTextDone,
+                              ]}
+                            >
+                              {day.totalItems > 0 ? `${day.pct}%` : "-"}
+                            </Text>
+                          </View>
+                          <Text style={styles.adherenceDayLabel}>{weekdayOpt?.short ?? ""}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
 
-                <Text style={styles.sectionTitle}>Suplementación del Plan</Text>
-                <View style={styles.supplementsList}>
-                  {plan.supplements.map((sup, idx) => (
-                    <View key={idx} style={styles.supplementCard}>
-                      <View style={styles.supIconBadge}>
-                        <Pill size={18} color={colors.primary} />
+                <Text style={styles.sectionTitle}>
+                  Checklist del {dateKey === getDateKey(new Date()) ? "día de hoy" : dateKey}
+                </Text>
+
+                <View style={styles.checklistCard}>
+                  {checklist.map((habit, idx) => {
+                    const isChecked = isHabitChecked(checkedItemsForDay, habit);
+                    return (
+                      <View key={`${habit}-${idx}`} style={styles.habitRow}>
+                        <TouchableOpacity
+                          style={styles.habitToggleArea}
+                          onPress={() =>
+                            toggleMutation.mutate({
+                              habit,
+                              checklist,
+                              currentChecked: checkedItemsForDay,
+                            })
+                          }
+                          disabled={toggleMutation.isPending}
+                          activeOpacity={0.7}
+                        >
+                          {isChecked ? (
+                            <CheckCircle2 size={22} color={colors.primary} />
+                          ) : (
+                            <Circle size={22} color={colors.textMuted} />
+                          )}
+                          <Text style={[styles.habitText, isChecked && styles.habitTextChecked]}>
+                            {habit}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteHabit(habit)}
+                          disabled={savePlanMutation.isPending}
+                          hitSlop={8}
+                        >
+                          <Trash2 size={15} color={colors.textMuted} />
+                        </TouchableOpacity>
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.supName}>{sup.name}</Text>
-                        <Text style={styles.supDose}>Dosis: {sup.dose}</Text>
-                        <Text style={styles.supTiming}>{sup.timing}</Text>
-                      </View>
-                    </View>
-                  ))}
+                    );
+                  })}
+
+                  <View style={styles.inlineAddRow}>
+                    <TextInput
+                      style={styles.inlineAddInput}
+                      value={newHabitText}
+                      onChangeText={setNewHabitText}
+                      placeholder="Nuevo hábito diario..."
+                      placeholderTextColor={colors.textMuted}
+                      maxLength={140}
+                    />
+                    <TouchableOpacity
+                      style={styles.inlineAddBtn}
+                      onPress={handleAddHabit}
+                      disabled={savePlanMutation.isPending}
+                    >
+                      <Plus size={16} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
+
+                {plan.supplements.length > 0 && (
+                  <>
+                    <Text style={styles.sectionTitle}>Suplementación del Plan</Text>
+                    <View style={styles.supplementsList}>
+                      {plan.supplements.map((sup, idx) => (
+                        <View key={idx} style={styles.supplementCard}>
+                          <View style={styles.supIconBadge}>
+                            <Pill size={18} color={colors.primary} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.supName}>{sup.name}</Text>
+                            <Text style={styles.supDose}>Dosis: {sup.dose}</Text>
+                            <Text style={styles.supTiming}>{sup.timing}</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
               </>
             )}
           </ScrollView>
@@ -308,12 +580,42 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15, 23, 42, 0.6)",
     justifyContent: "flex-end",
   },
+  emptyContainer: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 16,
+    paddingBottom: 28,
+  },
+  emptyBody: {
+    padding: 20,
+    gap: 14,
+  },
+  emptyDesc: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 19,
+  },
+  emptyCreateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingVertical: 13,
+  },
+  emptyCreateBtnText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "800",
+  },
   container: {
     backgroundColor: colors.background,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: "92%",
-    minHeight: "75%",
+    minHeight: "78%",
     paddingTop: 16,
   },
   header: {
@@ -324,27 +626,56 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderColor: colors.cardBorder,
+    gap: 8,
   },
   headerTitleWrap: {
     flex: 1,
-    marginRight: 10,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+    flexWrap: "wrap",
   },
   planBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
     backgroundColor: colors.primaryLight,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
-    alignSelf: "flex-start",
-    marginBottom: 6,
   },
   planBadgeText: {
     fontSize: 10,
     fontWeight: "800",
     color: colors.primaryDark,
     letterSpacing: 0.5,
+  },
+  dayModeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  dayModeStandard: {
+    backgroundColor: colors.surfaceMuted,
+  },
+  dayModeMatch: {
+    backgroundColor: colors.warningLight,
+  },
+  dayModeText: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  dayModeTextStandard: {
+    color: colors.textSecondary,
+  },
+  dayModeTextMatch: {
+    color: "#92400E",
   },
   title: {
     fontSize: 20,
@@ -356,6 +687,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  editBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primaryLight,
+    justifyContent: "center",
+    alignItems: "center",
   },
   closeBtn: {
     width: 36,
@@ -380,7 +724,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 5,
     paddingVertical: 8,
     borderRadius: 14,
     backgroundColor: colors.card,
@@ -425,7 +769,7 @@ const styles = StyleSheet.create({
   inbodyGrid: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   inbodyItem: {
     alignItems: "center",
@@ -474,6 +818,13 @@ const styles = StyleSheet.create({
     borderColor: colors.cardBorder,
     marginBottom: 12,
   },
+  cyclingCardActiveHighlight: {
+    borderColor: colors.primary,
+  },
+  matchCardActiveHighlight: {
+    borderWidth: 2,
+    borderColor: "#D97706",
+  },
   cyclingHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -502,6 +853,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginBottom: 10,
+  },
+  weekdayStrip: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  weekdayDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  weekdayDotActive: {
+    backgroundColor: "#D97706",
+    borderColor: "#D97706",
+  },
+  weekdayDotText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#92400E",
+  },
+  weekdayDotTextActive: {
+    color: "#FFFFFF",
   },
   macrosRow: {
     flexDirection: "row",
@@ -673,6 +1052,72 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
   },
+  adherenceCard: {
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    marginBottom: 16,
+    gap: 10,
+  },
+  adherenceHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  adherenceTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  adherencePct: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.primaryDark,
+  },
+  adherenceStrip: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  adherenceDay: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  adherenceDayCurrent: {
+    backgroundColor: colors.primaryGhost,
+  },
+  adherenceBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceMuted,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  adherenceBubbleDone: {
+    backgroundColor: colors.primary,
+  },
+  adherenceBubblePartial: {
+    backgroundColor: colors.primaryLight,
+  },
+  adherenceBubbleText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.textSecondary,
+  },
+  adherenceBubbleTextDone: {
+    color: "#FFFFFF",
+  },
+  adherenceDayLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.textMuted,
+  },
   checklistCard: {
     backgroundColor: colors.card,
     borderRadius: 20,
@@ -683,6 +1128,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   habitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  habitToggleArea: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -696,6 +1147,31 @@ const styles = StyleSheet.create({
   habitTextChecked: {
     textDecorationLine: "line-through",
     color: colors.textMuted,
+  },
+  inlineAddRow: {
+    flexDirection: "row",
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.cardBorder,
+    paddingTop: 10,
+  },
+  inlineAddInput: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 12,
+    color: colors.text,
+  },
+  inlineAddBtn: {
+    width: 38,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
   },
   supplementsList: {
     gap: 10,

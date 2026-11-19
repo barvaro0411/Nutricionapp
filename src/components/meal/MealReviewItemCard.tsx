@@ -14,6 +14,7 @@ export interface MealReviewItemCardProps {
   item: DetectedFoodItem;
   index: number;
   restrictions?: DietaryRestriction[];
+  customAllergies?: string[];
   inputValue?: string;
   inputError?: string;
   rememberedGrams?: number;
@@ -33,6 +34,7 @@ export function MealReviewItemCard({
   item,
   index,
   restrictions = [],
+  customAllergies = [],
   inputValue,
   inputError,
   rememberedGrams,
@@ -53,7 +55,7 @@ export function MealReviewItemCard({
   const isMl = itemUnit === "ml";
   const drinkVariant = getVariant(item.food);
   const standardPortions = getStandardPortions(itemUnit);
-  const { stamps, alerts, substituteSuggestion } = evaluateFoodAlerts(item, restrictions);
+  const { stamps, alerts, substituteSuggestion } = evaluateFoodAlerts(item, restrictions, customAllergies);
   const coherence = validateMacroCalorieCoherence(item);
 
   return (

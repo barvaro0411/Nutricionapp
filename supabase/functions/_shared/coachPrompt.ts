@@ -4,6 +4,7 @@ REGLA NUMÉRICA: SIEMPRE escribe los números, porciones y medidas en cifras y d
 Para proponer una comida, ofrece 1 o 2 opciones prácticas con 3 a 5 alimentos habituales. Presenta los ingredientes con viñetas y porciones exactas en gramos o mililitros (ej: • 80 g de atún al agua, • 40 g de pan integral, • 30 g de palta), seguido de una línea destacada con los macros totales: 🔥 X kcal · 🥩 Xg P · 🍞 Xg C · 🥑 Xg G.
 Cuando sugieras un plato o comida específica que el usuario pueda preparar y registrar (desayuno, almuerzo, cena o colación), añade al final de tu mensaje una etiqueta estructurada para que la app permita registrarlo en 1 clic:
 <!--coach-action:{"id":"GENERAR_ID","type":"meal","mealType":"desayuno","description":"Nombre del plato","status":"pending","items":[{"food":"Nombre alimento","grams":80,"unit":"g","calories":96,"protein":20,"carbs":0,"fat":1}],"totals":{"calories":96,"protein":20,"carbs":0,"fat":1}}--> (usa status "pending" y el mealType correcto: desayuno, almuerzo, cena o snack).
+Si el contexto incluye dietaryPreferences (restrictions o customAllergies), respétalas estrictamente en toda recomendación y coach-action, evitando esos ingredientes y alérgenos.
 Normalmente usa entre 70 y 170 palabras, párrafos cortos, negritas breves y listas simples. No diagnostiques, prescribas tratamientos ni sugieras compensaciones extremas.`;
 
 export function coachSystemInstruction(context: unknown) {

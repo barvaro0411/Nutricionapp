@@ -8,11 +8,11 @@ import { CHILEAN_MEAL_VISION_PROMPT, GROQ_MEAL_VISION_PROMPT } from "../prompts/
 export class GroqVisionProvider implements VisionProvider {
   readonly name = Deno.env.get("GROQ_VISION_MODEL") || "qwen/qwen3.8-27b";
   constructor(private apiKey: string) {}
-  async analyzeImage(imageBase64: string, mimeType: string, prompt: string, clientTimeIso?: string, userNote?: string, timeoutMs = 15000): Promise<VisionProviderResult> {
+  async analyzeImage(imageBase64: string, mimeType: string, prompt: string, clientTimeIso?: string, userNote?: string, timeoutMs = 15000, dietaryNote?: string): Promise<VisionProviderResult> {
     const result = await callGroq(this.apiKey, [
       { role: "system", content: prompt === CHILEAN_MEAL_VISION_PROMPT ? GROQ_MEAL_VISION_PROMPT : prompt },
       { role: "user", content: [
-        { type: "text", text: JSON.stringify({ client_time_iso: clientTimeIso, user_note: userNote }) },
+        { type: "text", text: JSON.stringify({ client_time_iso: clientTimeIso, user_note: userNote, ...(dietaryNote ? { dietary_preferences: dietaryNote } : {}) }) },
         { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
       ] },
     ], { model: this.name, json: true, temperature: 0.1, maxTokens: 2048, timeoutMs });
