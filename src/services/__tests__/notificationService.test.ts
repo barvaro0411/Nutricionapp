@@ -12,6 +12,9 @@ import * as SecureStore from "expo-secure-store";
 import {
   syncAllScheduledReminders,
   toggleReminder,
+  updateReminderTime,
+  getReminderPreferences,
+  buildRemindersIcs,
   evaluateAdaptiveRisks,
   syncAdaptiveNotifications,
 } from "../notificationService";
@@ -133,5 +136,76 @@ describe("Adaptive contextual notifications", () => {
     expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith(
       "reminder_adaptive_streak"
     );
+  });
+});
+
+describe("Editable reminder times and ICS calendar export", () => {
+  test("updateReminderTime persists custom hour/minute while remaining compatible with legacy prefs", async () => {
+    (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(
+      JSON.stringify({ reminder_lunch: true })
+    );
+    const updated = await updateReminderTime("reminder_lunch", 14, 15);
+    const lunch = updated.find((r) => r.id === "reminder_lunch");
+    expect(lunch).toMatchObject({ enabled: true, hour: 14, minute: 15 });
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+      "reminders_owner",
+      expect.stringContaining('"hour":14')
+    );
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: "reminder_lunch",
+        trigger: expect.objectContaining({ hour: 14, minute: 15 }),
+      })
+    );
+  });
+
+  test("getReminderPreferences reads new object prefs and rejects invalid time parts", async () => {
+    (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(
+      JSON.stringify({
+        reminder_breakfast: { enabled: true, hour: 7, minute: 45 },
+        reminder_water: { enabled: true, hour: 99, minute: -5 },
+      })
+    );
+    const prefs = await getReminderPreferences("owner");
+    expect(prefs.find((r) => r.id === "reminder_breakfast")).toMatchObject({
+      enabled: true,
+      hour: 7,
+      minute: 45,
+    });
+    expect(prefs.find((r) => r.id === "reminder_water")).toMatchObject({
+      enabled: true,
+      hour: 16,
+      minute: 0,
+    });
+  });
+
+  test("buildRemindersIcs emits daily VEVENT entries for enabled reminders", () => {
+    const ics = buildRemindersIcs(
+      [
+        {
+          id: "reminder_lunch",
+          mealType: "lunch",
+          title: "Almuerzo",
+          body: "Registra tu almuerzo",
+          hour: 13,
+          minute: 30,
+          enabled: true,
+        },
+        {
+          id: "reminder_dinner",
+          mealType: "dinner",
+          title: "Cena",
+          body: "Registra tu cena",
+          hour: 21,
+          minute: 0,
+          enabled: false,
+        },
+      ],
+      new Date("2026-11-19T12:00:00Z")
+    );
+    expect(ics).toContain("BEGIN:VCALENDAR");
+    expect(ics).toContain("DTSTART:20261119T133000");
+    expect(ics).toContain("RRULE:FREQ=DAILY");
+    expect(ics).not.toContain("reminder_dinner@nutricionia.cl");
   });
 });

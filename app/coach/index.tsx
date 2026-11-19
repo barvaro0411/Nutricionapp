@@ -482,6 +482,23 @@ export default function CoachChatScreen() {
               </View>
               <ArrowUpRight size={18} color={colors.primary} />
             </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Qué pedir en restaurante o casino"
+              onPress={() => router.push("/meal/menu-assistant" as any)}
+              style={styles.closingPromptBanner}
+            >
+              <View style={[styles.closingPromptIcon, { backgroundColor: colors.water }]}>
+                <Utensils size={17} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.closingPromptTitle}>¿Qué pido en el casino o restaurante?</Text>
+                <Text style={styles.closingPromptDesc}>
+                  Compara opciones del menú con tus calorías y proteína restantes
+                </Text>
+              </View>
+              <ArrowUpRight size={18} color={colors.primary} />
+            </TouchableOpacity>
             <Text style={styles.promptsTitle}>Empieza con una idea</Text>
             <View style={styles.promptsRow}>
               {quickPrompts.map(({ title, description, prompt, Icon }) => (

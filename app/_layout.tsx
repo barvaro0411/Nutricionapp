@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useThemeStore } from "@/stores/useThemeStore";
 import { syncAllScheduledReminders } from "@/services/notificationService";
+import { useWebReminderScheduler } from "@/hooks/useWebReminderScheduler";
 import { colors } from "@/constants/colors";
 import { ToastContainer } from "@/components/common/ToastContainer";
 import { PwaUpdateBanner } from "@/components/common/PwaUpdateBanner";
@@ -70,6 +71,7 @@ function RootNavigationLayout() {
   }, [setIsRecoveringPassword]);
 
   const userId = session?.user.id ?? null;
+  useWebReminderScheduler(initialized ? userId : null);
   useEffect(() => {
     if (!initialized || configurationError) return;
     let active = true;
@@ -132,6 +134,7 @@ function RootNavigationLayout() {
       />
       <Stack.Screen name="meal/camera" options={{ presentation: "fullScreenModal" }} />
       <Stack.Screen name="meal/barcode" options={{ presentation: "modal" }} />
+      <Stack.Screen name="meal/menu-assistant" options={{ presentation: "modal" }} />
       <Stack.Screen name="coach/index" options={{ presentation: "modal" }} />
       <Stack.Screen name="legal/index" options={{ presentation: "modal" }} />
     </Stack>

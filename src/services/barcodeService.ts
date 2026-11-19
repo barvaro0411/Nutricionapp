@@ -1,4 +1,5 @@
 import { supabase } from "@/services/supabase";
+import { CHILEAN_FOOD_FAMILIES } from "@/constants/chileanPresets";
 import { FoodUnit } from "@/types/meal";
 import { isLiquidFood, parseProductQuantity } from "@/utils/liquidUnits";
 
@@ -187,4 +188,92 @@ export async function saveCustomBarcodeProduct(
   }
 
   return data;
+}
+
+/**
+ * Busca productos por nombre en `barcode_products` y en el catálogo chileno INTA/MINSAL
+ * para comparar alimentos o elegir sin tener que digitar un código EAN.
+ */
+export async function searchProductsByName(rawQuery: string, limit = 10): Promise<BarcodeProduct[]> {
+  const query = rawQuery.trim();
+  if (query.length < 2) return [];
+
+  const results: BarcodeProduct[] = [];
+  const seen = new Set<string>();
+
+  try {
+    const { data, error } = await supabase
+      .from("barcode_products")
+      .select("*")
+      .or(`product_name.ilike.%${query}%,brand.ilike.%${query}%`)
+      .limit(limit);
+
+    if (!error && data) {
+      for (const row of data) {
+        const isLiquid = isLiquidFood(row.product_name);
+        const item: BarcodeProduct = {
+          barcode: row.barcode,
+          productName: row.product_name,
+          brand: row.brand || undefined,
+          servingSizeG: Number(row.serving_size_g) || (isLiquid ? 250 : 100),
+          unit: row.unit || (isLiquid ? "ml" : "g"),
+          containerSize: row.container_size ? Number(row.container_size) : undefined,
+          quantityText: row.quantity_text || undefined,
+          caloriesPer100g: Number(row.calories_per_100g),
+          proteinPer100g: Number(row.protein_per_100g),
+          carbsPer100g: Number(row.carbs_per_100g),
+          fatPer100g: Number(row.fat_per_100g),
+          source: row.created_by ? "custom" : "local",
+        };
+        const key = `${item.productName.toLowerCase()}|${(item.brand || "").toLowerCase()}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          results.push(item);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Error buscando productos por nombre:", err);
+  }
+
+  const normalizedQuery = query
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  let presetIndex = 0;
+  for (const family of Object.values(CHILEAN_FOOD_FAMILIES)) {
+    for (const variant of family.variants) {
+      presetIndex++;
+      if (results.length >= limit) break;
+      const normalizedFood = variant.food
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+      if (!normalizedFood.includes(normalizedQuery)) continue;
+
+      const key = `${variant.food.toLowerCase()}|`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const isLiquid =
+        variant.portions?.[0]?.unit === "ml" || isLiquidFood(variant.food);
+      const defaultPortion = variant.portions?.[0]?.grams || (isLiquid ? 200 : 100);
+      results.push({
+        barcode: `CL-INTA-${presetIndex}`,
+        productName: variant.food,
+        brand: family.category,
+        servingSizeG: defaultPortion,
+        unit: isLiquid ? "ml" : "g",
+        caloriesPer100g: variant.caloriesPer100g,
+        proteinPer100g: variant.proteinPer100g,
+        carbsPer100g: variant.carbsPer100g,
+        fatPer100g: variant.fatPer100g,
+        source: "local",
+      });
+    }
+    if (results.length >= limit) break;
+  }
+
+  return results;
 }

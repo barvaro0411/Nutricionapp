@@ -21,6 +21,8 @@ import {
   Check,
   RotateCcw,
   FileText,
+  Scale,
+  UtensilsCrossed,
 } from "lucide-react-native";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useFavoriteMeals } from "@/hooks/useFavoriteMeals";
@@ -329,7 +331,67 @@ export default function RecordScreen() {
           <ChevronRight size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        {/* 4. Comidas Frecuentes */}
+        {/* 4. Comparador de 2 Productos */}
+        <TouchableOpacity
+          style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Comparar dos productos de supermercado"
+          onPress={() => {
+            beginMeal();
+            router.push({ pathname: "/meal/barcode", params: { mode: "compare" } });
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: colors.primaryLight }]}>
+            <Scale size={24} color={colors.primaryDark} />
+          </View>
+          <View style={styles.methodInfo}>
+            <View style={styles.titleRow}>
+              <Text style={styles.methodTitle}>Comparar 2 Productos</Text>
+              <View style={styles.featuredBadge}>
+                <Text style={styles.featuredBadgeText}>LEY 20.606</Text>
+              </View>
+            </View>
+            <Text style={styles.methodDesc}>
+              Pon lado a lado dos productos por sellos negros, proteína por caloría y elige el mejor.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* 5. ¿Qué pido hoy? (Carta / Casino) */}
+        <TouchableOpacity
+          style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Elegir qué pedir en restaurante o casino"
+          onPress={() => {
+            beginMeal();
+            router.push({
+              pathname: "/meal/menu-assistant" as any,
+              params: { suggestedMealType: selectedMealType },
+            });
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: colors.waterLight }]}>
+            <UtensilsCrossed size={24} color={colors.water} />
+          </View>
+          <View style={styles.methodInfo}>
+            <View style={styles.titleRow}>
+              <Text style={styles.methodTitle}>¿Qué pido hoy? (Carta / Casino)</Text>
+              <View style={[styles.featuredBadge, { backgroundColor: colors.water }]}>
+                <Sparkles size={11} color="#FFFFFF" />
+                <Text style={styles.featuredBadgeText}>CON IA</Text>
+              </View>
+            </View>
+            <Text style={styles.methodDesc}>
+              Escribe o dicta las opciones del menú y te recomendamos las 2 mejores según tus macros de hoy.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* 6. Comidas Frecuentes */}
         <TouchableOpacity
           style={styles.methodCard}
           accessibilityRole="button"

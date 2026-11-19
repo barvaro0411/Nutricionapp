@@ -18,6 +18,7 @@ import {
   generateNutritionistReport,
   NutritionistReportData,
 } from "@/services/nutritionistReportService";
+import { buildNutritionistReportHtml } from "@/utils/reportPdf";
 import { colors, layout } from "@/constants/colors";
 import { PageBackHeader } from "@/components/common/AppUI";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -51,6 +52,56 @@ export default function ExportReportScreen() {
       });
     } catch (err: any) {
       showAlert("Error al compartir", err?.message);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!report) return;
+    try {
+      const html = buildNutritionistReportHtml(report);
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        const printWin = window.open("", "_blank", "width=880,height=920");
+        if (printWin) {
+          printWin.document.open();
+          printWin.document.write(html);
+          printWin.document.close();
+          printWin.focus();
+          setTimeout(() => {
+            try {
+              printWin.print();
+            } catch {}
+          }, 250);
+          return;
+        }
+        // Fallback si el navegador bloqueó la ventana emergente: descarga HTML listo para imprimir
+        const filename = `Informe_Nutricional_${report.startDate}_a_${report.endDate}.html`;
+        const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showAlert(
+          "Informe listo",
+          "Descargamos tu informe visual. Ábrelo en tu navegador y elige Imprimir → Guardar como PDF."
+        );
+      } else {
+        if (!(await Sharing.isAvailableAsync())) {
+          throw new Error("Este dispositivo no permite compartir archivos.");
+        }
+        const filename = `Informe_Nutricional_${report.startDate}_a_${report.endDate}.html`;
+        const file = FileSystem.cacheDirectory + filename;
+        await FileSystem.writeAsStringAsync(file, html);
+        try {
+          await Sharing.shareAsync(file, { mimeType: "text/html" });
+        } finally {
+          await FileSystem.deleteAsync(file, { idempotent: true });
+        }
+      }
+    } catch (err: any) {
+      showAlert("Error al generar PDF", err?.message || "No se pudo generar el documento.");
     }
   };
 
@@ -152,8 +203,12 @@ export default function ExportReportScreen() {
 
           {/* Botones de Acción */}
           <View style={styles.actionsContainer}>
-            <TouchableOpacity accessibilityRole="button" style={styles.shareBtn} onPress={handleShareWhatsApp}>
-              <Text style={styles.shareBtnText}>Compartir mi informe</Text>
+            <TouchableOpacity accessibilityRole="button" style={styles.shareBtn} onPress={handleExportPDF}>
+              <Text style={styles.shareBtnText}>Descargar / Imprimir PDF</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity accessibilityRole="button" style={styles.csvBtn} onPress={handleShareWhatsApp}>
+              <Text style={styles.csvBtnText}>Compartir resumen por WhatsApp / texto</Text>
             </TouchableOpacity>
 
             <TouchableOpacity accessibilityRole="button" style={styles.csvBtn} onPress={handleExportCSV}>

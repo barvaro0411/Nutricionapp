@@ -1,20 +1,22 @@
 import { parseDecimal } from "@/utils/dates";
-import { showAlert } from "@/utils/alerts";
-import React, { useState } from "react";
+import { showAlert, showToast } from "@/utils/alerts";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   ScrollView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import { Camera, Keyboard } from "lucide-react-native";
+import { Camera, Keyboard, Scale, Search, X } from "lucide-react-native";
 import {
   lookupBarcode,
   saveCustomBarcodeProduct,
+  searchProductsByName,
   BarcodeProduct,
 } from "@/services/barcodeService";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
@@ -32,18 +34,34 @@ import {
   BarcodeManualSearch,
   ScannedProductSheet,
   BarcodeNotFoundSheet,
+  ProductCompareCard,
 } from "@/components/meal/barcode";
 
 export default function BarcodeScreen() {
   const router = useRouter();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { addItem } = useMealReviewStore();
   const { analyzeProductPhoto } = useMealAnalysis();
   const { restrictions, customAllergies } = useDietaryPreferences();
 
-  const [activeTab, setActiveTab] = useState<"camera" | "manual">("camera");
+  const [activeTab, setActiveTab] = useState<"camera" | "manual" | "compare">(
+    mode === "compare" ? "compare" : "camera"
+  );
   const [scanned, setScanned] = useState(false);
+
+  // Estado del comparador de 2 productos
+  const [compareA, setCompareA] = useState<BarcodeProduct | null>(null);
+  const [compareB, setCompareB] = useState<BarcodeProduct | null>(null);
+  const [compareQuery, setCompareQuery] = useState("");
+  const [compareResults, setCompareResults] = useState<BarcodeProduct[]>([]);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [activeSlot, setActiveSlot] = useState<"A" | "B">("A");
+
+  useEffect(() => {
+    if (mode === "compare") setActiveTab("compare");
+  }, [mode]);
 
   const [barcodeInput, setBarcodeInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -305,6 +323,61 @@ export default function BarcodeScreen() {
     }
   };
 
+  const handleCompareWithOther = () => {
+    if (!product) return;
+    setCompareA(product);
+    setActiveSlot(compareB ? "B" : "B");
+    setActiveTab("compare");
+    showToast({
+      type: "info",
+      title: "Producto A guardado",
+      message: "Ahora busca o escanea el segundo producto para compararlos.",
+    });
+  };
+
+  const handleCompareSearch = async () => {
+    const q = compareQuery.trim();
+    if (!q) return;
+    setCompareLoading(true);
+    try {
+      if (/^[0-9]{8,14}$/.test(q)) {
+        const found = await lookupBarcode(q);
+        setCompareResults(found ? [found] : []);
+        if (!found) {
+          showAlert("Sin resultados", "No encontramos ese código de barras.");
+        }
+      } else {
+        const list = await searchProductsByName(q, 10);
+        setCompareResults(list);
+      }
+    } catch (err: any) {
+      showAlert("Comparador", err?.message || "No se pudo buscar el producto.");
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+
+  const assignCompareProduct = (item: BarcodeProduct) => {
+    if (activeSlot === "A") {
+      setCompareA(item);
+      if (!compareB) setActiveSlot("B");
+    } else {
+      setCompareB(item);
+      if (!compareA) setActiveSlot("A");
+    }
+    setCompareQuery("");
+    setCompareResults([]);
+  };
+
+  const handleChooseComparedForMeal = (chosen: BarcodeProduct) => {
+    const isLiquid = chosen.unit === "ml" || isLiquidFood(chosen.productName);
+    const unit: FoodUnit = isLiquid ? "ml" : "g";
+    setProduct(chosen);
+    setPortionUnit(unit);
+    setPortionGrams(String(chosen.servingSizeG || (isLiquid ? 250 : 100)));
+    setActiveTab("manual");
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -366,7 +439,29 @@ export default function BarcodeScreen() {
               activeTab === "manual" && styles.tabBtnTextActive,
             ]}
           >
-            Ingreso Manual
+            Código
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === "compare" && styles.tabBtnActive]}
+          onPress={() => setActiveTab("compare")}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Comparar dos productos"
+          accessibilityState={{ selected: activeTab === "compare" }}
+        >
+          <Scale
+            size={16}
+            color={activeTab === "compare" ? colors.primary : colors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.tabBtnText,
+              activeTab === "compare" && styles.tabBtnTextActive,
+            ]}
+          >
+            Comparar 2
           </Text>
         </TouchableOpacity>
       </View>
@@ -392,6 +487,130 @@ export default function BarcodeScreen() {
         />
       )}
 
+      {/* TAB 3: COMPARADOR DE 2 PRODUCTOS */}
+      {activeTab === "compare" && (
+        <View style={styles.comparePanel}>
+          <Text style={styles.compareTitle}>Comparador de supermercado</Text>
+          <Text style={styles.compareSubtitle}>
+            Elige dos productos por nombre o código de barras para ver sellos Ley 20.606 y cuál conviene más.
+          </Text>
+
+          {/* Ranuras A y B */}
+          <View style={styles.slotsRow}>
+            {(["A", "B"] as const).map((slot) => {
+              const item = slot === "A" ? compareA : compareB;
+              const isSelected = activeSlot === slot;
+              return (
+                <TouchableOpacity
+                  key={slot}
+                  style={[styles.slotCard, isSelected && styles.slotCardActive]}
+                  onPress={() => setActiveSlot(slot)}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.slotTop}>
+                    <Text style={styles.slotLabel}>PRODUCTO {slot}</Text>
+                    {item && (
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel={`Quitar producto ${slot}`}
+                        onPress={() => (slot === "A" ? setCompareA(null) : setCompareB(null))}
+                      >
+                        <X size={14} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <Text style={styles.slotName} numberOfLines={2}>
+                    {item ? item.productName : "Toca para buscar"}
+                  </Text>
+                  {item && (
+                    <Text style={styles.slotMeta}>
+                      {Math.round(item.caloriesPer100g)} kcal · {item.proteinPer100g}g P
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Buscador para el slot activo */}
+          <View style={styles.compareSearchRow}>
+            <TextInput
+              style={styles.compareInput}
+              value={compareQuery}
+              onChangeText={setCompareQuery}
+              placeholder={`Buscar para Opción ${activeSlot} (ej. yogur, pan, o código EAN)`}
+              placeholderTextColor={colors.textMuted}
+              returnKeyType="search"
+              onSubmitEditing={() => void handleCompareSearch()}
+            />
+            <TouchableOpacity
+              style={styles.compareSearchBtn}
+              onPress={() => void handleCompareSearch()}
+              disabled={compareLoading}
+            >
+              {compareLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Search size={17} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Sugerencias rápidas para probar al tiro */}
+          {!compareResults.length && (
+            <View style={styles.quickTermsRow}>
+              {["Yogurt", "Pan", "Leche", "Queso", "Avena"].map((term) => (
+                <TouchableOpacity
+                  key={term}
+                  style={styles.quickTermChip}
+                  onPress={() => {
+                    setCompareQuery(term);
+                    setCompareLoading(true);
+                    void searchProductsByName(term, 8)
+                      .then(setCompareResults)
+                      .finally(() => setCompareLoading(false));
+                  }}
+                >
+                  <Text style={styles.quickTermText}>{term}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Lista de resultados */}
+          {compareResults.length > 0 && (
+            <View style={styles.compareResultsList}>
+              {compareResults.map((item) => (
+                <TouchableOpacity
+                  key={`${item.barcode}-${item.productName}`}
+                  style={styles.compareResultItem}
+                  onPress={() => assignCompareProduct(item)}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.compareResultName}>{item.productName}</Text>
+                    <Text style={styles.compareResultMeta}>
+                      {item.brand ? `${item.brand} · ` : ""}
+                      {Math.round(item.caloriesPer100g)} kcal · {item.proteinPer100g}g P / 100{item.unit || "g"}
+                    </Text>
+                  </View>
+                  <Text style={styles.assignPill}>Usar en {activeSlot}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {compareA && compareB && (
+            <ProductCompareCard
+              productA={compareA}
+              productB={compareB}
+              restrictions={restrictions}
+              customAllergies={customAllergies}
+              onSelectForMeal={handleChooseComparedForMeal}
+            />
+          )}
+        </View>
+      )}
+
       {/* ESTADO DE CARGA */}
       {loading && (
         <View style={styles.loadingCard}>
@@ -403,7 +622,7 @@ export default function BarcodeScreen() {
       )}
 
       {/* PRODUCTO ENCONTRADO */}
-      {product && (
+      {activeTab !== "compare" && product && (
         <ScannedProductSheet
           product={product}
           restrictions={restrictions}
@@ -415,11 +634,12 @@ export default function BarcodeScreen() {
           onScanNutritionLabel={handleScanNutritionLabel}
           scanningLabel={scanningLabel}
           onAddToMeal={handleAddProductToMeal}
+          onCompareWithOther={handleCompareWithOther}
         />
       )}
 
       {/* PRODUCTO NO ENCONTRADO EN LA BASE DE DATOS */}
-      {notFound && (
+      {activeTab !== "compare" && notFound && (
         <BarcodeNotFoundSheet
           barcode={barcodeInput}
           customName={customName}
@@ -493,5 +713,135 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+  comparePanel: {
+    gap: 10,
+  },
+  compareTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  compareSubtitle: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  slotsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  slotCard: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+  },
+  slotCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryGhost,
+  },
+  slotTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  slotLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.primaryDark,
+    letterSpacing: 0.7,
+  },
+  slotName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+    minHeight: 34,
+  },
+  slotMeta: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  compareSearchRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  compareInput: {
+    flex: 1,
+    minHeight: 46,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 14,
+    fontSize: 13,
+    color: colors.text,
+  },
+  compareSearchBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickTermsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  quickTermChip: {
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  quickTermText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  compareResultsList: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    overflow: "hidden",
+  },
+  compareResultItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+  },
+  compareResultName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  compareResultMeta: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  assignPill: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.primaryDark,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
 });

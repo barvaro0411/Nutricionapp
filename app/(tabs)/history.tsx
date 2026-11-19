@@ -3,12 +3,15 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, 
 import { useRouter } from "expo-router";
 import { ArrowUpRight, CalendarDays, Download, Plus, TrendingUp, Flame, PieChart } from "lucide-react-native";
 import { useWeeklyStats } from "@/hooks/useWeeklyStats";
+import { useQualityAndWaterStats } from "@/hooks/useQualityAndWaterStats";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
 import { useWeightTracker } from "@/hooks/useWeightTracker";
 import { useUserStreak } from "@/hooks/useUserStreak";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { WeeklyMacroChart } from "@/components/charts/WeeklyMacroChart";
 import { WeightTrendCard } from "@/components/charts/WeightTrendCard";
+import { WaterTrendCard } from "@/components/charts/WaterTrendCard";
+import { WarningStampsSummaryCard } from "@/components/charts/WarningStampsSummaryCard";
 import { PageHeading, StateCard, AppButton } from "@/components/common/AppUI";
 import { colors, layout, shadows } from "@/constants/colors";
 import { getDateKey, dateForMealRoute, APP_TIME_ZONE } from "@/utils/dates";
@@ -38,6 +41,7 @@ export default function HistoryScreen() {
   const [showAllDays, setShowAllDays] = useState(false);
 
   const { data, error, isLoading, refetch, isRefetching } = useWeeklyStats(period);
+  const { data: qualityData, refetch: refetchQuality } = useQualityAndWaterStats(period);
   const { data: today, refetch: refetchToday } = useDailyNutrition();
   const {
     stats: weightStats,
@@ -81,7 +85,7 @@ export default function HistoryScreen() {
         <RefreshControl
           refreshing={isRefetching}
           onRefresh={() => {
-            void Promise.all([refetch(), refetchToday(), refetchWeight()]);
+            void Promise.all([refetch(), refetchToday(), refetchWeight(), refetchQuality()]);
           }}
           tintColor={colors.primary}
         />
@@ -191,6 +195,14 @@ export default function HistoryScreen() {
             onUpdateTarget={updateTargetWeight}
             isSaving={isLoggingWeight}
           />
+
+          {/* Tendencia semanal de Hidratación y Semáforo Ley 20.606 */}
+          {qualityData && (
+            <>
+              <WaterTrendCard stats={qualityData.water} period={period} />
+              <WarningStampsSummaryCard stats={qualityData.stamps} period={period} />
+            </>
+          )}
 
           {/* Tendencias Nutricionales */}
           {loggedDays === 0 ? (

@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
-import { CheckCircle2, Camera as CameraIcon } from "lucide-react-native";
+import { CheckCircle2, Camera as CameraIcon, Scale } from "lucide-react-native";
 import { colors, shadows } from "@/constants/colors";
 import { BarcodeProduct } from "@/services/barcodeService";
 import { FoodUnit } from "@/types/meal";
@@ -32,6 +32,7 @@ export interface ScannedProductSheetProps {
   onScanNutritionLabel: () => void;
   scanningLabel: boolean;
   onAddToMeal: () => void;
+  onCompareWithOther?: () => void;
 }
 
 export function ScannedProductSheet({
@@ -45,6 +46,7 @@ export function ScannedProductSheet({
   onScanNutritionLabel,
   scanningLabel,
   onAddToMeal,
+  onCompareWithOther,
 }: ScannedProductSheetProps) {
   const parsedPortion = parseQuantityInput(portionGrams, portionUnit);
   const factor = parsedPortion.ok ? parsedPortion.value / 100 : 1;
@@ -268,6 +270,19 @@ export function ScannedProductSheet({
           </>
         )}
       </TouchableOpacity>
+
+      {onCompareWithOther && (
+        <TouchableOpacity
+          style={styles.compareBtn}
+          onPress={onCompareWithOther}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Comparar este producto con otro"
+        >
+          <Scale size={15} color={colors.primaryDark} />
+          <Text style={styles.compareBtnText}>Comparar con otro producto</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity
         style={styles.addToMealBtn}
@@ -543,6 +558,23 @@ const styles = StyleSheet.create({
   },
   rescanLabelBtnText: {
     fontSize: 12,
+    fontWeight: "700",
+    color: colors.primaryDark,
+  },
+  compareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 12,
+    marginBottom: 10,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  compareBtnText: {
+    fontSize: 13,
     fontWeight: "700",
     color: colors.primaryDark,
   },

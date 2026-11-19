@@ -29,6 +29,9 @@ import {
   Moon,
   Sun,
   Smartphone,
+  Bell,
+  CalendarPlus,
+  Clock,
 } from "lucide-react-native";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -41,13 +44,17 @@ import { useThemeStore, ThemeMode } from "@/stores/useThemeStore";
 import {
   getReminderPreferences,
   toggleReminder,
+  updateReminderTime,
+  sendTestNotification,
+  getWebNotificationStatus,
+  buildRemindersIcs,
   MealReminderConfig,
   DEFAULT_CHILEAN_REMINDERS,
 } from "@/services/notificationService";
+import { showAlert, showToast } from "@/utils/alerts";
 import { calculateBMR, calculateTDEE } from "@/utils/nutritionCalculator";
 import { QuickWeightModal } from "@/components/profile/QuickWeightModal";
 import { PageHeading, AppButton, FormField } from "@/components/common/AppUI";
-import { showAlert } from "@/utils/alerts";
 import { colors, layout } from "@/constants/colors";
 
 export default function SettingsScreen() {
@@ -71,6 +78,10 @@ export default function SettingsScreen() {
     DEFAULT_CHILEAN_REMINDERS
   );
   const [busyReminder, setBusyReminder] = useState<string | null>(null);
+  const [editingReminderId, setEditingReminderId] = useState<string | null>(null);
+  const [webNotifStatus, setWebNotifStatus] = useState(() =>
+    Platform.OS === "web" ? getWebNotificationStatus() : "granted"
+  );
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
@@ -91,7 +102,13 @@ export default function SettingsScreen() {
     setBusyReminder(id);
     try {
       setReminders(await toggleReminder(id, enabled));
+      if (Platform.OS === "web") {
+        setWebNotifStatus(getWebNotificationStatus());
+      }
     } catch (error) {
+      if (Platform.OS === "web") {
+        setWebNotifStatus(getWebNotificationStatus());
+      }
       showAlert(
         "Recordatorios",
         error instanceof Error
@@ -101,6 +118,60 @@ export default function SettingsScreen() {
     } finally {
       setBusyReminder(null);
     }
+  };
+
+  const shiftReminderTime = async (rem: MealReminderConfig, deltaMinutes: number) => {
+    if (busyReminder) return;
+    const total = ((rem.hour * 60 + rem.minute + deltaMinutes) % 1440 + 1440) % 1440;
+    const nextHour = Math.floor(total / 60);
+    const nextMinute = total % 60;
+    setBusyReminder(rem.id);
+    try {
+      setReminders(await updateReminderTime(rem.id, nextHour, nextMinute));
+    } catch (error) {
+      showAlert(
+        "Horario",
+        error instanceof Error ? error.message : "No se pudo actualizar la hora."
+      );
+    } finally {
+      setBusyReminder(null);
+    }
+  };
+
+  const handleTestReminder = async () => {
+    try {
+      await sendTestNotification();
+      if (Platform.OS === "web") setWebNotifStatus(getWebNotificationStatus());
+      showToast({
+        type: "success",
+        title: "Aviso enviado",
+        message: "Tu recordatorio de prueba llegó correctamente.",
+      });
+    } catch (error) {
+      if (Platform.OS === "web") setWebNotifStatus(getWebNotificationStatus());
+      showAlert(
+        "Notificaciones",
+        error instanceof Error ? error.message : "No se pudo enviar el aviso de prueba."
+      );
+    }
+  };
+
+  const handleDownloadIcs = () => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    const ics = buildRemindersIcs(reminders);
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "Recordatorios_Nutricion_IA.ics";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast({
+      type: "success",
+      title: "Calendario descargado",
+      message: "Importa el archivo .ics para activar tus alarmas diarias.",
+    });
   };
 
   const saveName = async () => {
@@ -591,53 +662,131 @@ export default function SettingsScreen() {
       {/* 4. SECCIÓN: RECORDATORIOS */}
       <Text style={styles.sectionTitle}>Un recordatorio a tiempo</Text>
       <Text style={styles.sectionDescription}>
-        Horarios de comidas e hidratación para tu rutina en Chile.
+        Toca cualquier horario para ajustarlo a tu rutina en Chile y activa avisos en tu navegador o calendario.
       </Text>
 
       <View style={styles.reminders}>
         {Platform.OS === "web" && (
           <View style={styles.webReminderNotice}>
             <Text style={styles.noticeText}>
-              Disponibles en la app instalada en tu celular. En el navegador puedes
-              registrar tus hábitos en cualquier momento.
+              {webNotifStatus === "granted"
+                ? "✅ Notificaciones del navegador permitidas. Recibirás avisos mientras la app esté abierta o instalada."
+                : webNotifStatus === "denied"
+                  ? "⚠️ Permiso bloqueado en este navegador. Habilítalo en el candado de la barra de dirección o usa Calendario (.ics)."
+                  : "🔔 Activa cualquier recordatorio para autorizar avisos PWA, o descárgalos en tu Calendario (.ics) con alarma diaria."}
             </Text>
+            <View style={styles.webReminderActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Probar aviso ahora"
+                onPress={() => void handleTestReminder()}
+                style={styles.webActionBtn}
+              >
+                <Bell size={13} color={colors.primaryDark} />
+                <Text style={styles.webActionBtnText}>Probar aviso</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Agregar recordatorios a mi calendario"
+                onPress={handleDownloadIcs}
+                style={styles.webActionBtn}
+              >
+                <CalendarPlus size={13} color={colors.primaryDark} />
+                <Text style={styles.webActionBtnText}>Calendario (.ics)</Text>
+              </Pressable>
+            </View>
           </View>
         )}
-        {reminders.map((rem, index) => (
-          <View
-            key={rem.id}
-            style={[styles.reminder, index > 0 && styles.reminderBorder]}
-          >
-            <View style={styles.reminderTime}>
-              <Text style={styles.timeText}>
-                {String(rem.hour).padStart(2, "0")}:
-                {String(rem.minute).padStart(2, "0")}
-              </Text>
+        {reminders.map((rem, index) => {
+          const isEditingTime = editingReminderId === rem.id;
+          const timeFormatted = `${String(rem.hour).padStart(2, "0")}:${String(rem.minute).padStart(2, "0")}`;
+          const mealLabel =
+            rem.mealType === "breakfast"
+              ? "Desayuno"
+              : rem.mealType === "lunch"
+                ? "Almuerzo"
+                : rem.mealType === "water"
+                  ? "Hidratación"
+                  : "Once / Cena";
+          return (
+            <View
+              key={rem.id}
+              style={index > 0 || Platform.OS === "web" ? styles.reminderBorder : undefined}
+            >
+              <View style={styles.reminder}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Cambiar hora de ${mealLabel}, actual ${timeFormatted}`}
+                  onPress={() =>
+                    setEditingReminderId((prev) => (prev === rem.id ? null : rem.id))
+                  }
+                  style={[styles.reminderTime, isEditingTime && styles.reminderTimeActive]}
+                >
+                  <Clock size={12} color={isEditingTime ? "#FFFFFF" : colors.primary} />
+                  <Text style={[styles.timeText, isEditingTime && { color: "#FFFFFF" }]}>
+                    {timeFormatted}
+                  </Text>
+                </Pressable>
+                <View style={styles.actionCopy}>
+                  <Text style={styles.actionTitle}>{mealLabel}</Text>
+                  <Text style={styles.actionDescription}>
+                    {rem.enabled ? "Activado · Toca la hora para editar" : "Desactivado · Toca la hora para editar"}
+                  </Text>
+                </View>
+                <Switch
+                  accessibilityLabel={"Recordatorio de " + rem.mealType}
+                  disabled={!!busyReminder}
+                  value={rem.enabled}
+                  onValueChange={(value) => void toggle(rem.id, value)}
+                  trackColor={{ false: colors.cardBorder, true: colors.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+
+              {isEditingTime && (
+                <View style={styles.timeEditorRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Restar una hora"
+                    disabled={!!busyReminder}
+                    onPress={() => void shiftReminderTime(rem, -60)}
+                    style={styles.timeStepBtn}
+                  >
+                    <Text style={styles.timeStepText}>-1h</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Restar quince minutos"
+                    disabled={!!busyReminder}
+                    onPress={() => void shiftReminderTime(rem, -15)}
+                    style={styles.timeStepBtn}
+                  >
+                    <Text style={styles.timeStepText}>-15m</Text>
+                  </Pressable>
+                  <Text style={styles.timeEditorValue}>{timeFormatted}</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Sumar quince minutos"
+                    disabled={!!busyReminder}
+                    onPress={() => void shiftReminderTime(rem, 15)}
+                    style={styles.timeStepBtn}
+                  >
+                    <Text style={styles.timeStepText}>+15m</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Sumar una hora"
+                    disabled={!!busyReminder}
+                    onPress={() => void shiftReminderTime(rem, 60)}
+                    style={styles.timeStepBtn}
+                  >
+                    <Text style={styles.timeStepText}>+1h</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
-            <View style={styles.actionCopy}>
-              <Text style={styles.actionTitle}>
-                {rem.mealType === "breakfast"
-                  ? "Desayuno"
-                  : rem.mealType === "lunch"
-                    ? "Almuerzo"
-                    : rem.mealType === "water"
-                      ? "Hidratación"
-                      : "Once / Cena"}
-              </Text>
-              <Text style={styles.actionDescription}>
-                {rem.enabled ? "Activado" : "Desactivado"}
-              </Text>
-            </View>
-            <Switch
-              accessibilityLabel={"Recordatorio de " + rem.mealType}
-              disabled={Platform.OS === "web" || !!busyReminder}
-              value={rem.enabled}
-              onValueChange={(value) => void toggle(rem.id, value)}
-              trackColor={{ false: colors.cardBorder, true: colors.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       {/* 5. SECCIÓN: PRIVACIDAD, DATOS Y EXPORTACIÓN */}
@@ -1161,8 +1310,21 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 24,
   },
-  webReminderNotice: { padding: 14, backgroundColor: colors.primaryLight },
-  noticeText: { fontSize: 11, lineHeight: 17, color: colors.primaryDark },
+  webReminderNotice: { padding: 14, backgroundColor: colors.primaryLight, gap: 10 },
+  noticeText: { fontSize: 12, lineHeight: 18, color: colors.primaryDark, fontWeight: "600" },
+  webReminderActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  webActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  webActionBtnText: { fontSize: 11, fontWeight: "700", color: colors.primaryDark },
   reminder: {
     flexDirection: "row",
     alignItems: "center",
@@ -1171,12 +1333,46 @@ const styles = StyleSheet.create({
   },
   reminderBorder: { borderTopWidth: 1, borderTopColor: colors.cardBorder },
   reminderTime: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
     backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 10,
   },
-  timeText: { fontSize: 12, fontWeight: "700", color: colors.text },
+  reminderTimeActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  timeText: { fontSize: 12, fontWeight: "800", color: colors.text },
+  timeEditorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
+  timeStepBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  timeStepText: { fontSize: 12, fontWeight: "700", color: colors.text },
+  timeEditorValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.primaryDark,
+    minWidth: 50,
+    textAlign: "center",
+  },
   privacy: {
     flexDirection: "row",
     alignItems: "flex-start",
