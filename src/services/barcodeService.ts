@@ -15,6 +15,12 @@ export interface BarcodeProduct {
   proteinPer100g: number;
   carbsPer100g: number;
   fatPer100g: number;
+  sugarsPer100g?: number;
+  saturatedFatPer100g?: number;
+  sodiumMgPer100g?: number;
+  fiberPer100g?: number;
+  novaGroup?: 1 | 2 | 3 | 4;
+  ingredientsText?: string;
   source: "local" | "openfoodfacts" | "custom";
 }
 
@@ -90,6 +96,30 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeProduct | n
         const containerSize = parsedQty?.value;
         const servingSize = containerSize || (isLiquid ? 250 : 100);
 
+        const toOptionalNum = (raw: unknown, max: number) => {
+          const n = Number(raw);
+          return Number.isFinite(n) && n >= 0 && n <= max ? Math.round(n * 10) / 10 : undefined;
+        };
+
+        const sugarsPer100g = toOptionalNum(nutriments.sugars_100g, 100);
+        const saturatedFatPer100g = toOptionalNum(nutriments["saturated-fat_100g"], 100);
+        const fiberPer100g = toOptionalNum(nutriments.fiber_100g, 100);
+        const sodiumRawG = Number(nutriments.sodium_100g);
+        const saltRawG = Number(nutriments.salt_100g);
+        const sodiumMgPer100g =
+          Number.isFinite(sodiumRawG) && sodiumRawG >= 0 && sodiumRawG <= 50
+            ? Math.round(sodiumRawG * 1000)
+            : Number.isFinite(saltRawG) && saltRawG >= 0 && saltRawG <= 100
+              ? Math.round(saltRawG * 400)
+              : undefined;
+        const novaRaw = Number(p.nova_group);
+        const novaGroup =
+          novaRaw === 1 || novaRaw === 2 || novaRaw === 3 || novaRaw === 4
+            ? (novaRaw as 1 | 2 | 3 | 4)
+            : undefined;
+        const ingredientsRaw = String(p.ingredients_text_es || p.ingredients_text || "").trim();
+        const ingredientsText = ingredientsRaw ? ingredientsRaw.slice(0, 600) : undefined;
+
         const productResult: BarcodeProduct = {
           barcode: cleanBarcode,
           productName,
@@ -102,6 +132,12 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeProduct | n
           proteinPer100g: Math.round(prot * 10) / 10,
           carbsPer100g: Math.round(carbs * 10) / 10,
           fatPer100g: Math.round(fat * 10) / 10,
+          sugarsPer100g,
+          saturatedFatPer100g,
+          sodiumMgPer100g,
+          fiberPer100g,
+          novaGroup,
+          ingredientsText,
           source: "openfoodfacts",
         };
 

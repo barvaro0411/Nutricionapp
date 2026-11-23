@@ -41,6 +41,9 @@ function evaluateSingle(
       fat: product.fatPer100g,
       grams: 100,
       unit: product.unit,
+      sugars: product.sugarsPer100g,
+      saturatedFat: product.saturatedFatPer100g,
+      sodiumMg: product.sodiumMgPer100g,
     },
     restrictions,
     customAllergies

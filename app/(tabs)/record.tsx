@@ -326,9 +326,9 @@ export default function RecordScreen() {
             <Barcode size={24} color={colors.fat} />
           </View>
           <View style={styles.methodInfo}>
-            <Text style={styles.methodTitle}>Código de Barras</Text>
+            <Text style={styles.methodTitle}>Escáner de Supermercado / Barras</Text>
             <Text style={styles.methodDesc}>
-              Busca los nutrientes del envase por su código o lee la etiqueta.
+              Evalúa si un producto sirve para tu dieta (azúcar, sellos Ley 20.606, semáforo) o regístralo en tu comida.
             </Text>
           </View>
           <ChevronRight size={18} color={colors.textMuted} />

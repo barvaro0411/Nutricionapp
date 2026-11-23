@@ -73,6 +73,9 @@ export function detectFoodWarningLabels(item: {
   fat: number;
   grams: number;
   unit?: string;
+  sugars?: number;
+  saturatedFat?: number;
+  sodiumMg?: number;
 }): FoodWarningStamp[] {
   const stamps: FoodWarningStamp[] = [];
   const grams = Number(item.grams) || 100;
@@ -83,10 +86,13 @@ export function detectFoodWarningLabels(item: {
   const cal100 = (Number(item.calories) || 0) * factor;
   const carbs100 = (Number(item.carbs) || 0) * factor;
   const fat100 = (Number(item.fat) || 0) * factor;
+  const hasExactSugars = typeof item.sugars === "number" && Number.isFinite(item.sugars) && item.sugars >= 0;
+  const hasExactSatFat = typeof item.saturatedFat === "number" && Number.isFinite(item.saturatedFat) && item.saturatedFat >= 0;
+  const hasExactSodium = typeof item.sodiumMg === "number" && Number.isFinite(item.sodiumMg) && item.sodiumMg >= 0;
 
   const normalizedFood = normalize(item.food);
 
-  // Umbrales Ley 20.606
+  // Umbrales Ley 20.606 (Etapa 3 vigente en Chile)
   // Sólidos: >= 275 kcal/100g. Líquidos: >= 70 kcal/100ml.
   const calThreshold = isLiquid ? 70 : 275;
   if (cal100 >= calThreshold) {
@@ -98,48 +104,82 @@ export function detectFoodWarningLabels(item: {
   }
 
   // Azúcares: Sólidos >= 10g/100g. Líquidos >= 5g/100ml.
-  // Se evalúa cuando el producto contiene carbohidratos simples o es un snack/dulce/bebida azucarada.
   const sugarThreshold = isLiquid ? 5 : 10;
-  const isSavoryLiquid = /\b(sopa|caldo|consome|aceite|vinagre|salsa de soya)\b/i.test(
-    normalizedFood
-  );
-  const isSweetFood =
-    /\b(azucar|miel|manjar|chocolate|galleta|dulce|torta|helado|mermelada|gaseosa|bebida|nestea|jugo|fruta|caramelo|coca|cola|pepsi|fanta|sprite|bilz|pap|kem|crush|limon soda|canada dry|7up|seven up|red bull|monster|score|gatorade|powerade|aquarius|watts|nectar|refresco|soda|energizante|isotonica|kombucha|batido|yogur|yogurt|milo|nesquik|cereal|barra|queque|pastel|kuchen|alfajor|dona|berlin|flan|postre|gomita|jarabe|syrup)\b/i.test(
+  if (hasExactSugars) {
+    const sugars100 = item.sugars! * factor;
+    if (sugars100 >= sugarThreshold) {
+      stamps.push({
+        stamp: "sugars",
+        label: "ALTO EN AZÚCARES",
+        description: `Contiene ${Math.round(sugars100 * 10) / 10} g de azúcares por 100 ${isLiquid ? "ml" : "g"} (límite: ${sugarThreshold} g).`,
+      });
+    }
+  } else {
+    const isSavoryLiquid = /\b(sopa|caldo|consome|aceite|vinagre|salsa de soya)\b/i.test(
       normalizedFood
     );
-  if (carbs100 >= sugarThreshold && (isSweetFood || (isLiquid && !isSavoryLiquid))) {
-    stamps.push({
-      stamp: "sugars",
-      label: "ALTO EN AZÚCARES",
-      description: `Contiene ${Math.round(carbs100)} g de carbohidratos/azúcares por 100 ${isLiquid ? "ml" : "g"}.`,
-    });
+    const isSweetFood =
+      /\b(azucar|miel|manjar|chocolate|galleta|dulce|torta|helado|mermelada|gaseosa|bebida|nestea|jugo|fruta|caramelo|coca|cola|pepsi|fanta|sprite|bilz|pap|kem|crush|limon soda|canada dry|7up|seven up|red bull|monster|score|gatorade|powerade|aquarius|watts|nectar|refresco|soda|energizante|isotonica|kombucha|batido|yogur|yogurt|milo|nesquik|cereal|barra|queque|pastel|kuchen|alfajor|dona|berlin|flan|postre|gomita|jarabe|syrup)\b/i.test(
+        normalizedFood
+      );
+    if (carbs100 >= sugarThreshold && (isSweetFood || (isLiquid && !isSavoryLiquid))) {
+      stamps.push({
+        stamp: "sugars",
+        label: "ALTO EN AZÚCARES",
+        description: `Contiene ${Math.round(carbs100)} g de carbohidratos/azúcares por 100 ${isLiquid ? "ml" : "g"}.`,
+      });
+    }
   }
 
-  // Grasas saturadas / totales: Sólidos >= 4g saturadas (o >= 14g totales). Líquidos >= 3g.
-  const fatThreshold = isLiquid ? 3 : 14;
-  const isHighFatFood =
-    /\b(mantequilla|queso|fritura|frito|empanada|mayonesa|crema|snack|tocino|salchicha|papas fritas)\b/i.test(
-      normalizedFood
-    );
-  if (fat100 >= fatThreshold && (isHighFatFood || fat100 >= (isLiquid ? 6 : 20))) {
-    stamps.push({
-      stamp: "fats",
-      label: "ALTO EN GRASAS",
-      description: `Contiene ${Math.round(fat100)} g de grasas por cada 100 ${isLiquid ? "ml" : "g"}.`,
-    });
+  // Grasas saturadas: Sólidos >= 4g/100g. Líquidos >= 3g/100ml.
+  if (hasExactSatFat) {
+    const satFat100 = item.saturatedFat! * factor;
+    const satThreshold = isLiquid ? 3 : 4;
+    if (satFat100 >= satThreshold) {
+      stamps.push({
+        stamp: "fats",
+        label: "ALTO EN GRASAS SATURADAS",
+        description: `Contiene ${Math.round(satFat100 * 10) / 10} g de grasas saturadas por 100 ${isLiquid ? "ml" : "g"} (límite: ${satThreshold} g).`,
+      });
+    }
+  } else {
+    const fatThreshold = isLiquid ? 3 : 14;
+    const isHighFatFood =
+      /\b(mantequilla|queso|fritura|frito|empanada|mayonesa|crema|snack|tocino|salchicha|papas fritas)\b/i.test(
+        normalizedFood
+      );
+    if (fat100 >= fatThreshold && (isHighFatFood || fat100 >= (isLiquid ? 6 : 20))) {
+      stamps.push({
+        stamp: "fats",
+        label: "ALTO EN GRASAS",
+        description: `Contiene ${Math.round(fat100)} g de grasas por cada 100 ${isLiquid ? "ml" : "g"}.`,
+      });
+    }
   }
 
-  // Sodio: productos conocidos por alta salinidad (> 400 mg/100g o 100mg/100ml)
-  const isHighSodiumFood =
-    /\b(sopa sobre|caldo|ramitas|doritos|papas fritas|embutido|salchicha|vienesas|chorizo|salsa de soya|mostaza|snack salado)\b/i.test(
-      normalizedFood
-    );
-  if (isHighSodiumFood) {
-    stamps.push({
-      stamp: "sodium",
-      label: "ALTO EN SODIO",
-      description: "Alimento procesado con alto aporte de sodio por porción.",
-    });
+  // Sodio: Sólidos >= 400 mg/100g. Líquidos >= 100 mg/100ml.
+  if (hasExactSodium) {
+    const sodium100 = item.sodiumMg! * factor;
+    const sodiumThreshold = isLiquid ? 100 : 400;
+    if (sodium100 >= sodiumThreshold) {
+      stamps.push({
+        stamp: "sodium",
+        label: "ALTO EN SODIO",
+        description: `Contiene ${Math.round(sodium100)} mg de sodio por 100 ${isLiquid ? "ml" : "g"} (límite: ${sodiumThreshold} mg).`,
+      });
+    }
+  } else {
+    const isHighSodiumFood =
+      /\b(sopa sobre|caldo|ramitas|doritos|papas fritas|embutido|salchicha|vienesas|chorizo|salsa de soya|mostaza|snack salado)\b/i.test(
+        normalizedFood
+      );
+    if (isHighSodiumFood) {
+      stamps.push({
+        stamp: "sodium",
+        label: "ALTO EN SODIO",
+        description: "Alimento procesado con alto aporte de sodio por porción.",
+      });
+    }
   }
 
   return stamps;
@@ -395,6 +435,9 @@ export function evaluateFoodAlerts(
     fat: number;
     grams: number;
     unit?: string;
+    sugars?: number;
+    saturatedFat?: number;
+    sodiumMg?: number;
   },
   userRestrictions: DietaryRestriction[] = [],
   customAllergies: string[] = []

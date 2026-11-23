@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,13 +8,29 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
-import { CheckCircle2, Camera as CameraIcon, Scale, Plus } from "lucide-react-native";
+import {
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Camera as CameraIcon,
+  Scale,
+  Plus,
+  ShoppingCart,
+  ScanLine,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  Sparkles,
+} from "lucide-react-native";
 import { colors, shadows } from "@/constants/colors";
 import { BarcodeProduct } from "@/services/barcodeService";
 import { FoodUnit, MealType } from "@/types/meal";
 import { DietaryRestriction } from "@/types/profile";
-import { evaluateFoodAlerts } from "@/utils/foodAlerts";
 import { ChileanWarningStamps } from "@/components/food/ChileanWarningStamps";
+import {
+  evaluateSupermarketProduct,
+  TrafficLightLevel,
+} from "@/utils/supermarketEvaluator";
 import {
   parseQuantityInput,
   getStandardPortions,
@@ -32,6 +48,9 @@ export interface ScannedProductSheetProps {
   product: BarcodeProduct;
   restrictions: DietaryRestriction[];
   customAllergies?: string[];
+  objective?: string | null;
+  remainingCalories?: number;
+  remainingProtein?: number;
   portionGrams: string;
   portionUnit: FoodUnit;
   selectedMealType: MealType;
@@ -44,12 +63,24 @@ export interface ScannedProductSheetProps {
   savingDirect?: boolean;
   onAddToMeal: () => void;
   onCompareWithOther?: () => void;
+  onScanAnother?: () => void;
+  onAddToShoppingList?: () => void;
+  addingToShopping?: boolean;
+}
+
+function trafficColor(level: TrafficLightLevel): string {
+  if (level === "good") return colors.primary;
+  if (level === "warn") return colors.warning;
+  return colors.danger;
 }
 
 export function ScannedProductSheet({
   product,
   restrictions,
   customAllergies = [],
+  objective,
+  remainingCalories,
+  remainingProtein,
   portionGrams,
   portionUnit,
   selectedMealType,
@@ -62,53 +93,136 @@ export function ScannedProductSheet({
   savingDirect = false,
   onAddToMeal,
   onCompareWithOther,
+  onScanAnother,
+  onAddToShoppingList,
+  addingToShopping = false,
 }: ScannedProductSheetProps) {
+  const [showLogPanel, setShowLogPanel] = useState(false);
+
   const selectedMomentLabel =
     MEAL_MOMENTS.find((m) => m.type === selectedMealType)?.label || "Comida";
-  const parsedPortion = parseQuantityInput(portionGrams, portionUnit);
-  const factor = parsedPortion.ok ? parsedPortion.value / 100 : 1;
 
-  const productAlerts = evaluateFoodAlerts(
-    {
-      food: `${product.productName} ${product.brand || ""}`,
-      calories: product.caloriesPer100g,
-      protein: product.proteinPer100g,
-      carbs: product.carbsPer100g,
-      fat: product.fatPer100g,
-      grams: 100,
-      unit: portionUnit || product.unit,
-    },
-    restrictions,
-    customAllergies
+  const parsedPortion = parseQuantityInput(portionGrams, portionUnit);
+  const portionAmount = parsedPortion.ok
+    ? parsedPortion.value
+    : product.servingSizeG || 100;
+  const factor = portionAmount / 100;
+
+  const evaluation = useMemo(
+    () =>
+      evaluateSupermarketProduct({
+        product,
+        portionAmount,
+        portionUnit,
+        objective,
+        remainingCalories,
+        remainingProtein,
+        restrictions,
+        customAllergies,
+      }),
+    [
+      product,
+      portionAmount,
+      portionUnit,
+      objective,
+      remainingCalories,
+      remainingProtein,
+      restrictions,
+      customAllergies,
+    ]
   );
+
+  const verdictTheme =
+    evaluation.verdict === "great"
+      ? {
+          bg: colors.primaryLight,
+          border: colors.primary,
+          accent: colors.primaryDark,
+          Icon: CheckCircle2,
+        }
+      : evaluation.verdict === "moderate"
+        ? {
+            bg: colors.warningLight,
+            border: colors.warning,
+            accent: colors.warning,
+            Icon: AlertTriangle,
+          }
+        : {
+            bg: colors.dangerLight,
+            border: colors.danger,
+            accent: colors.danger,
+            Icon: XCircle,
+          };
+
+  const VerdictIcon = verdictTheme.Icon;
 
   return (
     <View style={styles.resultCard}>
+      {/* 1. Cabecera del producto */}
       <View style={styles.resultHeader}>
-        <View style={styles.sourceBadge}>
-          <Text style={styles.sourceBadgeText}>
-            {product.source === "custom"
-              ? "⭐ Mi Producto Guardado"
-              : product.source === "local"
-              ? "🇨🇱 Catálogo Chileno"
-              : "🌐 Open Food Facts"}
-          </Text>
+        <View style={styles.badgesTopRow}>
+          <View style={styles.sourceBadge}>
+            <Text style={styles.sourceBadgeText}>
+              {product.source === "custom"
+                ? "⭐ Mi Producto"
+                : product.source === "local"
+                  ? "🇨🇱 Catálogo Chileno"
+                  : "🌐 Open Food Facts"}
+            </Text>
+          </View>
+          {evaluation.isUltraProcessed && (
+            <View style={styles.novaBadge}>
+              <Text style={styles.novaBadgeText}>Ultraprocesado · NOVA 4</Text>
+            </View>
+          )}
         </View>
         <Text style={styles.productName}>{product.productName}</Text>
-        {product.brand ? <Text style={styles.productBrand}>{product.brand}</Text> : null}
+        {product.brand ? (
+          <Text style={styles.productBrand}>{product.brand}</Text>
+        ) : null}
         <Text style={styles.productCode}>Código: {product.barcode}</Text>
+      </View>
 
-        {/* Sellos negros oficiales de la Ley 20.606 */}
-        <View style={styles.stampsContainer}>
-          <ChileanWarningStamps
-            stamps={productAlerts.stamps}
-            showZeroNotice={true}
-          />
+      {/* 2. Veredicto de Supermercado ("¿Me sirve para mi dieta?") */}
+      <View
+        style={[
+          styles.verdictCard,
+          {
+            backgroundColor: verdictTheme.bg,
+            borderColor: verdictTheme.border,
+          },
+        ]}
+        accessibilityRole="summary"
+        accessibilityLabel={`${evaluation.verdictTitle}. Puntaje ${evaluation.score} de 100. ${evaluation.summary}`}
+      >
+        <View style={styles.verdictHeaderRow}>
+          <View style={styles.verdictTitleWrap}>
+            <VerdictIcon size={22} color={verdictTheme.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.verdictOverline, { color: verdictTheme.accent }]}>
+                PARA TU META · {evaluation.objectiveLabel.toUpperCase()}
+              </Text>
+              <Text style={styles.verdictTitle}>{evaluation.verdictTitle}</Text>
+            </View>
+          </View>
+          <View
+            style={[
+              styles.scoreBadge,
+              { borderColor: verdictTheme.border },
+            ]}
+          >
+            <Text style={[styles.scoreNum, { color: verdictTheme.accent }]}>
+              {evaluation.score}
+            </Text>
+            <Text style={styles.scoreDenom}>/100</Text>
+          </View>
         </View>
 
-        {productAlerts.alerts.length > 0 && (
+        <Text style={styles.verdictSummary}>{evaluation.summary}</Text>
+
+        {evaluation.alerts.length > 0 && (
           <View style={styles.productAlertsRow}>
-            {productAlerts.alerts.map((alert, aIdx) => (
+            {evaluation.alerts.map((alert, aIdx) => (
               <View
                 key={aIdx}
                 style={[
@@ -128,180 +242,143 @@ export function ScannedProductSheet({
             ))}
           </View>
         )}
-        {productAlerts.substituteSuggestion ? (
-          <View style={styles.substituteTipBox}>
-            <Text style={styles.substituteTipText}>{productAlerts.substituteSuggestion}</Text>
-          </View>
-        ) : null}
       </View>
 
-      {/* Selector de porción */}
-      <View style={styles.portionSection}>
-        <View style={styles.portionHeaderRow}>
-          <Text style={styles.portionLabel}>
-            {portionUnit === "ml" ? "¿Cuánto volumen consumiste?" : "¿Cuántos gramos consumiste?"}
-          </Text>
-          {/* Selector [ g | ml ] */}
-          <View style={styles.unitToggle}>
-            <TouchableOpacity
-              style={[styles.unitToggleBtn, portionUnit === "g" && styles.unitToggleBtnActive]}
-              onPress={() => onChangePortionUnit("g")}
-              accessibilityRole="button"
-              accessibilityLabel="Cambiar unidad a gramos"
-              accessibilityState={{ selected: portionUnit === "g" }}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.unitToggleText, portionUnit === "g" && styles.unitToggleTextActive]}>
-                g
+      {/* 3. Sellos Negros Oficiales Ley 20.606 */}
+      <View style={styles.stampsContainer}>
+        <ChileanWarningStamps
+          stamps={evaluation.stamps}
+          showZeroNotice={true}
+        />
+      </View>
+
+      {/* 4. Semáforo de Nutrientes (por 100g/ml) */}
+      <Text style={styles.miniSectionTitle}>
+        Semáforo nutricional (por 100 {portionUnit})
+      </Text>
+      <View style={styles.trafficGrid}>
+        {evaluation.trafficLights.map((item) => {
+          const dotColor = trafficColor(item.level);
+          return (
+            <View key={item.key} style={styles.trafficTile}>
+              <View style={styles.trafficTopRow}>
+                <View
+                  style={[styles.trafficDot, { backgroundColor: dotColor }]}
+                />
+                <Text style={styles.trafficLabel}>{item.label}</Text>
+              </View>
+              <Text style={styles.trafficValue} numberOfLines={1}>
+                {item.valueText}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.unitToggleBtn, portionUnit === "ml" && styles.unitToggleBtnActive]}
-              onPress={() => onChangePortionUnit("ml")}
-              accessibilityRole="button"
-              accessibilityLabel="Cambiar unidad a mililitros"
-              accessibilityState={{ selected: portionUnit === "ml" }}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.unitToggleText, portionUnit === "ml" && styles.unitToggleTextActive]}>
-                ml
+              <Text
+                style={[styles.trafficStatus, { color: dotColor }]}
+                numberOfLines={1}
+              >
+                {item.statusText}
               </Text>
-            </TouchableOpacity>
-          </View>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* 5. Lo bueno / Ojo con esto */}
+      {(evaluation.pros.length > 0 || evaluation.cons.length > 0) && (
+        <View style={styles.pointsBox}>
+          {evaluation.pros.slice(0, 3).map((pro, idx) => (
+            <View key={`pro-${idx}`} style={styles.pointRow}>
+              <Check size={14} color={colors.primary} />
+              <Text style={styles.pointText}>{pro}</Text>
+            </View>
+          ))}
+          {evaluation.cons.slice(0, 3).map((con, idx) => (
+            <View key={`con-${idx}`} style={styles.pointRow}>
+              <AlertTriangle size={13} color={colors.danger} />
+              <Text style={styles.pointText}>{con}</Text>
+            </View>
+          ))}
         </View>
+      )}
 
-        <View style={styles.portionInputRow}>
-          <TextInput
-            style={[styles.portionInput, !parsedPortion.ok && styles.portionInputError]}
-            value={portionGrams}
-            onChangeText={(text) => {
-              onChangePortionGrams(text);
-              const parsed = parseQuantityInput(text, portionUnit);
-              if (parsed.ok && parsed.unit !== portionUnit) {
-                onChangePortionUnit(parsed.unit);
-              }
-            }}
-            placeholder={portionUnit === "ml" ? "ej. 250, 1L" : "ej. 150"}
-            placeholderTextColor={colors.textMuted}
-            accessibilityLabel="Cantidad consumida"
-          />
-          <Text style={styles.portionUnitLabel}>{portionUnit}</Text>
-        </View>
-
-        {!parsedPortion.ok && portionGrams.trim().length > 0 && (
-          <Text style={styles.portionErrorText}>{parsedPortion.error}</Text>
-        )}
-
-        {/* Chips de envase si existe tamaño conocido */}
-        {product.containerSize && product.containerSize > 0 && (
-          <View style={styles.containerChipsRow}>
-            <TouchableOpacity
-              style={styles.containerChip}
-              onPress={() => onChangePortionGrams(String(Math.round(product.containerSize! / 2)))}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.containerChipText}>
-                ½ envase ({formatQuantityDisplay(product.containerSize / 2, portionUnit)})
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.containerChip}
-              onPress={() => onChangePortionGrams(String(product.containerSize))}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.containerChipText}>
-                Envase completo ({formatQuantityDisplay(product.containerSize, portionUnit)})
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Chips de porciones estándar */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.standardChipsScroll}
-          contentContainerStyle={styles.standardChipsContainer}
+      {/* Impacto real en el presupuesto de hoy */}
+      {evaluation.dayBudgetImpact && (
+        <View
+          style={[
+            styles.budgetBox,
+            evaluation.dayBudgetImpact.exceedsRemainingCalories &&
+              styles.budgetBoxWarn,
+          ]}
         >
-          {getStandardPortions(portionUnit).map((portion) => {
-            const isSelected = parsedPortion.ok && parsedPortion.value === portion.value;
-            return (
-              <TouchableOpacity
-                key={portion.label}
-                style={[styles.portionChip, isSelected && styles.portionChipActive]}
-                onPress={() => onChangePortionGrams(String(portion.value))}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.portionChipText, isSelected && styles.portionChipTextActive]}>
-                  {portion.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+          <Sparkles
+            size={14}
+            color={
+              evaluation.dayBudgetImpact.exceedsRemainingCalories
+                ? colors.danger
+                : colors.primaryDark
+            }
+          />
+          <Text style={styles.budgetText}>
+            {evaluation.dayBudgetImpact.summaryText}
+          </Text>
+        </View>
+      )}
+
+      {/* Alternativa más saludable en el mismo pasillo */}
+      {evaluation.smartTip ? (
+        <View style={styles.substituteTipBox}>
+          <Text style={styles.substituteTipText}>{evaluation.smartTip}</Text>
+        </View>
+      ) : null}
+
+      {/* 6. Barra rápida de pasillo (sin obligar a registrar como comido) */}
+      <View style={styles.aisleActionsRow}>
+        {onScanAnother && (
+          <TouchableOpacity
+            style={styles.aisleActionBtn}
+            onPress={onScanAnother}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Escanear otro producto"
+          >
+            <ScanLine size={15} color={colors.primaryDark} />
+            <Text style={styles.aisleActionText}>Escanear otro</Text>
+          </TouchableOpacity>
+        )}
+
+        {onCompareWithOther && (
+          <TouchableOpacity
+            style={styles.aisleActionBtn}
+            onPress={onCompareWithOther}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Comparar este producto con otro"
+          >
+            <Scale size={15} color={colors.primaryDark} />
+            <Text style={styles.aisleActionText}>Comparar 2</Text>
+          </TouchableOpacity>
+        )}
+
+        {onAddToShoppingList && (
+          <TouchableOpacity
+            style={styles.aisleActionBtn}
+            onPress={onAddToShoppingList}
+            disabled={addingToShopping}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Agregar producto a la lista de compras"
+          >
+            {addingToShopping ? (
+              <ActivityIndicator size="small" color={colors.primaryDark} />
+            ) : (
+              <>
+                <ShoppingCart size={15} color={colors.primaryDark} />
+                <Text style={styles.aisleActionText}>+ Compras</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Información nutricional calculada */}
-      <View style={styles.nutritionPreview}>
-        <View style={styles.nutriCol}>
-          <Text style={styles.nutriVal}>
-            {Math.round(product.caloriesPer100g * factor)}
-          </Text>
-          <Text style={styles.nutriLbl}>kcal</Text>
-        </View>
-        <View style={styles.nutriCol}>
-          <Text style={styles.nutriVal}>
-            {Math.round(product.proteinPer100g * factor * 10) / 10}g
-          </Text>
-          <Text style={styles.nutriLbl}>Prot</Text>
-        </View>
-        <View style={styles.nutriCol}>
-          <Text style={styles.nutriVal}>
-            {Math.round(product.carbsPer100g * factor * 10) / 10}g
-          </Text>
-          <Text style={styles.nutriLbl}>Carbos</Text>
-        </View>
-        <View style={styles.nutriCol}>
-          <Text style={styles.nutriVal}>
-            {Math.round(product.fatPer100g * factor * 10) / 10}g
-          </Text>
-          <Text style={styles.nutriLbl}>Grasas</Text>
-        </View>
-      </View>
-
-      {/* Selector de momento del día */}
-      <View style={styles.mealTypeSection}>
-        <Text style={styles.mealTypePrompt}>¿En qué momento lo comiste?</Text>
-        <View style={styles.mealTypesRow}>
-          {MEAL_MOMENTS.map((m) => {
-            const active = selectedMealType === m.type;
-            return (
-              <TouchableOpacity
-                key={m.type}
-                style={[styles.mealTypeChip, active && styles.mealTypeChipActive]}
-                onPress={() => onChangeMealType(m.type)}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel={`Registrar en ${m.label}`}
-                accessibilityState={{ selected: active }}
-              >
-                <Text style={styles.mealTypeEmoji}>{m.emoji}</Text>
-                <Text
-                  style={[
-                    styles.mealTypeChipText,
-                    active && styles.mealTypeChipTextActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {m.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Botón para corregir tabla con foto si no coincide */}
+      {/* Botón para corregir tabla nutricional física con IA */}
       <TouchableOpacity
         style={styles.rescanLabelBtn}
         onPress={onScanNutritionLabel}
@@ -314,72 +391,263 @@ export function ScannedProductSheet({
           <>
             <CameraIcon size={14} color={colors.primary} />
             <Text style={styles.rescanLabelBtnText}>
-              ¿No coincide con tu envase? Leer tabla física con IA
+              ¿La tabla física es distinta? Leer etiqueta con IA
             </Text>
           </>
         )}
       </TouchableOpacity>
 
-      {onCompareWithOther && (
-        <TouchableOpacity
-          style={styles.compareBtn}
-          onPress={onCompareWithOther}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Comparar este producto con otro"
-        >
-          <Scale size={15} color={colors.primaryDark} />
-          <Text style={styles.compareBtnText}>Comparar con otro producto</Text>
-        </TouchableOpacity>
-      )}
-
-      {onSaveDirectToMeal ? (
-        <>
-          <TouchableOpacity
-            style={[styles.addToMealBtn, savingDirect && { opacity: 0.7 }]}
-            onPress={onSaveDirectToMeal}
-            disabled={savingDirect}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel={`Guardar en ${selectedMomentLabel}`}
-          >
-            {savingDirect ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <>
-                <CheckCircle2 size={18} color="#FFFFFF" />
-                <Text style={styles.addToMealBtnText}>
-                  Guardar en {selectedMomentLabel} ✓
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.addAndContinueBtn}
-            onPress={onAddToMeal}
-            disabled={savingDirect}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel={`Añadir a ${selectedMomentLabel} y sumar más alimentos`}
-          >
-            <Plus size={15} color={colors.primaryDark} />
-            <Text style={styles.addAndContinueText}>
-              Añadir a {selectedMomentLabel} y sumar más alimentos
-            </Text>
-          </TouchableOpacity>
-        </>
-      ) : (
-        <TouchableOpacity
-          style={styles.addToMealBtn}
-          onPress={onAddToMeal}
-          activeOpacity={0.85}
-        >
-          <CheckCircle2 size={18} color="#FFFFFF" />
-          <Text style={styles.addToMealBtnText}>
-            Añadir a {selectedMomentLabel} ✓
+      {/* 7. Sección opcional: Registrar que ya lo comí */}
+      <TouchableOpacity
+        style={styles.logToggleHeader}
+        onPress={() => setShowLogPanel((prev) => !prev)}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Registrar que consumiste este producto"
+        accessibilityState={{ expanded: showLogPanel }}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={styles.logToggleTitle}>¿Te lo comiste? Regístralo en tu día</Text>
+          <Text style={styles.logToggleSub}>
+            {Math.round(product.caloriesPer100g * factor)} kcal ·{" "}
+            {formatQuantityDisplay(portionAmount, portionUnit)} · {selectedMomentLabel}
           </Text>
-        </TouchableOpacity>
+        </View>
+        {showLogPanel ? (
+          <ChevronUp size={18} color={colors.primaryDark} />
+        ) : (
+          <ChevronDown size={18} color={colors.primaryDark} />
+        )}
+      </TouchableOpacity>
+
+      {showLogPanel && (
+        <View style={styles.logPanelBody}>
+          {/* Selector de porción */}
+          <View style={styles.portionSection}>
+            <View style={styles.portionHeaderRow}>
+              <Text style={styles.portionLabel}>
+                {portionUnit === "ml"
+                  ? "¿Cuánto volumen consumiste?"
+                  : "¿Cuántos gramos consumiste?"}
+              </Text>
+              <View style={styles.unitToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.unitToggleBtn,
+                    portionUnit === "g" && styles.unitToggleBtnActive,
+                  ]}
+                  onPress={() => onChangePortionUnit("g")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cambiar unidad a gramos"
+                  accessibilityState={{ selected: portionUnit === "g" }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.unitToggleText,
+                      portionUnit === "g" && styles.unitToggleTextActive,
+                    ]}
+                  >
+                    g
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.unitToggleBtn,
+                    portionUnit === "ml" && styles.unitToggleBtnActive,
+                  ]}
+                  onPress={() => onChangePortionUnit("ml")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cambiar unidad a mililitros"
+                  accessibilityState={{ selected: portionUnit === "ml" }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.unitToggleText,
+                      portionUnit === "ml" && styles.unitToggleTextActive,
+                    ]}
+                  >
+                    ml
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.portionInputRow}>
+              <TextInput
+                style={[
+                  styles.portionInput,
+                  !parsedPortion.ok && styles.portionInputError,
+                ]}
+                value={portionGrams}
+                onChangeText={(text) => {
+                  onChangePortionGrams(text);
+                  const parsed = parseQuantityInput(text, portionUnit);
+                  if (parsed.ok && parsed.unit !== portionUnit) {
+                    onChangePortionUnit(parsed.unit);
+                  }
+                }}
+                keyboardType="default"
+                placeholder={portionUnit === "ml" ? "Ej: 250 ml" : "Ej: 100 g"}
+                placeholderTextColor={colors.textMuted}
+                accessibilityLabel="Cantidad consumida"
+              />
+              <Text style={styles.portionUnitBadge}>
+                {parsedPortion.ok
+                  ? formatQuantityDisplay(parsedPortion.value, parsedPortion.unit)
+                  : portionUnit}
+              </Text>
+            </View>
+            {!parsedPortion.ok && (
+              <Text style={styles.portionErrorText}>{parsedPortion.error}</Text>
+            )}
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.standardChipsScroll}
+              contentContainerStyle={styles.standardChipsContainer}
+            >
+              {getStandardPortions(portionUnit).map((portion) => {
+                const isSelected =
+                  parsedPortion.ok && parsedPortion.value === portion.value;
+                return (
+                  <TouchableOpacity
+                    key={portion.label}
+                    style={[
+                      styles.portionChip,
+                      isSelected && styles.portionChipActive,
+                    ]}
+                    onPress={() => onChangePortionGrams(String(portion.value))}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.portionChipText,
+                        isSelected && styles.portionChipTextActive,
+                      ]}
+                    >
+                      {portion.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Información nutricional calculada de la porción */}
+          <View style={styles.nutritionPreview}>
+            <View style={styles.nutriCol}>
+              <Text style={styles.nutriVal}>
+                {Math.round(product.caloriesPer100g * factor)}
+              </Text>
+              <Text style={styles.nutriLbl}>kcal</Text>
+            </View>
+            <View style={styles.nutriCol}>
+              <Text style={styles.nutriVal}>
+                {Math.round(product.proteinPer100g * factor * 10) / 10}g
+              </Text>
+              <Text style={styles.nutriLbl}>Prot</Text>
+            </View>
+            <View style={styles.nutriCol}>
+              <Text style={styles.nutriVal}>
+                {Math.round(product.carbsPer100g * factor * 10) / 10}g
+              </Text>
+              <Text style={styles.nutriLbl}>Carbos</Text>
+            </View>
+            <View style={styles.nutriCol}>
+              <Text style={styles.nutriVal}>
+                {Math.round(product.fatPer100g * factor * 10) / 10}g
+              </Text>
+              <Text style={styles.nutriLbl}>Grasas</Text>
+            </View>
+          </View>
+
+          {/* Selector de momento del día */}
+          <View style={styles.mealTypeSection}>
+            <Text style={styles.mealTypePrompt}>¿En qué momento lo comiste?</Text>
+            <View style={styles.mealTypesRow}>
+              {MEAL_MOMENTS.map((m) => {
+                const active = selectedMealType === m.type;
+                return (
+                  <TouchableOpacity
+                    key={m.type}
+                    style={[
+                      styles.mealTypeChip,
+                      active && styles.mealTypeChipActive,
+                    ]}
+                    onPress={() => onChangeMealType(m.type)}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Registrar en ${m.label}`}
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Text style={styles.mealTypeEmoji}>{m.emoji}</Text>
+                    <Text
+                      style={[
+                        styles.mealTypeChipText,
+                        active && styles.mealTypeChipTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {m.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {onSaveDirectToMeal ? (
+            <>
+              <TouchableOpacity
+                style={[styles.addToMealBtn, savingDirect && { opacity: 0.7 }]}
+                onPress={onSaveDirectToMeal}
+                disabled={savingDirect}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Guardar en ${selectedMomentLabel}`}
+              >
+                {savingDirect ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <>
+                    <CheckCircle2 size={18} color="#FFFFFF" />
+                    <Text style={styles.addToMealBtnText}>
+                      Guardar en {selectedMomentLabel} ✓
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.addAndContinueBtn}
+                onPress={onAddToMeal}
+                disabled={savingDirect}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Añadir a ${selectedMomentLabel} y sumar más alimentos`}
+              >
+                <Plus size={15} color={colors.primaryDark} />
+                <Text style={styles.addAndContinueText}>
+                  Añadir a {selectedMomentLabel} y sumar más alimentos
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity
+              style={styles.addToMealBtn}
+              onPress={onAddToMeal}
+              activeOpacity={0.85}
+            >
+              <CheckCircle2 size={18} color="#FFFFFF" />
+              <Text style={styles.addToMealBtnText}>
+                Añadir a {selectedMomentLabel} ✓
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
     </View>
   );
@@ -389,22 +657,26 @@ const styles = StyleSheet.create({
   resultCard: {
     backgroundColor: colors.card,
     borderRadius: 22,
-    padding: 20,
+    padding: 18,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     ...shadows.card,
     marginBottom: 16,
   },
   resultHeader: {
-    marginBottom: 14,
+    marginBottom: 12,
+  },
+  badgesTopRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 6,
   },
   sourceBadge: {
-    alignSelf: "flex-start",
     backgroundColor: colors.primaryLight,
     paddingVertical: 3.5,
     paddingHorizontal: 9,
     borderRadius: 10,
-    marginBottom: 6,
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
@@ -413,88 +685,293 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: colors.primaryDark,
   },
+  novaBadge: {
+    backgroundColor: colors.dangerLight,
+    paddingVertical: 3.5,
+    paddingHorizontal: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.danger + "44",
+  },
+  novaBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.danger,
+  },
   productName: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.3,
-    marginBottom: 2,
   },
   productBrand: {
     fontSize: 13,
+    fontWeight: "600",
     color: colors.textSecondary,
-    marginBottom: 4,
-    fontWeight: "500",
+    marginTop: 2,
   },
   productCode: {
     fontSize: 11,
     color: colors.textMuted,
+    marginTop: 3,
+  },
+  verdictCard: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 12,
+  },
+  verdictHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 8,
+  },
+  verdictTitleWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  verdictOverline: {
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.7,
+  },
+  verdictTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: colors.text,
+    marginTop: 1,
+  },
+  scoreBadge: {
+    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 1,
+  },
+  scoreNum: {
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  scoreDenom: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.textMuted,
+  },
+  verdictSummary: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.text,
+    fontWeight: "500",
   },
   stampsContainer: {
-    marginTop: 8,
+    marginBottom: 14,
+  },
+  miniSectionTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.textSecondary,
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  trafficGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  trafficTile: {
+    flexGrow: 1,
+    flexBasis: "46%",
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    padding: 10,
+  },
+  trafficTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     marginBottom: 4,
+  },
+  trafficDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  trafficLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.textSecondary,
+  },
+  trafficValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  trafficStatus: {
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  pointsBox: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    padding: 12,
+    gap: 7,
+    marginBottom: 10,
+  },
+  pointRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  pointText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.text,
+    fontWeight: "500",
+  },
+  budgetBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: colors.primaryGhost,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    padding: 11,
+    marginBottom: 10,
+  },
+  budgetBoxWarn: {
+    backgroundColor: colors.dangerLight,
+    borderColor: colors.danger + "44",
+  },
+  budgetText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.text,
+    fontWeight: "600",
   },
   productAlertsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
-    marginTop: 8,
-  },
-  stampBadge: {
-    backgroundColor: "#111827",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    alignSelf: "flex-start",
-  },
-  stampText: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 0.3,
+    marginTop: 10,
   },
   dietAlertPill: {
-    backgroundColor: colors.warningLight,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: colors.cardBorder,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    alignSelf: "flex-start",
+    borderColor: colors.warning,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   dietAlertPillDanger: {
-    backgroundColor: colors.dangerLight,
     borderColor: colors.danger,
   },
   dietAlertText: {
-    fontSize: 10,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "800",
     color: colors.warning,
   },
   dietAlertTextDanger: {
     color: colors.danger,
   },
   substituteTipBox: {
-    marginTop: 8,
-    backgroundColor: colors.successLight,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 12,
+    padding: 11,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+    marginBottom: 12,
   },
   substituteTipText: {
-    fontSize: 11.5,
-    fontWeight: "600",
+    fontSize: 12,
     color: colors.primaryDark,
-    lineHeight: 16,
+    fontWeight: "600",
+    lineHeight: 17,
   },
-  portionSection: {
+  aisleActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 10,
+  },
+  aisleActionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    borderRadius: 13,
     backgroundColor: colors.surfaceMuted,
-    borderRadius: 16,
-    padding: 14,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+  },
+  aisleActionText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.primaryDark,
+  },
+  rescanLabelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    marginBottom: 12,
+    backgroundColor: colors.primaryGhost,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  rescanLabelBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.primaryDark,
+  },
+  logToggleHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: 16,
+    padding: 14,
+  },
+  logToggleTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.primaryDark,
+  },
+  logToggleSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+    fontWeight: "600",
+  },
+  logPanelBody: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.cardBorder,
+  },
+  portionSection: {
     marginBottom: 14,
   },
   portionHeaderRow: {
@@ -504,21 +981,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   portionLabel: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: "700",
-    color: colors.textSecondary,
+    color: colors.text,
   },
   unitToggle: {
     flexDirection: "row",
-    backgroundColor: colors.card,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 10,
     padding: 2,
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
   unitToggleBtn: {
-    paddingHorizontal: 11,
     paddingVertical: 4,
+    paddingHorizontal: 10,
     borderRadius: 8,
   },
   unitToggleBtnActive: {
@@ -539,60 +1016,46 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   portionInput: {
-    backgroundColor: colors.card,
-    height: 40,
-    width: 120,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    fontWeight: "800",
-    color: colors.text,
-    borderWidth: 1,
+    flex: 1,
+    height: 44,
+    borderWidth: 1.5,
     borderColor: colors.cardBorder,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.text,
+    backgroundColor: colors.surfaceMuted,
   },
   portionInputError: {
     borderColor: colors.danger,
   },
-  portionUnitLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.textSecondary,
-  },
-  portionErrorText: {
-    fontSize: 11,
-    color: colors.danger,
-    marginBottom: 8,
-  },
-  containerChipsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 8,
-    flexWrap: "wrap",
-  },
-  containerChip: {
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  containerChipText: {
-    fontSize: 11,
+  portionUnitBadge: {
+    fontSize: 12,
     fontWeight: "700",
     color: colors.primaryDark,
+    backgroundColor: colors.primaryLight,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  portionErrorText: {
+    fontSize: 12,
+    color: colors.danger,
+    marginBottom: 6,
   },
   standardChipsScroll: {
     marginTop: 4,
   },
   standardChipsContainer: {
     gap: 6,
+    paddingVertical: 2,
   },
   portionChip: {
-    backgroundColor: colors.card,
+    paddingVertical: 6,
     paddingHorizontal: 11,
-    paddingVertical: 7,
     borderRadius: 10,
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
@@ -617,7 +1080,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   nutriCol: {
     alignItems: "center",
@@ -632,56 +1095,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.textSecondary,
     marginTop: 2,
-  },
-  rescanLabelBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 11,
-    marginBottom: 12,
-    backgroundColor: colors.primaryLight,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#A7F3D0",
-  },
-  rescanLabelBtnText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.primaryDark,
-  },
-  compareBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    paddingVertical: 12,
-    marginBottom: 10,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  compareBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.primaryDark,
-  },
-  addToMealBtn: {
-    backgroundColor: colors.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 15,
-    borderRadius: 16,
-    ...shadows.glow,
-  },
-  addToMealBtnText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
-    letterSpacing: -0.2,
   },
   mealTypeSection: {
     marginBottom: 14,
@@ -723,6 +1136,22 @@ const styles = StyleSheet.create({
   mealTypeChipTextActive: {
     color: colors.primaryDark,
     fontWeight: "800",
+  },
+  addToMealBtn: {
+    backgroundColor: colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 15,
+    borderRadius: 16,
+    ...shadows.glow,
+  },
+  addToMealBtnText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: -0.2,
   },
   addAndContinueBtn: {
     flexDirection: "row",

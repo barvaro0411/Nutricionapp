@@ -29,6 +29,8 @@ import { isLiquidFood, parseQuantityInput } from "@/utils/liquidUnits";
 import { colors, layout } from "@/constants/colors";
 import { nutritionPer100 } from "@/utils/productNutrition";
 import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
+import { useDailyNutrition } from "@/hooks/useDailyNutrition";
+import { useShoppingList } from "@/hooks/useShoppingList";
 import { PageBackHeader } from "@/components/common/AppUI";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -62,10 +64,19 @@ export default function BarcodeScreen() {
     mealType?: MealType;
   }>();
   const insets = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const { addItem, setMealType, loggedAt, reset } = useMealReviewStore();
   const { analyzeProductPhoto } = useMealAnalysis();
   const { restrictions, customAllergies } = useDietaryPreferences();
+  const { data: dailyNutrition } = useDailyNutrition();
+  const { addManualItem, isAdding: isAddingShopping } = useShoppingList();
+
+  const remainingCalories = dailyNutrition
+    ? Math.max(0, dailyNutrition.goal.calories - dailyNutrition.consumed.calories)
+    : undefined;
+  const remainingProtein = dailyNutrition
+    ? Math.max(0, dailyNutrition.goal.protein_g - dailyNutrition.consumed.protein)
+    : undefined;
 
   const [selectedMealType, setSelectedMealType] = useState<MealType>(() => {
     if (
@@ -440,6 +451,29 @@ export default function BarcodeScreen() {
     });
   };
 
+  const handleAddProductToShoppingList = async () => {
+    if (!product) return;
+    try {
+      await addManualItem({
+        name: product.brand
+          ? `${product.productName} (${product.brand})`
+          : product.productName,
+        quantity: 1,
+        unit: "unidad",
+      });
+      showToast({
+        type: "success",
+        title: "Agregado a Compras",
+        message: `${product.productName} quedó en tu lista de supermercado.`,
+      });
+    } catch (err: any) {
+      showAlert(
+        "Lista de compras",
+        err?.message || "No se pudo agregar a tu lista."
+      );
+    }
+  };
+
   const handleCompareSearch = async () => {
     const q = compareQuery.trim();
     if (!q) return;
@@ -732,6 +766,9 @@ export default function BarcodeScreen() {
           product={product}
           restrictions={restrictions}
           customAllergies={customAllergies}
+          objective={profile?.objective}
+          remainingCalories={remainingCalories}
+          remainingProtein={remainingProtein}
           portionGrams={portionGrams}
           portionUnit={portionUnit}
           selectedMealType={selectedMealType}
@@ -744,6 +781,12 @@ export default function BarcodeScreen() {
           savingDirect={savingDirect}
           onAddToMeal={handleAddProductToMeal}
           onCompareWithOther={handleCompareWithOther}
+          onScanAnother={() => {
+            handleResetScanner();
+            setActiveTab("camera");
+          }}
+          onAddToShoppingList={() => void handleAddProductToShoppingList()}
+          addingToShopping={isAddingShopping}
         />
       )}
 
