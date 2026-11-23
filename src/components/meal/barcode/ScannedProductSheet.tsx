@@ -8,10 +8,10 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
-import { CheckCircle2, Camera as CameraIcon, Scale } from "lucide-react-native";
+import { CheckCircle2, Camera as CameraIcon, Scale, Plus } from "lucide-react-native";
 import { colors, shadows } from "@/constants/colors";
 import { BarcodeProduct } from "@/services/barcodeService";
-import { FoodUnit } from "@/types/meal";
+import { FoodUnit, MealType } from "@/types/meal";
 import { DietaryRestriction } from "@/types/profile";
 import { evaluateFoodAlerts } from "@/utils/foodAlerts";
 import { ChileanWarningStamps } from "@/components/food/ChileanWarningStamps";
@@ -21,16 +21,27 @@ import {
   formatQuantityDisplay,
 } from "@/utils/liquidUnits";
 
+const MEAL_MOMENTS: { type: MealType; label: string; emoji: string }[] = [
+  { type: "desayuno", label: "Desayuno", emoji: "🌅" },
+  { type: "almuerzo", label: "Almuerzo", emoji: "🍽️" },
+  { type: "cena", label: "Once / Cena", emoji: "🥗" },
+  { type: "snack", label: "Colación", emoji: "🍎" },
+];
+
 export interface ScannedProductSheetProps {
   product: BarcodeProduct;
   restrictions: DietaryRestriction[];
   customAllergies?: string[];
   portionGrams: string;
   portionUnit: FoodUnit;
+  selectedMealType: MealType;
+  onChangeMealType: (mealType: MealType) => void;
   onChangePortionGrams: (val: string) => void;
   onChangePortionUnit: (unit: FoodUnit) => void;
   onScanNutritionLabel: () => void;
   scanningLabel: boolean;
+  onSaveDirectToMeal?: () => void;
+  savingDirect?: boolean;
   onAddToMeal: () => void;
   onCompareWithOther?: () => void;
 }
@@ -41,13 +52,19 @@ export function ScannedProductSheet({
   customAllergies = [],
   portionGrams,
   portionUnit,
+  selectedMealType,
+  onChangeMealType,
   onChangePortionGrams,
   onChangePortionUnit,
   onScanNutritionLabel,
   scanningLabel,
+  onSaveDirectToMeal,
+  savingDirect = false,
   onAddToMeal,
   onCompareWithOther,
 }: ScannedProductSheetProps) {
+  const selectedMomentLabel =
+    MEAL_MOMENTS.find((m) => m.type === selectedMealType)?.label || "Comida";
   const parsedPortion = parseQuantityInput(portionGrams, portionUnit);
   const factor = parsedPortion.ok ? parsedPortion.value / 100 : 1;
 
@@ -252,6 +269,38 @@ export function ScannedProductSheet({
         </View>
       </View>
 
+      {/* Selector de momento del día */}
+      <View style={styles.mealTypeSection}>
+        <Text style={styles.mealTypePrompt}>¿En qué momento lo comiste?</Text>
+        <View style={styles.mealTypesRow}>
+          {MEAL_MOMENTS.map((m) => {
+            const active = selectedMealType === m.type;
+            return (
+              <TouchableOpacity
+                key={m.type}
+                style={[styles.mealTypeChip, active && styles.mealTypeChipActive]}
+                onPress={() => onChangeMealType(m.type)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Registrar en ${m.label}`}
+                accessibilityState={{ selected: active }}
+              >
+                <Text style={styles.mealTypeEmoji}>{m.emoji}</Text>
+                <Text
+                  style={[
+                    styles.mealTypeChipText,
+                    active && styles.mealTypeChipTextActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {m.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
       {/* Botón para corregir tabla con foto si no coincide */}
       <TouchableOpacity
         style={styles.rescanLabelBtn}
@@ -284,14 +333,54 @@ export function ScannedProductSheet({
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity
-        style={styles.addToMealBtn}
-        onPress={onAddToMeal}
-        activeOpacity={0.85}
-      >
-        <CheckCircle2 size={18} color="#FFFFFF" />
-        <Text style={styles.addToMealBtnText}>Añadir a mi Comida ✓</Text>
-      </TouchableOpacity>
+      {onSaveDirectToMeal ? (
+        <>
+          <TouchableOpacity
+            style={[styles.addToMealBtn, savingDirect && { opacity: 0.7 }]}
+            onPress={onSaveDirectToMeal}
+            disabled={savingDirect}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Guardar en ${selectedMomentLabel}`}
+          >
+            {savingDirect ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <CheckCircle2 size={18} color="#FFFFFF" />
+                <Text style={styles.addToMealBtnText}>
+                  Guardar en {selectedMomentLabel} ✓
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.addAndContinueBtn}
+            onPress={onAddToMeal}
+            disabled={savingDirect}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Añadir a ${selectedMomentLabel} y sumar más alimentos`}
+          >
+            <Plus size={15} color={colors.primaryDark} />
+            <Text style={styles.addAndContinueText}>
+              Añadir a {selectedMomentLabel} y sumar más alimentos
+            </Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <TouchableOpacity
+          style={styles.addToMealBtn}
+          onPress={onAddToMeal}
+          activeOpacity={0.85}
+        >
+          <CheckCircle2 size={18} color="#FFFFFF" />
+          <Text style={styles.addToMealBtnText}>
+            Añadir a {selectedMomentLabel} ✓
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -593,5 +682,63 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
     letterSpacing: -0.2,
+  },
+  mealTypeSection: {
+    marginBottom: 14,
+  },
+  mealTypePrompt: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: 8,
+  },
+  mealTypesRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  mealTypeChip: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    gap: 2,
+  },
+  mealTypeChipActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  mealTypeEmoji: {
+    fontSize: 15,
+  },
+  mealTypeChipText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.textSecondary,
+  },
+  mealTypeChipTextActive: {
+    color: colors.primaryDark,
+    fontWeight: "800",
+  },
+  addAndContinueBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    marginTop: 9,
+    borderRadius: 14,
+    backgroundColor: colors.primaryGhost,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  addAndContinueText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.primaryDark,
   },
 });

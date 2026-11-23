@@ -9,8 +9,15 @@ import {
 } from "react-native";
 import { AlertCircle, Sparkles } from "lucide-react-native";
 import { colors } from "@/constants/colors";
-import { FoodUnit } from "@/types/meal";
+import { FoodUnit, MealType } from "@/types/meal";
 import { isLiquidFood } from "@/utils/liquidUnits";
+
+const MEAL_MOMENTS: { type: MealType; label: string }[] = [
+  { type: "desayuno", label: "Desayuno" },
+  { type: "almuerzo", label: "Almuerzo" },
+  { type: "cena", label: "Once / Cena" },
+  { type: "snack", label: "Colación" },
+];
 
 export interface BarcodeNotFoundSheetProps {
   barcode: string;
@@ -21,6 +28,8 @@ export interface BarcodeNotFoundSheetProps {
   customProt: string;
   customCarbs: string;
   customFat: string;
+  selectedMealType?: MealType;
+  onChangeMealType?: (mealType: MealType) => void;
   scanningLabel: boolean;
   loading: boolean;
   onChangeCustomName: (name: string) => void;
@@ -43,6 +52,8 @@ export function BarcodeNotFoundSheet({
   customProt,
   customCarbs,
   customFat,
+  selectedMealType,
+  onChangeMealType,
   scanningLabel,
   loading,
   onChangeCustomName,
@@ -174,6 +185,33 @@ export function BarcodeNotFoundSheet({
         </View>
       </View>
 
+      {selectedMealType && onChangeMealType && (
+        <View style={styles.mealMomentWrap}>
+          <Text style={styles.macroInputLbl}>¿En qué momento lo comiste?</Text>
+          <View style={styles.mealMomentRow}>
+            {MEAL_MOMENTS.map((m) => {
+              const active = selectedMealType === m.type;
+              return (
+                <TouchableOpacity
+                  key={m.type}
+                  style={[styles.mealMomentChip, active && styles.mealMomentChipActive]}
+                  onPress={() => onChangeMealType(m.type)}
+                >
+                  <Text
+                    style={[
+                      styles.mealMomentText,
+                      active && styles.mealMomentTextActive,
+                    ]}
+                  >
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
       <TouchableOpacity
         style={styles.saveCustomBtn}
         onPress={onSaveCustomProduct}
@@ -182,7 +220,10 @@ export function BarcodeNotFoundSheet({
         accessibilityRole="button"
         accessibilityLabel="Guardar y añadir a comida"
       >
-        <Text style={styles.saveCustomBtnText}>Guardar y Añadir a Comida</Text>
+        <Text style={styles.saveCustomBtnText}>
+          Guardar y añadir a{" "}
+          {MEAL_MOMENTS.find((m) => m.type === selectedMealType)?.label || "Comida"}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -300,5 +341,35 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "700",
+  },
+  mealMomentWrap: {
+    marginBottom: 14,
+    gap: 6,
+  },
+  mealMomentRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  mealMomentChip: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  mealMomentChipActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  mealMomentText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.textSecondary,
+  },
+  mealMomentTextActive: {
+    color: colors.primaryDark,
+    fontWeight: "800",
   },
 });

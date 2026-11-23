@@ -1,4 +1,4 @@
-import { parseDecimal } from "@/utils/dates";
+import { getDateKey, parseDecimal } from "@/utils/dates";
 import { showAlert, showToast } from "@/utils/alerts";
 import React, { useEffect, useState } from "react";
 import {
@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { Camera, Keyboard, Scale, Search, X } from "lucide-react-native";
 import {
@@ -19,9 +20,10 @@ import {
   searchProductsByName,
   BarcodeProduct,
 } from "@/services/barcodeService";
+import { saveMealToDatabase } from "@/services/mealService";
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { FoodUnit } from "@/types/meal";
+import { FoodUnit, MealType } from "@/types/meal";
 import { useMealAnalysis } from "@/hooks/useMealAnalysis";
 import { isLiquidFood, parseQuantityInput } from "@/utils/liquidUnits";
 import { colors, layout } from "@/constants/colors";
@@ -37,19 +39,62 @@ import {
   ProductCompareCard,
 } from "@/components/meal/barcode";
 
+function guessChileanMealTypeByHour(): MealType {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 11) return "desayuno";
+  if (hour >= 11 && hour < 16) return "almuerzo";
+  if (hour >= 16 && hour < 19) return "snack";
+  return "cena";
+}
+
+const MEAL_TYPE_LABELS: Record<MealType, string> = {
+  desayuno: "Desayuno",
+  almuerzo: "Almuerzo",
+  cena: "Once / Cena",
+  snack: "Colación",
+};
+
 export default function BarcodeScreen() {
   const router = useRouter();
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const queryClient = useQueryClient();
+  const { mode, mealType: mealTypeParam } = useLocalSearchParams<{
+    mode?: string;
+    mealType?: MealType;
+  }>();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
-  const { addItem } = useMealReviewStore();
+  const { addItem, setMealType, loggedAt, reset } = useMealReviewStore();
   const { analyzeProductPhoto } = useMealAnalysis();
   const { restrictions, customAllergies } = useDietaryPreferences();
+
+  const [selectedMealType, setSelectedMealType] = useState<MealType>(() => {
+    if (
+      mealTypeParam &&
+      ["desayuno", "almuerzo", "cena", "snack"].includes(mealTypeParam)
+    ) {
+      return mealTypeParam;
+    }
+    const storeState = useMealReviewStore.getState();
+    if (storeState.items.length > 0) {
+      return storeState.mealType;
+    }
+    return guessChileanMealTypeByHour();
+  });
+  const [savingDirect, setSavingDirect] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"camera" | "manual" | "compare">(
     mode === "compare" ? "compare" : "camera"
   );
   const [scanned, setScanned] = useState(false);
+
+  useEffect(() => {
+    if (
+      mealTypeParam &&
+      ["desayuno", "almuerzo", "cena", "snack"].includes(mealTypeParam)
+    ) {
+      setSelectedMealType(mealTypeParam);
+    }
+  }, [mealTypeParam]);
 
   // Estado del comparador de 2 productos
   const [compareA, setCompareA] = useState<BarcodeProduct | null>(null);
@@ -256,18 +301,18 @@ export default function BarcodeScreen() {
     }
   };
 
-  const handleAddProductToMeal = () => {
-    if (!product) return;
+  const buildProductFoodItem = () => {
+    if (!product) return null;
     const parsed = parseQuantityInput(portionGrams, portionUnit);
     if (!parsed.ok) {
       showAlert("Porción inválida", parsed.error);
-      return;
+      return null;
     }
     const finalAmount = parsed.value;
     const finalUnit = parsed.unit;
     const factor = finalAmount / 100;
 
-    addItem({
+    return {
       food: `${product.productName}${product.brand ? ` (${product.brand})` : ""}`,
       grams: finalAmount,
       unit: finalUnit,
@@ -276,8 +321,67 @@ export default function BarcodeScreen() {
       carbs: Math.round(product.carbsPer100g * factor * 10) / 10,
       fat: Math.round(product.fatPer100g * factor * 10) / 10,
       confidence: 1.0,
-    });
+    };
+  };
 
+  const handleSaveDirectToMeal = async () => {
+    const item = buildProductFoodItem();
+    if (!item) return;
+    if (!user) {
+      showAlert("Iniciar sesión", "Inicia sesión para guardar este producto.");
+      return;
+    }
+
+    setSavingDirect(true);
+    try {
+      const targetDate = loggedAt ? new Date(loggedAt) : new Date();
+      await saveMealToDatabase({
+        userId: user.id,
+        mealType: selectedMealType,
+        imagePath: null,
+        items: [item],
+        totals: {
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fat: item.fat,
+        },
+        loggedAt: targetDate,
+      });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["dailyNutrition"] }),
+        queryClient.invalidateQueries({ queryKey: ["weeklyStats"] }),
+        queryClient.invalidateQueries({ queryKey: ["qualityAndWaterStats"] }),
+        queryClient.invalidateQueries({ queryKey: ["recentMeals"] }),
+        queryClient.invalidateQueries({ queryKey: ["userStreak"] }),
+      ]);
+
+      reset();
+      showToast({
+        type: "success",
+        title: `¡Guardado en ${MEAL_TYPE_LABELS[selectedMealType]}!`,
+        message: `${item.food} · ${Math.round(item.calories)} kcal`,
+      });
+      router.replace({
+        pathname: "/(tabs)",
+        params: { date: getDateKey(targetDate) },
+      });
+    } catch (err: any) {
+      showAlert(
+        "Error al guardar",
+        err?.message || "No se pudo guardar el producto."
+      );
+    } finally {
+      setSavingDirect(false);
+    }
+  };
+
+  const handleAddProductToMeal = () => {
+    const item = buildProductFoodItem();
+    if (!item) return;
+    setMealType(selectedMealType);
+    addItem(item);
     router.push("/meal/review");
   };
 
@@ -304,6 +408,7 @@ export default function BarcodeScreen() {
         fatPer100g: parseDecimal(customFat),
       });
 
+      setMealType(selectedMealType);
       addItem({
         food: `${customName.trim()}${customBrand ? ` (${customBrand.trim()})` : ""}`,
         grams: 100,
@@ -629,10 +734,14 @@ export default function BarcodeScreen() {
           customAllergies={customAllergies}
           portionGrams={portionGrams}
           portionUnit={portionUnit}
+          selectedMealType={selectedMealType}
+          onChangeMealType={setSelectedMealType}
           onChangePortionGrams={setPortionGrams}
           onChangePortionUnit={setPortionUnit}
           onScanNutritionLabel={handleScanNutritionLabel}
           scanningLabel={scanningLabel}
+          onSaveDirectToMeal={handleSaveDirectToMeal}
+          savingDirect={savingDirect}
           onAddToMeal={handleAddProductToMeal}
           onCompareWithOther={handleCompareWithOther}
         />
@@ -649,6 +758,8 @@ export default function BarcodeScreen() {
           customProt={customProt}
           customCarbs={customCarbs}
           customFat={customFat}
+          selectedMealType={selectedMealType}
+          onChangeMealType={setSelectedMealType}
           scanningLabel={scanningLabel}
           loading={loading}
           onChangeCustomName={setCustomName}

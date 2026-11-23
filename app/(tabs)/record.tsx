@@ -315,7 +315,10 @@ export default function RecordScreen() {
           accessibilityLabel="Registrar con código de barras"
           onPress={() => {
             beginMeal();
-            router.push("/meal/barcode");
+            router.push({
+              pathname: "/meal/barcode",
+              params: { mealType: selectedMealType },
+            });
           }}
           activeOpacity={0.85}
         >
