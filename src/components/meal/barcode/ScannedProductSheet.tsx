@@ -23,6 +23,7 @@ import {
   Sparkles,
 } from "lucide-react-native";
 import { colors, shadows } from "@/constants/colors";
+import { MEAL_MOMENT_LIST } from "@/constants/mealMoments";
 import { BarcodeProduct } from "@/services/barcodeService";
 import { FoodUnit, MealType } from "@/types/meal";
 import { DietaryRestriction } from "@/types/profile";
@@ -36,13 +37,6 @@ import {
   getStandardPortions,
   formatQuantityDisplay,
 } from "@/utils/liquidUnits";
-
-const MEAL_MOMENTS: { type: MealType; label: string; emoji: string }[] = [
-  { type: "desayuno", label: "Desayuno", emoji: "🌅" },
-  { type: "almuerzo", label: "Almuerzo", emoji: "🍽️" },
-  { type: "cena", label: "Once / Cena", emoji: "🥗" },
-  { type: "snack", label: "Colación", emoji: "🍎" },
-];
 
 export interface ScannedProductSheetProps {
   product: BarcodeProduct;
@@ -100,7 +94,7 @@ export function ScannedProductSheet({
   const [showLogPanel, setShowLogPanel] = useState(false);
 
   const selectedMomentLabel =
-    MEAL_MOMENTS.find((m) => m.type === selectedMealType)?.label || "Comida";
+    MEAL_MOMENT_LIST.find((m) => m.type === selectedMealType)?.label || "Comida";
 
   const parsedPortion = parseQuantityInput(portionGrams, portionUnit);
   const portionAmount = parsedPortion.ok
@@ -568,8 +562,9 @@ export function ScannedProductSheet({
           <View style={styles.mealTypeSection}>
             <Text style={styles.mealTypePrompt}>¿En qué momento lo comiste?</Text>
             <View style={styles.mealTypesRow}>
-              {MEAL_MOMENTS.map((m) => {
+              {MEAL_MOMENT_LIST.map((m) => {
                 const active = selectedMealType === m.type;
+                const MomentIcon = m.Icon;
                 return (
                   <TouchableOpacity
                     key={m.type}
@@ -583,7 +578,14 @@ export function ScannedProductSheet({
                     accessibilityLabel={`Registrar en ${m.label}`}
                     accessibilityState={{ selected: active }}
                   >
-                    <Text style={styles.mealTypeEmoji}>{m.emoji}</Text>
+                    <View
+                      style={[
+                        styles.mealTypeIconBadge,
+                        { backgroundColor: active ? colors.card : m.bg },
+                      ]}
+                    >
+                      <MomentIcon size={14} color={m.color} />
+                    </View>
                     <Text
                       style={[
                         styles.mealTypeChipText,
@@ -591,7 +593,7 @@ export function ScannedProductSheet({
                       ]}
                       numberOfLines={1}
                     >
-                      {m.label}
+                      {m.shortLabel}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -1125,8 +1127,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
     borderColor: colors.primary,
   },
-  mealTypeEmoji: {
-    fontSize: 15,
+  mealTypeIconBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
   },
   mealTypeChipText: {
     fontSize: 10,

@@ -1,25 +1,84 @@
 import React from "react";
 import { Tabs, useRouter } from "expo-router";
-import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  useWindowDimensions,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LayoutDashboard, CalendarDays, Plus, Sparkles, UserRound, Leaf } from "lucide-react-native";
+import {
+  LayoutDashboard,
+  TrendingUp,
+  Plus,
+  Sparkles,
+  UserRound,
+  Leaf,
+  ChefHat,
+  ShoppingCart,
+} from "lucide-react-native";
 import { colors } from "@/constants/colors";
-import { useAuthStore } from "@/stores/useAuthStore";
+import { useShoppingList } from "@/hooks/useShoppingList";
 import { AppTabBar, appTabBarHeight } from "@/components/common/AppTabBar";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const wide = useWindowDimensions().width >= 768;
-  const fullName = useAuthStore(state => state.profile?.full_name);
+  const { pendingCount } = useShoppingList();
 
   return (
     <Tabs
-      tabBar={props => <AppTabBar {...props} />}
+      tabBar={(props) => <AppTabBar {...props} />}
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
-        headerTitle: () => <View style={styles.brand}><View style={styles.brandIcon}><Leaf size={20} color={colors.primary}/></View><View><Text style={styles.brandText}>Nutrición IA</Text><Text style={styles.brandTagline}>Comer bien, a tu ritmo</Text></View></View>,
-        headerRight: () => <Pressable accessibilityRole="button" accessibilityLabel="Abrir mi perfil" onPress={() => router.push("/(tabs)/settings")} style={({ pressed }) => [styles.profileShortcut, pressed && { opacity: 0.7 }]}><Text style={styles.profileInitial}>{fullName?.trim().charAt(0).toUpperCase() || "N"}</Text></Pressable>,
+        headerTitle: () => (
+          <View style={styles.brand}>
+            <View style={styles.brandIcon}>
+              <Leaf size={18} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={styles.brandText}>Nutrición IA</Text>
+              {wide && (
+                <Text style={styles.brandTagline}>Comer bien, a tu ritmo</Text>
+              )}
+            </View>
+          </View>
+        ),
+        headerRight: () => (
+          <View style={styles.headerActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir recetas y plan semanal"
+              onPress={() => router.push("/recipes")}
+              style={({ pressed }) => [
+                styles.headerBtn,
+                pressed && { opacity: 0.72 },
+              ]}
+            >
+              <ChefHat size={18} color={colors.primaryDark} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir lista de compras"
+              onPress={() => router.push("/recipes/shopping-list")}
+              style={({ pressed }) => [
+                styles.headerBtn,
+                pressed && { opacity: 0.72 },
+              ]}
+            >
+              <ShoppingCart size={18} color={colors.primaryDark} />
+              {pendingCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {pendingCount > 99 ? "99" : pendingCount}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+        ),
         tabBarStyle: { height: appTabBarHeight(insets.bottom, wide) },
         headerStyle: {
           backgroundColor: colors.background,
@@ -30,7 +89,7 @@ export default function TabLayout() {
         },
         headerTitleStyle: {
           fontWeight: "800",
-          fontSize: 18,
+          fontSize: 17,
           color: colors.text,
           letterSpacing: -0.3,
         },
@@ -40,41 +99,43 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Inicio",
+          title: "Hoy",
           tabBarAccessibilityLabel: "Ir al inicio",
           tabBarIcon: ({ color, focused }) => (
             <LayoutDashboard
-              size={21}
+              size={20}
               color={color}
-              strokeWidth={focused ? 2.5 : 1.8}
+              strokeWidth={focused ? 2.4 : 1.8}
             />
           ),
         }}
       />
 
-      {/* Tab 2: Historial */}
+      {/* Tab 2: Progreso */}
       <Tabs.Screen
         name="history"
         options={{
           title: "Progreso",
           tabBarAccessibilityLabel: "Ver progreso",
           tabBarIcon: ({ color, focused }) => (
-            <CalendarDays
-              size={21}
+            <TrendingUp
+              size={20}
               color={color}
-              strokeWidth={focused ? 2.5 : 1.8}
+              strokeWidth={focused ? 2.4 : 1.8}
             />
           ),
         }}
       />
 
-      {/* Tab 3: Botón Central: Registrar Comida */}
+      {/* Tab 3: Botón Central Protagonista */}
       <Tabs.Screen
         name="record"
         options={{
           title: "Registrar",
           tabBarAccessibilityLabel: "Registrar comida",
-          tabBarIcon: ({ color }) => <Plus size={21} color={color} strokeWidth={2.5} />,
+          tabBarIcon: ({ color }) => (
+            <Plus size={23} color={color} strokeWidth={2.8} />
+          ),
         }}
       />
 
@@ -84,18 +145,18 @@ export default function TabLayout() {
         options={{
           title: "Coach",
           tabBarAccessibilityLabel: "Abrir asistente",
-          headerShown: false, // CoachChatScreen ya maneja su propia cabecera completa
+          headerShown: false,
           tabBarIcon: ({ color, focused }) => (
             <Sparkles
-              size={21}
+              size={20}
               color={color}
-              strokeWidth={focused ? 2.5 : 1.8}
+              strokeWidth={focused ? 2.4 : 1.8}
             />
           ),
         }}
       />
 
-      {/* Tab 5: Ajustes */}
+      {/* Tab 5: Perfil */}
       <Tabs.Screen
         name="settings"
         options={{
@@ -103,9 +164,9 @@ export default function TabLayout() {
           tabBarAccessibilityLabel: "Abrir perfil",
           tabBarIcon: ({ color, focused }) => (
             <UserRound
-              size={21}
+              size={20}
               color={color}
-              strokeWidth={focused ? 2.5 : 1.8}
+              strokeWidth={focused ? 2.4 : 1.8}
             />
           ),
         }}
@@ -116,9 +177,55 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   brand: { flexDirection: "row", alignItems: "center", gap: 8 },
-  brandIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center" },
-  brandText: { fontSize: 17, fontWeight: "800", letterSpacing: -0.5, color: colors.text },
-  brandTagline: { fontSize: 9, color: colors.textSecondary, marginTop: 2 },
-  profileShortcut: { width: 44, height: 44, borderRadius: 15, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center", marginRight: 16, borderWidth: 1, borderColor: colors.cardBorder },
-  profileInitial: { color: colors.primaryDark, fontSize: 16, fontWeight: "800" },
+  brandIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  brandText: {
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+    color: colors.text,
+  },
+  brandTagline: { fontSize: 10, color: colors.textSecondary, marginTop: 1 },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginRight: 14,
+  },
+  headerBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: colors.background,
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "800",
+  },
 });

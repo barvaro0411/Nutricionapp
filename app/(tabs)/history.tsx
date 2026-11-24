@@ -1,7 +1,17 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowUpRight, CalendarDays, Download, Plus, TrendingUp, Flame, PieChart } from "lucide-react-native";
+import {
+  ArrowUpRight,
+  CalendarDays,
+  Download,
+  Plus,
+  TrendingUp,
+  Flame,
+  PieChart,
+  Scale,
+  ShieldCheck,
+} from "lucide-react-native";
 import { useWeeklyStats } from "@/hooks/useWeeklyStats";
 import { useQualityAndWaterStats } from "@/hooks/useQualityAndWaterStats";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
@@ -12,7 +22,7 @@ import { WeeklyMacroChart } from "@/components/charts/WeeklyMacroChart";
 import { WeightTrendCard } from "@/components/charts/WeightTrendCard";
 import { WaterTrendCard } from "@/components/charts/WaterTrendCard";
 import { WarningStampsSummaryCard } from "@/components/charts/WarningStampsSummaryCard";
-import { PageHeading, StateCard, AppButton } from "@/components/common/AppUI";
+import { StateCard, AppButton } from "@/components/common/AppUI";
 import { colors, layout, shadows } from "@/constants/colors";
 import { getDateKey, dateForMealRoute, APP_TIME_ZONE } from "@/utils/dates";
 import { ProgressPeriod, ProgressMetric } from "@/utils/progressStats";
@@ -32,10 +42,13 @@ const formatDate = (key: string) =>
     month: "short",
   });
 
+type ProgressSectionTab = "summary" | "body" | "quality";
+
 export default function HistoryScreen() {
   const router = useRouter();
   const profile = useAuthStore((state) => state.profile);
   const [period, setPeriod] = useState<ProgressPeriod>(7);
+  const [activeTab, setActiveTab] = useState<ProgressSectionTab>("summary");
   const [metric, setMetric] = useState<ProgressMetric>("calories");
   const [selectedDate, setSelectedDate] = useState(getDateKey());
   const [showAllDays, setShowAllDays] = useState(false);
@@ -91,12 +104,20 @@ export default function HistoryScreen() {
         />
       }
     >
-      <PageHeading
-        eyebrow="Cada registro cuenta"
-        title="Tu progreso"
-        description="Descubre tus hábitos, sigue tu curva corporal y revisa cómo evoluciona tu alimentación."
-      />
+      {/* Encabezado compacto + Selector de período en 1 fila */}
       <View style={styles.periodRow}>
+        <View>
+          <Text accessibilityRole="header" style={styles.compactTitle}>
+            Tu progreso
+          </Text>
+          <Text style={styles.periodDate}>
+            {data?.days?.length
+              ? formatDate(data.days[0].date) +
+                " – " +
+                formatDate(data.days[data.days.length - 1].date)
+              : "Cargando periodo…"}
+          </Text>
+        </View>
         <View style={styles.segment}>
           {([7, 30] as ProgressPeriod[]).map((value) => (
             <Pressable
@@ -114,18 +135,46 @@ export default function HistoryScreen() {
               <Text
                 style={[styles.periodText, period === value && styles.periodTextActive]}
               >
-                {value} días
+                {value}d
               </Text>
             </Pressable>
           ))}
         </View>
-        <Text style={styles.periodDate}>
-          {data?.days?.length
-            ? formatDate(data.days[0].date) +
-              " – " +
-              formatDate(data.days[data.days.length - 1].date)
-            : "Cargando periodo…"}
-        </Text>
+      </View>
+
+      {/* Sub-pestañas limpias para evitar scroll eterno */}
+      <View style={styles.subTabsRow}>
+        {[
+          { key: "summary" as const, label: "Resumen", Icon: TrendingUp },
+          { key: "body" as const, label: "Cuerpo y Agua", Icon: Scale },
+          { key: "quality" as const, label: "Calidad", Icon: ShieldCheck },
+        ].map(({ key, label, Icon }) => {
+          const selectedTab = activeTab === key;
+          return (
+            <Pressable
+              key={key}
+              accessibilityRole="tab"
+              accessibilityLabel={`Ver pestaña ${label}`}
+              accessibilityState={{ selected: selectedTab }}
+              onPress={() => setActiveTab(key)}
+              style={[styles.subTabBtn, selectedTab && styles.subTabBtnActive]}
+            >
+              <Icon
+                size={15}
+                color={selectedTab ? colors.primaryDark : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.subTabText,
+                  selectedTab && styles.subTabTextActive,
+                ]}
+                numberOfLines={1}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {isLoading ? (
@@ -141,6 +190,42 @@ export default function HistoryScreen() {
         />
       ) : (
         <>
+          {/* PESTAÑA 2: CUERPO Y AGUA */}
+          {activeTab === "body" && (
+            <>
+              <WeightTrendCard
+                stats={weightStats}
+                heightCm={profile?.height_cm}
+                onLogWeight={logWeight}
+                onUpdateTarget={updateTargetWeight}
+                isSaving={isLoggingWeight}
+              />
+              {qualityData && (
+                <WaterTrendCard stats={qualityData.water} period={period} />
+              )}
+            </>
+          )}
+
+          {/* PESTAÑA 3: CALIDAD NUTRICIONAL (LEY 20.606) */}
+          {activeTab === "quality" && (
+            <>
+              {qualityData ? (
+                <WarningStampsSummaryCard
+                  stats={qualityData.stamps}
+                  period={period}
+                />
+              ) : (
+                <StateCard
+                  title="Sin datos de sellos aún"
+                  message="Registra comidas para revisar el semáforo de sellos negros Ley 20.606."
+                />
+              )}
+            </>
+          )}
+
+          {/* PESTAÑA 1: RESUMEN (CONSTANCIA, TENDENCIAS, PROMEDIOS, DÍA A DÍA) */}
+          {activeTab === "summary" && (
+            <>
           {/* Tarjeta de Constancia */}
           <View style={styles.summary}>
             <View style={styles.summaryHeader}>
@@ -186,23 +271,6 @@ export default function HistoryScreen() {
                 : "Empieza con una comida. Tu progreso se construye día a día."}
             </Text>
           </View>
-
-          {/* Seguimiento Corporal con Curva SVG, IMC y Progreso hacia Meta */}
-          <WeightTrendCard
-            stats={weightStats}
-            heightCm={profile?.height_cm}
-            onLogWeight={logWeight}
-            onUpdateTarget={updateTargetWeight}
-            isSaving={isLoggingWeight}
-          />
-
-          {/* Tendencia semanal de Hidratación y Semáforo Ley 20.606 */}
-          {qualityData && (
-            <>
-              <WaterTrendCard stats={qualityData.water} period={period} />
-              <WarningStampsSummaryCard stats={qualityData.stamps} period={period} />
-            </>
-          )}
 
           {/* Tendencias Nutricionales */}
           {loggedDays === 0 ? (
@@ -544,6 +612,8 @@ export default function HistoryScreen() {
               </Text>
             </Pressable>
           )}
+            </>
+          )}
 
           <View style={styles.exportCard}>
             <View style={styles.exportCopy}>
@@ -572,30 +642,67 @@ const styles = StyleSheet.create({
   muted: { fontSize: 11, lineHeight: 16, color: colors.textSecondary },
   periodRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 14,
+  },
+  compactTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: -0.4,
+  },
+  subTabsRow: {
+    flexDirection: "row",
+    gap: 6,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 16,
+    padding: 4,
+    marginBottom: 16,
+  },
+  subTabBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  subTabBtnActive: {
+    backgroundColor: colors.primaryLight,
+  },
+  subTabText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  subTabTextActive: {
+    color: colors.primaryDark,
+    fontWeight: "800",
   },
   segment: {
     flexDirection: "row",
     backgroundColor: colors.surfaceMuted,
-    borderRadius: 14,
-    padding: 4,
+    borderRadius: 12,
+    padding: 3,
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
   periodButton: {
-    minHeight: 42,
-    paddingHorizontal: 22,
+    minHeight: 34,
+    paddingHorizontal: 14,
     justifyContent: "center",
-    borderRadius: 11,
+    borderRadius: 9,
   },
   periodActive: { backgroundColor: colors.card, ...shadows.sm },
-  periodText: { color: colors.textSecondary, fontSize: 13, fontWeight: "600" },
+  periodText: { color: colors.textSecondary, fontSize: 12, fontWeight: "600" },
   periodTextActive: { color: colors.primaryDark, fontWeight: "800" },
-  periodDate: { color: colors.textSecondary, fontSize: 12, fontWeight: "600" },
+  periodDate: { color: colors.textSecondary, fontSize: 12, fontWeight: "600", marginTop: 2 },
   summary: {
     backgroundColor: colors.forest,
     borderRadius: 24,

@@ -1,10 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, Image, ActivityIndicator } from "react-native";
 import {
-  Sunrise,
-  Sun,
-  Moon,
-  Apple,
   Plus,
   ChevronDown,
   ChevronUp,
@@ -13,21 +9,21 @@ import {
   Sparkles,
   RotateCcw,
   Pencil,
-  LucideIcon,
 } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { MealWithItems, MealType } from "@/types/meal";
 import { colors, shadows } from "@/constants/colors";
+import { MEAL_MOMENT_MAP } from "@/constants/mealMoments";
 import { formatQuantityDisplay, resolveItemUnit } from "@/utils/liquidUnits";
 import { supabase } from "@/services/supabase";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { YesterdayMealOption } from "@/hooks/useYesterdayMeal";
 
-const MEAL_META: Record<MealType, { title: string; Icon: LucideIcon; color: string; bg: string }> = {
-  desayuno: { title: "Desayuno", Icon: Sunrise, color: colors.carbs, bg: colors.carbsLight },
-  almuerzo: { title: "Almuerzo", Icon: Sun, color: colors.primary, bg: colors.primaryLight },
-  cena: { title: "Once / Cena", Icon: Moon, color: colors.protein, bg: colors.proteinLight },
-  snack: { title: "Colación", Icon: Apple, color: colors.fat, bg: colors.fatLight },
+const MEAL_META = {
+  desayuno: { title: MEAL_MOMENT_MAP.desayuno.label, ...MEAL_MOMENT_MAP.desayuno },
+  almuerzo: { title: MEAL_MOMENT_MAP.almuerzo.label, ...MEAL_MOMENT_MAP.almuerzo },
+  cena: { title: MEAL_MOMENT_MAP.cena.label, ...MEAL_MOMENT_MAP.cena },
+  snack: { title: MEAL_MOMENT_MAP.snack.label, ...MEAL_MOMENT_MAP.snack },
 };
 
 /** A photo belongs to the whole meal, rather than to any one ingredient. */

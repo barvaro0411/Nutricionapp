@@ -27,6 +27,10 @@ import { FoodUnit, MealType } from "@/types/meal";
 import { useMealAnalysis } from "@/hooks/useMealAnalysis";
 import { isLiquidFood, parseQuantityInput } from "@/utils/liquidUnits";
 import { colors, layout } from "@/constants/colors";
+import {
+  MEAL_MOMENT_MAP,
+  guessChileanMealTypeByHour,
+} from "@/constants/mealMoments";
 import { nutritionPer100 } from "@/utils/productNutrition";
 import { useDietaryPreferences } from "@/hooks/useDietaryPreferences";
 import { useDailyNutrition } from "@/hooks/useDailyNutrition";
@@ -40,21 +44,6 @@ import {
   BarcodeNotFoundSheet,
   ProductCompareCard,
 } from "@/components/meal/barcode";
-
-function guessChileanMealTypeByHour(): MealType {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 11) return "desayuno";
-  if (hour >= 11 && hour < 16) return "almuerzo";
-  if (hour >= 16 && hour < 19) return "snack";
-  return "cena";
-}
-
-const MEAL_TYPE_LABELS: Record<MealType, string> = {
-  desayuno: "Desayuno",
-  almuerzo: "Almuerzo",
-  cena: "Once / Cena",
-  snack: "Colación",
-};
 
 export default function BarcodeScreen() {
   const router = useRouter();
@@ -371,7 +360,7 @@ export default function BarcodeScreen() {
       reset();
       showToast({
         type: "success",
-        title: `¡Guardado en ${MEAL_TYPE_LABELS[selectedMealType]}!`,
+        title: `¡Guardado en ${MEAL_MOMENT_MAP[selectedMealType].label}!`,
         message: `${item.food} · ${Math.round(item.calories)} kcal`,
       });
       router.replace({
