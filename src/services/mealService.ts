@@ -138,7 +138,10 @@ export async function updateSavedMeal(params: UpdateSavedMealParams) {
     }
   }
 
-  for (const item of items) {
+  const existingItems = items.filter((item) => !item.isNew);
+  const newItems = items.filter((item) => item.isNew);
+
+  for (const item of existingItems) {
     const { error: itemErr } = await supabase
       .from("meal_items")
       .update({
@@ -153,6 +156,48 @@ export async function updateSavedMeal(params: UpdateSavedMealParams) {
 
     if (itemErr) {
       throw new Error(`No se pudo actualizar ${item.food_name}.`);
+    }
+  }
+
+  if (newItems.length > 0) {
+    const insertRows = newItems.map((item) => ({
+      meal_id: mealId,
+      food_name: item.food_name,
+      grams: item.grams,
+      unit: item.unit,
+      calories: item.calories,
+      protein: item.protein,
+      carbs: item.carbs,
+      fat: item.fat,
+      confidence: 1,
+      ai_detected: false,
+    }));
+
+    const { error: insErr } = await supabase.from("meal_items").insert(insertRows);
+    if (insErr) {
+      const isUnitMissing =
+        insErr.message?.includes("unit") || insErr.code === "42703";
+      if (isUnitMissing) {
+        const fallbackRows = newItems.map((item) => ({
+          meal_id: mealId,
+          food_name: item.food_name,
+          grams: item.grams,
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fat: item.fat,
+          confidence: 1,
+          ai_detected: false,
+        }));
+        const { error: fallbackErr } = await supabase
+          .from("meal_items")
+          .insert(fallbackRows);
+        if (fallbackErr) {
+          throw new Error("No se pudieron agregar los nuevos alimentos.");
+        }
+      } else {
+        throw new Error("No se pudieron agregar los nuevos alimentos.");
+      }
     }
   }
 

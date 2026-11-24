@@ -17,12 +17,14 @@ import {
   ChevronRight,
   Minus,
   Plus,
+  Search,
   Star,
   Trash2,
   X,
 } from "lucide-react-native";
 import { colors, shadows } from "@/constants/colors";
 import { useFavoriteMeals } from "@/hooks/useFavoriteMeals";
+import { BarcodeProduct, searchProductsByName } from "@/services/barcodeService";
 import { deleteSavedMeal, updateSavedMeal } from "@/services/mealService";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { MealType, MealWithItems } from "@/types/meal";
@@ -70,6 +72,10 @@ export function SavedMealDetailModal({
   const [draftGrams, setDraftGrams] = useState<Record<string, string>>({});
   const [busyAction, setBusyAction] = useState<"save" | "delete" | null>(null);
   const [savedFav, setSavedFav] = useState(false);
+  const [showAddSearch, setShowAddSearch] = useState(false);
+  const [addQuery, setAddQuery] = useState("");
+  const [addResults, setAddResults] = useState<BarcodeProduct[]>([]);
+  const [searchingAdd, setSearchingAdd] = useState(false);
 
   useEffect(() => {
     if (!meal) return;
@@ -92,6 +98,9 @@ export function SavedMealDetailModal({
     );
     setSavedFav(false);
     setBusyAction(null);
+    setShowAddSearch(false);
+    setAddQuery("");
+    setAddResults([]);
   }, [meal]);
 
   const totals = useMemo(() => computeMealItemsTotals(items), [items]);
@@ -126,8 +135,50 @@ export function SavedMealDetailModal({
       );
       return;
     }
+    const targetItem = items.find((it) => it.id === itemId);
     setItems((prev) => prev.filter((it) => it.id !== itemId));
-    setRemovedIds((prev) => [...prev, itemId]);
+    if (!targetItem?.isNew) {
+      setRemovedIds((prev) => [...prev, itemId]);
+    }
+  };
+
+  const handleSearchFoodToAdd = async (text: string) => {
+    setAddQuery(text);
+    const trimmed = text.trim();
+    if (trimmed.length < 2) {
+      setAddResults([]);
+      return;
+    }
+    setSearchingAdd(true);
+    try {
+      const results = await searchProductsByName(trimmed, 8);
+      setAddResults(results);
+    } finally {
+      setSearchingAdd(false);
+    }
+  };
+
+  const handleAppendFoodItem = (prod: BarcodeProduct) => {
+    const unit = prod.unit === "ml" ? "ml" : "g";
+    const grams = prod.servingSizeG > 0 ? prod.servingSizeG : unit === "ml" ? 200 : 100;
+    const factor = grams / 100;
+    const newId = `new_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const newItem: EditableMealItem = {
+      id: newId,
+      food_name: prod.productName,
+      grams,
+      unit,
+      calories: Math.round(prod.caloriesPer100g * factor * 10) / 10,
+      protein: Math.round(prod.proteinPer100g * factor * 10) / 10,
+      carbs: Math.round(prod.carbsPer100g * factor * 10) / 10,
+      fat: Math.round(prod.fatPer100g * factor * 10) / 10,
+      isNew: true,
+    };
+    setItems((prev) => [...prev, newItem]);
+    setDraftGrams((prev) => ({ ...prev, [newId]: String(Math.round(grams)) }));
+    setAddQuery("");
+    setAddResults([]);
+    setShowAddSearch(false);
   };
 
   const shiftDateByDays = (delta: number) => {
@@ -429,6 +480,70 @@ export function SavedMealDetailModal({
               })}
             </View>
 
+            {/* + Agregar otro alimento al mismo registro */}
+            {!showAddSearch ? (
+              <TouchableOpacity
+                style={styles.addMoreBtn}
+                onPress={() => setShowAddSearch(true)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Agregar otro alimento a esta comida"
+              >
+                <Plus size={16} color={colors.primaryDark} />
+                <Text style={styles.addMoreBtnText}>
+                  Agregar otro alimento a esta comida
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.addSearchBox}>
+                <View style={styles.addSearchInputRow}>
+                  <Search size={15} color={colors.primary} />
+                  <TextInput
+                    style={styles.addSearchInput}
+                    value={addQuery}
+                    onChangeText={(txt) => void handleSearchFoodToAdd(txt)}
+                    placeholder="Buscar alimento (ej. palta, huevo, café, pan...)"
+                    placeholderTextColor={colors.textMuted}
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowAddSearch(false);
+                      setAddQuery("");
+                      setAddResults([]);
+                    }}
+                  >
+                    <X size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+
+                {searchingAdd && (
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.primary}
+                    style={{ marginVertical: 8 }}
+                  />
+                )}
+
+                {addResults.map((prod) => (
+                  <TouchableOpacity
+                    key={`${prod.barcode}-${prod.productName}`}
+                    style={styles.addResultRow}
+                    onPress={() => handleAppendFoodItem(prod)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.addResultName}>{prod.productName}</Text>
+                      <Text style={styles.addResultMeta}>
+                        {Math.round(prod.caloriesPer100g)} kcal · {prod.proteinPer100g}g P / 100
+                        {prod.unit || "g"}
+                      </Text>
+                    </View>
+                    <Text style={styles.addResultPill}>+ Sumar</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             {/* Acción secundaria: Guardar en Favoritos */}
             <TouchableOpacity
               style={[styles.favBtn, savedFav && styles.favBtnDone]}
@@ -721,6 +836,78 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: colors.text,
+  },
+  addMoreBtn: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 11,
+    marginBottom: 12,
+    borderRadius: 14,
+    backgroundColor: colors.primaryGhost,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.primary,
+  },
+  addMoreBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.primaryDark,
+  },
+  addSearchBox: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  addSearchInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 10,
+    minHeight: 42,
+  },
+  addSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+  },
+  addResultRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderTopWidth: 1,
+    borderTopColor: colors.cardBorder,
+  },
+  addResultName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  addResultMeta: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  addResultPill: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.primaryDark,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   footer: {
     flexDirection: "row",

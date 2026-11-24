@@ -52,8 +52,13 @@ import {
   DEFAULT_CHILEAN_REMINDERS,
 } from "@/services/notificationService";
 import { showAlert, showToast } from "@/utils/alerts";
-import { calculateBMR, calculateTDEE } from "@/utils/nutritionCalculator";
+import {
+  calculateBMR,
+  calculateTDEE,
+  calculateNutritionGoals,
+} from "@/utils/nutritionCalculator";
 import { QuickWeightModal } from "@/components/profile/QuickWeightModal";
+import { CustomGoalsModal } from "@/components/profile/CustomGoalsModal";
 import { PageHeading, AppButton, FormField } from "@/components/common/AppUI";
 import { colors, layout } from "@/constants/colors";
 
@@ -86,6 +91,7 @@ export default function SettingsScreen() {
   const [name, setName] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [showWeightModal, setShowWeightModal] = useState(false);
+  const [showCustomGoalsModal, setShowCustomGoalsModal] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -601,6 +607,19 @@ export default function SettingsScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Botón limpio para editar metas manualmente (nutricionista) */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Personalizar metas nutricionales manualmente"
+          onPress={() => setShowCustomGoalsModal(true)}
+          style={({ pressed }) => [styles.customGoalsBtn, pressed && styles.pressed]}
+        >
+          <Pencil size={14} color={colors.primaryDark} />
+          <Text style={styles.customGoalsBtnText}>
+            Personalizar cifras manualmente (pauta nutricionista)
+          </Text>
+        </Pressable>
       </View>
 
       {/* SECCIÓN: APARIENCIA Y MODO OSCURO */}
@@ -936,6 +955,29 @@ export default function SettingsScreen() {
           });
         }}
       />
+
+      {/* Modal de Metas Personalizadas */}
+      <CustomGoalsModal
+        visible={showCustomGoalsModal}
+        initialCalories={caloriesGoal}
+        initialProtein={proteinGoal}
+        initialCarbs={carbsGoal}
+        initialFat={fatGoal}
+        autoSuggested={
+          currentWeight && heightCm
+            ? calculateNutritionGoals({
+                fullName: profile?.full_name || "Usuario",
+                gender: profile?.gender ?? "other",
+                age: profile?.age ?? 30,
+                heightCm,
+                weightKg: currentWeight,
+                activityLevel: profile?.activity_level ?? "moderate",
+                objective: profile?.objective ?? "maintain",
+              })
+            : null
+        }
+        onClose={() => setShowCustomGoalsModal(false)}
+      />
     </ScrollView>
   );
 }
@@ -1259,6 +1301,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     marginTop: 1,
+  },
+  customGoalsBtn: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 14,
+    backgroundColor: colors.primaryGhost,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  customGoalsBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.primaryDark,
   },
   actions: {
     backgroundColor: colors.card,

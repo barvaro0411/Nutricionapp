@@ -38,13 +38,15 @@ export default function RecipeDetailScreen() {
   const toggleFavorite = useToggleRecipeFavorite();
   const deleteMutation = useDeleteUserRecipe();
 
-  const [plannedServings, setPlannedServings] = useState(1);
+  const [cookServings, setCookServings] = useState(1);
+  const [eatenServings, setEatenServings] = useState(1);
   const [selectedMealType, setSelectedMealType] = useState<MealType>("almuerzo");
   const [addedToShopping, setAddedToShopping] = useState(false);
 
   useEffect(() => {
     if (recipe) {
-      setPlannedServings(recipe.servings || 1);
+      setCookServings(recipe.servings || 1);
+      setEatenServings(1);
       setSelectedMealType(recipe.mealType);
       setAddedToShopping(false);
     }
@@ -56,23 +58,24 @@ export default function RecipeDetailScreen() {
   }, [recipe, restrictions, customAllergies]);
 
   const baseServings = recipe?.servings && recipe.servings > 0 ? recipe.servings : 1;
-  const scaleFactor = plannedServings / baseServings;
+  const scaleFactor = cookServings / baseServings;
+  const eatenScaleFactor = eatenServings / baseServings;
 
   const handleLogRecipe = () => {
     if (!recipe) return;
 
-    // Convertir ingredientes al formato de items de comida escalados por porción
+    // Convertir ingredientes escalados exactamente por las porciones que consumiste hoy
     const detectedItems: DetectedFoodItem[] = recipe.ingredients.map((ing, idx) => {
       const isLiquid = ing.unit === "ml" || isLiquidFood(ing.foodName);
       return {
         id: `recipe_ing_${idx}_${Date.now()}`,
         food: ing.foodName,
-        grams: Math.round(ing.grams * scaleFactor * 10) / 10,
+        grams: Math.round(ing.grams * eatenScaleFactor * 10) / 10,
         unit: isLiquid ? "ml" : "g",
-        calories: Math.round(ing.calories * scaleFactor * 10) / 10,
-        protein: Math.round(ing.protein * scaleFactor * 10) / 10,
-        carbs: Math.round(ing.carbs * scaleFactor * 10) / 10,
-        fat: Math.round(ing.fat * scaleFactor * 10) / 10,
+        calories: Math.round(ing.calories * eatenScaleFactor * 10) / 10,
+        protein: Math.round(ing.protein * eatenScaleFactor * 10) / 10,
+        carbs: Math.round(ing.carbs * eatenScaleFactor * 10) / 10,
+        fat: Math.round(ing.fat * eatenScaleFactor * 10) / 10,
         confidence: 1.0,
       };
     });
@@ -91,12 +94,12 @@ export default function RecipeDetailScreen() {
   const handleAddShopping = async () => {
     if (!recipe || isAddingShopping) return;
     try {
-      await addRecipeIngredients({ recipe, servings: plannedServings });
+      await addRecipeIngredients({ recipe, servings: cookServings });
       setAddedToShopping(true);
       showToast({
         type: "success",
         title: "Ingredientes agregados",
-        message: `${recipe.title} (${plannedServings} ${plannedServings === 1 ? "porción" : "porciones"})`,
+        message: `${recipe.title} (${cookServings} ${cookServings === 1 ? "porción" : "porciones"})`,
       });
     } catch (err: any) {
       showToast({
@@ -287,22 +290,22 @@ export default function RecipeDetailScreen() {
         <View style={styles.servingsStepper}>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Menos porciones"
+            accessibilityLabel="Menos porciones a preparar"
             style={styles.stepBtn}
-            onPress={() => setPlannedServings((p) => Math.max(1, p - 1))}
-            disabled={plannedServings <= 1}
+            onPress={() => setCookServings((p) => Math.max(1, p - 1))}
+            disabled={cookServings <= 1}
           >
             <Minus size={14} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.stepLabel}>
-            {plannedServings} {plannedServings === 1 ? "porción" : "porciones"}
+            Para {cookServings} {cookServings === 1 ? "porción" : "porciones"}
           </Text>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Más porciones"
+            accessibilityLabel="Más porciones a preparar"
             style={styles.stepBtn}
-            onPress={() => setPlannedServings((p) => Math.min(12, p + 1))}
-            disabled={plannedServings >= 12}
+            onPress={() => setCookServings((p) => Math.min(12, p + 1))}
+            disabled={cookServings >= 12}
           >
             <Plus size={14} color={colors.text} />
           </TouchableOpacity>
@@ -376,12 +379,12 @@ export default function RecipeDetailScreen() {
           })}
         </View>
 
-        {/* Selector de porciones */}
+        {/* Selector de porciones consumidas */}
         <View style={styles.servingsRow}>
           <View>
-            <Text style={styles.logConfigLabel}>PORCIONES</Text>
+            <Text style={styles.logConfigLabel}>PORCIÓN QUE COMISTE HOY</Text>
             <Text style={styles.servingsCalc}>
-              ~{Math.round(recipe.caloriesPerServing * plannedServings)} kcal en total
+              ~{Math.round(recipe.caloriesPerServing * eatenServings)} kcal en total
             </Text>
           </View>
 
@@ -390,18 +393,22 @@ export default function RecipeDetailScreen() {
               accessibilityRole="button"
               accessibilityLabel="Restar 0.5 porción"
               style={styles.servingsBtn}
-              onPress={() => setPlannedServings((s) => Math.max(0.5, Math.round((s - 0.5) * 10) / 10))}
+              onPress={() =>
+                setEatenServings((s) => Math.max(0.5, Math.round((s - 0.5) * 10) / 10))
+              }
             >
               <Minus size={15} color={colors.text} />
             </TouchableOpacity>
 
-            <Text style={styles.servingsValue}>{plannedServings}</Text>
+            <Text style={styles.servingsValue}>{eatenServings}</Text>
 
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Sumar 0.5 porción"
               style={styles.servingsBtn}
-              onPress={() => setPlannedServings((s) => Math.min(12, Math.round((s + 0.5) * 10) / 10))}
+              onPress={() =>
+                setEatenServings((s) => Math.min(12, Math.round((s + 0.5) * 10) / 10))
+              }
             >
               <Plus size={15} color={colors.text} />
             </TouchableOpacity>
@@ -423,7 +430,7 @@ export default function RecipeDetailScreen() {
           <View style={styles.shoppingBtnContent}>
             <ShoppingCart size={18} color={colors.primaryDark} />
             <Text style={styles.shoppingButtonText}>
-              Agregar ingredientes a Compras ({plannedServings} {plannedServings === 1 ? "porción" : "porc."})
+              Agregar ingredientes a Compras ({cookServings} {cookServings === 1 ? "porción" : "porc."})
             </Text>
           </View>
         )}
@@ -441,7 +448,7 @@ export default function RecipeDetailScreen() {
 
       <TouchableOpacity accessibilityRole="button" style={styles.logButton} onPress={handleLogRecipe}>
         <Text style={styles.logButtonText}>
-          🍽️ Registrar {plannedServings === 1 ? "1 porción" : `${plannedServings} porciones`} en{" "}
+          🍽️ Registrar {eatenServings === 1 ? "1 porción" : `${eatenServings} porciones`} en{" "}
           {selectedMealType === "desayuno"
             ? "Desayuno"
             : selectedMealType === "almuerzo"

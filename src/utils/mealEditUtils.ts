@@ -9,6 +9,7 @@ export interface EditableMealItem {
   protein: number;
   carbs: number;
   fat: number;
+  isNew?: boolean;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
