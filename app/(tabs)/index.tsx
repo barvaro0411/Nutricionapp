@@ -33,9 +33,10 @@ import {
   Camera,
   Mic,
   Barcode,
-  Droplets,
+  Star,
   Target,
   HelpCircle,
+  Plus,
   ArrowUpRight,
   Moon,
   Sun,
@@ -291,13 +292,17 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* Encabezado compacto con Saludo, Plan, Tema y Racha */}
+        {/* Encabezado con Saludo, Guía y Racha */}
         <View style={styles.topHeader}>
           <View style={styles.greetingWrap}>
+            <Text style={styles.greetingEyebrow}>TU DIARIO PERSONAL</Text>
             <Text accessibilityRole="header" style={styles.greetingTitle}>
               {profile?.full_name
                 ? `Hola, ${profile.full_name.split(" ")[0]}`
-                : "Tu diario de hoy"}
+                : "Tu espacio de bienestar"}
+            </Text>
+            <Text style={styles.greetingSubtitle}>
+              Un día a la vez, a tu ritmo.
             </Text>
             {personalPlan && (
               <TouchableOpacity
@@ -308,11 +313,11 @@ export default function DashboardScreen() {
                 accessibilityLabel={`Plan Maestro activo: ${personalPlan.user.objectiveTitle}`}
               >
                 <View style={styles.headerPlanDot} />
-                <Target size={12} color={colors.primaryDark} />
+                <Target size={13} color={colors.primaryDark} />
                 <Text style={styles.headerPlanPillText} numberOfLines={1}>
                   {personalPlan.user.objectiveTitle}
                 </Text>
-                <ChevronRight size={12} color={colors.primaryDark} />
+                <ChevronRight size={13} color={colors.primaryDark} />
               </TouchableOpacity>
             )}
           </View>
@@ -421,102 +426,6 @@ export default function DashboardScreen() {
               onExercisePress={() => setShowActivityModal(true)}
             />
 
-            {/* Atajos rápidos al alcance del pulgar */}
-            <View style={styles.quickActionsBar}>
-              <TouchableOpacity
-                style={styles.quickActionBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Registrar con foto"
-                onPress={() => {
-                  beginMeal();
-                  router.push("/meal/camera");
-                }}
-                activeOpacity={0.8}
-              >
-                <View
-                  style={[
-                    styles.quickActionIconWrap,
-                    { backgroundColor: colors.primaryLight },
-                  ]}
-                >
-                  <Camera size={18} color={colors.primary} />
-                </View>
-                <Text style={styles.quickActionText}>Foto IA</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickActionBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Escáner de supermercado y código de barras"
-                onPress={() => {
-                  beginMeal();
-                  router.push("/meal/barcode");
-                }}
-                activeOpacity={0.8}
-              >
-                <View
-                  style={[
-                    styles.quickActionIconWrap,
-                    { backgroundColor: colors.fatLight },
-                  ]}
-                >
-                  <Barcode size={18} color={colors.fat} />
-                </View>
-                <Text style={styles.quickActionText}>Súper</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickActionBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Registrar con texto o voz"
-                onPress={() => {
-                  beginMeal();
-                  setShowTextVoiceModal(true);
-                }}
-                activeOpacity={0.8}
-              >
-                <View
-                  style={[
-                    styles.quickActionIconWrap,
-                    { backgroundColor: colors.proteinLight },
-                  ]}
-                >
-                  <Mic size={18} color={colors.protein} />
-                </View>
-                <Text style={styles.quickActionText}>Texto/Voz</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickActionBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Sumar un vaso de agua rápido"
-                disabled={isAdding}
-                onPress={async () => {
-                  try {
-                    await addWater(250);
-                    showToast({
-                      type: "success",
-                      title: "+250 ml sumados",
-                      message: `Llevas ${totalMl + 250} ml de ${targetMl} ml hoy.`,
-                    });
-                  } catch {
-                    showAlert("Agua", "No se pudo guardar. Revisa la conexión.");
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <View
-                  style={[
-                    styles.quickActionIconWrap,
-                    { backgroundColor: colors.waterLight },
-                  ]}
-                >
-                  <Droplets size={18} color={colors.water} />
-                </View>
-                <Text style={styles.quickActionText}>+250 ml</Text>
-              </TouchableOpacity>
-            </View>
-
             {/* Widget de Hidratación compacto con acción de deshacer */}
             <WaterCard
               totalMl={totalMl}
@@ -591,6 +500,116 @@ export default function DashboardScreen() {
                   </View>
                 ),
               )}
+            </View>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Añadir comida a este día"
+              activeOpacity={0.85}
+              onPress={() => {
+                beginMeal();
+                router.push("/(tabs)/record");
+              }}
+              style={styles.addMealAction}
+            >
+              <View style={styles.addMealIcon}>
+                <Plus size={20} color={colors.primary} />
+              </View>
+              <View style={styles.addMealCopy}>
+                <Text style={styles.addMealTitle}>Añadir comida</Text>
+                <Text style={styles.addMealDescription}>
+                  Busca alimentos, usa la cámara IA o dicta con tu voz
+                </Text>
+              </View>
+              <View style={styles.addMealArrowWrap}>
+                <ArrowUpRight size={18} color={colors.primary} />
+              </View>
+            </TouchableOpacity>
+            {/* Barra de atajos de registro rápido */}
+            <View style={styles.quickActionsBar}>
+              <TouchableOpacity
+                style={styles.quickActionBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar con foto"
+                onPress={() => {
+                  beginMeal();
+                  router.push("/meal/camera");
+                }}
+                activeOpacity={0.8}
+              >
+                <View
+                  style={[
+                    styles.quickActionIconWrap,
+                    { backgroundColor: colors.primaryLight },
+                  ]}
+                >
+                  <Camera size={18} color={colors.primary} />
+                </View>
+                <Text style={styles.quickActionText}>Foto IA</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickActionBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar con texto o voz"
+                onPress={() => {
+                  beginMeal();
+                  setShowTextVoiceModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <View
+                  style={[
+                    styles.quickActionIconWrap,
+                    { backgroundColor: colors.proteinLight },
+                  ]}
+                >
+                  <Mic size={18} color={colors.protein} />
+                </View>
+                <Text style={styles.quickActionText}>Texto/Voz</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickActionBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar con código de barras"
+                onPress={() => {
+                  beginMeal();
+                  router.push("/meal/barcode");
+                }}
+                activeOpacity={0.8}
+              >
+                <View
+                  style={[
+                    styles.quickActionIconWrap,
+                    { backgroundColor: colors.fatLight },
+                  ]}
+                >
+                  <Barcode size={18} color={colors.fat} />
+                </View>
+                <Text style={styles.quickActionText}>Código</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickActionBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar comida frecuente"
+                onPress={() => {
+                  beginMeal();
+                  setShowFavoritesModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <View
+                  style={[
+                    styles.quickActionIconWrap,
+                    { backgroundColor: colors.carbsLight },
+                  ]}
+                >
+                  <Star size={18} color={colors.carbs} />
+                </View>
+                <Text style={styles.quickActionText}>Frecuentes</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={[styles.summaryLayout, wide && isToday && styles.summaryWide]}>
@@ -810,18 +829,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
-    marginTop: 2,
+    marginBottom: 16,
+    marginTop: 4,
   },
   headerRightActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: 8,
   },
   helpGuideBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
+    width: 44,
+    height: 44,
+    borderRadius: 17,
     backgroundColor: colors.primaryLight,
     alignItems: "center",
     justifyContent: "center",

@@ -23,7 +23,6 @@ import {
   Sparkles,
 } from "lucide-react-native";
 import { colors, shadows } from "@/constants/colors";
-import { MEAL_MOMENT_LIST } from "@/constants/mealMoments";
 import { BarcodeProduct } from "@/services/barcodeService";
 import { FoodUnit, MealType } from "@/types/meal";
 import { DietaryRestriction } from "@/types/profile";
@@ -37,6 +36,13 @@ import {
   getStandardPortions,
   formatQuantityDisplay,
 } from "@/utils/liquidUnits";
+
+const MEAL_MOMENTS: { type: MealType; label: string; emoji: string }[] = [
+  { type: "desayuno", label: "Desayuno", emoji: "🌅" },
+  { type: "almuerzo", label: "Almuerzo", emoji: "🍽️" },
+  { type: "cena", label: "Once / Cena", emoji: "🥗" },
+  { type: "snack", label: "Colación", emoji: "🍎" },
+];
 
 export interface ScannedProductSheetProps {
   product: BarcodeProduct;
@@ -94,7 +100,7 @@ export function ScannedProductSheet({
   const [showLogPanel, setShowLogPanel] = useState(false);
 
   const selectedMomentLabel =
-    MEAL_MOMENT_LIST.find((m) => m.type === selectedMealType)?.label || "Comida";
+    MEAL_MOMENTS.find((m) => m.type === selectedMealType)?.label || "Comida";
 
   const parsedPortion = parseQuantityInput(portionGrams, portionUnit);
   const portionAmount = parsedPortion.ok
@@ -334,7 +340,9 @@ export function ScannedProductSheet({
             accessibilityLabel="Escanear otro producto"
           >
             <ScanLine size={15} color={colors.primaryDark} />
-            <Text style={styles.aisleActionText}>Escanear otro</Text>
+            <Text style={styles.aisleActionText} numberOfLines={1}>
+              Otro
+            </Text>
           </TouchableOpacity>
         )}
 
@@ -347,7 +355,9 @@ export function ScannedProductSheet({
             accessibilityLabel="Comparar este producto con otro"
           >
             <Scale size={15} color={colors.primaryDark} />
-            <Text style={styles.aisleActionText}>Comparar 2</Text>
+            <Text style={styles.aisleActionText} numberOfLines={1}>
+              Comparar
+            </Text>
           </TouchableOpacity>
         )}
 
@@ -365,7 +375,9 @@ export function ScannedProductSheet({
             ) : (
               <>
                 <ShoppingCart size={15} color={colors.primaryDark} />
-                <Text style={styles.aisleActionText}>+ Compras</Text>
+                <Text style={styles.aisleActionText} numberOfLines={1}>
+                  + Compras
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -562,9 +574,8 @@ export function ScannedProductSheet({
           <View style={styles.mealTypeSection}>
             <Text style={styles.mealTypePrompt}>¿En qué momento lo comiste?</Text>
             <View style={styles.mealTypesRow}>
-              {MEAL_MOMENT_LIST.map((m) => {
+              {MEAL_MOMENTS.map((m) => {
                 const active = selectedMealType === m.type;
-                const MomentIcon = m.Icon;
                 return (
                   <TouchableOpacity
                     key={m.type}
@@ -578,14 +589,7 @@ export function ScannedProductSheet({
                     accessibilityLabel={`Registrar en ${m.label}`}
                     accessibilityState={{ selected: active }}
                   >
-                    <View
-                      style={[
-                        styles.mealTypeIconBadge,
-                        { backgroundColor: active ? colors.card : m.bg },
-                      ]}
-                    >
-                      <MomentIcon size={14} color={m.color} />
-                    </View>
+                    <Text style={styles.mealTypeEmoji}>{m.emoji}</Text>
                     <Text
                       style={[
                         styles.mealTypeChipText,
@@ -593,7 +597,7 @@ export function ScannedProductSheet({
                       ]}
                       numberOfLines={1}
                     >
-                      {m.shortLabel}
+                      {m.label}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -913,11 +917,12 @@ const styles = StyleSheet.create({
   },
   aisleActionBtn: {
     flex: 1,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 5,
-    paddingVertical: 11,
+    paddingVertical: 10,
     paddingHorizontal: 8,
     borderRadius: 13,
     backgroundColor: colors.surfaceMuted,
@@ -1127,13 +1132,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
     borderColor: colors.primary,
   },
-  mealTypeIconBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 2,
+  mealTypeEmoji: {
+    fontSize: 15,
   },
   mealTypeChipText: {
     fontSize: 10,

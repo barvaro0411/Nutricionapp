@@ -27,36 +27,31 @@ import {
 import { useMealReviewStore } from "@/stores/useMealReviewStore";
 import { useFavoriteMeals } from "@/hooks/useFavoriteMeals";
 import { useYesterdayMeals } from "@/hooks/useYesterdayMeal";
+import { CHILEAN_CATALOG_METADATA } from "@/constants/chileanPresets";
 import { useAiConsent } from "@/hooks/useAiConsent";
 import { AiConsentModal } from "@/components/common/AiConsentModal";
 import { MealType } from "@/types/meal";
-import { colors, layout, shadows } from "@/constants/colors";
-import {
-  MEAL_MOMENT_LIST,
-  guessChileanMealTypeByHour,
-} from "@/constants/mealMoments";
-import {
-  getDateKey,
-  dateForMealRoute,
-  loggedAtForDate,
-  APP_TIME_ZONE,
-} from "@/utils/dates";
+import { colors, layout } from "@/constants/colors";
+import { PageHeading } from "@/components/common/AppUI";
+import { getDateKey, dateForMealRoute, loggedAtForDate, APP_TIME_ZONE } from "@/utils/dates";
 
 const TextVoiceModal = lazy(() =>
-  import("@/components/meal/TextVoiceModal").then((m) => ({
-    default: m.TextVoiceModal,
-  }))
+  import("@/components/meal/TextVoiceModal").then((m) => ({ default: m.TextVoiceModal }))
 );
 const FavoritesModal = lazy(() =>
-  import("@/components/meal/FavoritesModal").then((m) => ({
-    default: m.FavoritesModal,
-  }))
+  import("@/components/meal/FavoritesModal").then((m) => ({ default: m.FavoritesModal }))
 );
 const UsdaSearchModal = lazy(() =>
-  import("@/components/meal/UsdaSearchModal").then((m) => ({
-    default: m.UsdaSearchModal,
-  }))
+  import("@/components/meal/UsdaSearchModal").then((m) => ({ default: m.UsdaSearchModal }))
 );
+
+function guessChileanMealTypeByHour(): MealType {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 11) return "desayuno";
+  if (hour >= 11 && hour < 16) return "almuerzo";
+  if (hour >= 16 && hour < 19) return "snack";
+  return "cena";
+}
 
 export default function RecordScreen() {
   const router = useRouter();
@@ -80,14 +75,11 @@ export default function RecordScreen() {
 
   const selectedDate = dateForMealRoute(params.date);
   const dateKey = getDateKey(selectedDate);
-  const isToday = dateKey === getDateKey();
   const { data: yesterdayMeals } = useYesterdayMeals(selectedDate);
   const yesterdayMealForType = yesterdayMeals?.[selectedMealType];
 
   const habitualFavorite =
-    favorites.find((f) => f.meal_type === selectedMealType) ||
-    favorites[0] ||
-    null;
+    favorites.find((f) => f.meal_type === selectedMealType) || favorites[0] || null;
 
   const beginMeal = () => {
     useMealReviewStore.getState().reset();
@@ -95,449 +87,344 @@ export default function RecordScreen() {
     useMealReviewStore.getState().setMealType(selectedMealType);
   };
 
+  const mealTypes: { type: MealType; label: string; emoji: string }[] = [
+    { type: "desayuno", label: "Desayuno", emoji: "🌅" },
+    { type: "almuerzo", label: "Almuerzo", emoji: "🍽️" },
+    { type: "cena", label: "Once / Cena", emoji: "🥗" },
+    { type: "snack", label: "Colación", emoji: "🍎" },
+  ];
+
   return (
     <>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Cabecera compacta + Fecha */}
-        <View style={styles.topRow}>
-          <View style={{ flex: 1 }}>
-            <Text accessibilityRole="header" style={styles.screenTitle}>
-              Registrar comida
-            </Text>
-          </View>
-          <View style={styles.datePill}>
-            <CalendarDays size={13} color={colors.primaryDark} />
-            <Text style={styles.datePillText}>
-              {isToday
-                ? "Hoy"
-                : selectedDate.toLocaleDateString("es-CL", {
-                    timeZone: APP_TIME_ZONE,
-                    day: "numeric",
-                    month: "short",
-                  })}
-            </Text>
-            {!isToday && (
-              <TouchableOpacity
-                accessibilityRole="button"
-                onPress={() => router.setParams({ date: getDateKey() })}
-              >
-                <Text style={styles.todayReset}>· Hoy</Text>
-              </TouchableOpacity>
-            )}
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <PageHeading eyebrow="Tu diario de alimentación" title="Añadir alimentos" description="Busca un alimento o registra tu plato completo. Revisa la porción y guarda cuando esté listo." />
+        <View style={styles.dateBanner}>
+          <CalendarDays size={18} color={colors.primary} />
+          <Text style={styles.dateText}>{dateKey === getDateKey() ? "Hoy" : "Registrando para"} · {selectedDate.toLocaleDateString("es-CL", { timeZone: APP_TIME_ZONE, day: "numeric", month: "long" })}</Text>
+          {dateKey !== getDateKey() && <TouchableOpacity accessibilityRole="button" onPress={() => router.setParams({ date: getDateKey() })} style={styles.todayButton}><Text style={styles.todayText}>Ir a hoy</Text></TouchableOpacity>}
+        </View>
+        {/* Selector de Tiempo de Comida */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>1. Elige la comida</Text>
+          <View style={styles.mealTypesRow}>
+            {mealTypes.map((m) => {
+              const active = selectedMealType === m.type;
+              return (
+                <TouchableOpacity
+                  key={m.type}
+                  style={[styles.mealTypeChip, active && styles.mealTypeChipActive]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Elegir ${m.label}`}
+                  accessibilityState={{ selected: active }}
+                  aria-pressed={active}
+                  onPress={() => setSelectedMealType(m.type)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.mealTypeEmoji}>{m.emoji}</Text>
+                  <Text
+                    style={[
+                      styles.mealTypeLabel,
+                      active && styles.mealTypeLabelActive,
+                    ]}
+                  >
+                    {m.label}
+                  </Text>
+                  {active && <View style={styles.mealCheck}><Check size={10} color="white" strokeWidth={3} /></View>}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
-        {/* 1. Selector de Momento con íconos vectoriales consistentes */}
-        <View style={styles.mealTypesRow}>
-          {MEAL_MOMENT_LIST.map((m) => {
-            const active = selectedMealType === m.type;
-            const MomentIcon = m.Icon;
-            return (
-              <TouchableOpacity
-                key={m.type}
-                style={[
-                  styles.mealTypeChip,
-                  active && styles.mealTypeChipActive,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`Elegir ${m.label}`}
-                accessibilityState={{ selected: active }}
-                aria-pressed={active}
-                onPress={() => setSelectedMealType(m.type)}
-                activeOpacity={0.8}
-              >
-                <View
-                  style={[
-                    styles.momentIconWrap,
-                    { backgroundColor: active ? colors.card : m.bg },
-                  ]}
-                >
-                  <MomentIcon size={16} color={m.color} />
-                </View>
-                <Text
-                  style={[
-                    styles.mealTypeLabel,
-                    active && styles.mealTypeLabelActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {m.shortLabel}
-                </Text>
-                {active && (
-                  <View style={styles.mealCheck}>
-                    <Check size={9} color="#FFFFFF" strokeWidth={3} />
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Buscador rápido en 1 línea */}
-        <TouchableOpacity
-          style={styles.quickSearchBar}
-          accessibilityRole="button"
-          accessibilityLabel="Buscar un alimento"
-          activeOpacity={0.85}
-          onPress={() => {
-            beginMeal();
-            setShowSearchModal(true);
-          }}
-        >
-          <View style={styles.quickSearchIcon}>
-            <Search size={17} color="#FFFFFF" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.quickSearchPlaceholder} numberOfLines={1}>
-              Buscar alimento (arroz, pollo, yogur…)
-            </Text>
-            <Text style={styles.quickSearchSub} numberOfLines={1}>
-              Catálogo Chileno INTA / MINSAL · USDA
-            </Text>
-          </View>
-          <ChevronRight size={17} color={colors.primary} />
-        </TouchableOpacity>
-
-        {/* Atajo de 1 toque: Ayer o Habitual */}
-        {(yesterdayMealForType || habitualFavorite) && (
-          <View style={styles.repeatStrip}>
-            {yesterdayMealForType && (
-              <TouchableOpacity
-                style={styles.repeatChip}
-                accessibilityRole="button"
-                accessibilityLabel={`Repetir comida de ayer: ${yesterdayMealForType.summaryLabel}`}
-                activeOpacity={0.85}
-                onPress={() => {
-                  beginMeal();
-                  useMealReviewStore
-                    .getState()
-                    .loadFavoriteCombo(yesterdayMealForType, selectedMealType);
-                  router.push("/meal/review");
-                }}
-              >
-                <View
-                  style={[
-                    styles.repeatIcon,
-                    { backgroundColor: colors.waterLight },
-                  ]}
-                >
-                  <RotateCcw size={14} color={colors.water} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.repeatEyebrow}>AYER · 1 TOQUE</Text>
-                  <Text style={styles.repeatTitle} numberOfLines={1}>
-                    {yesterdayMealForType.summaryLabel}
-                  </Text>
-                </View>
-                <Text style={styles.repeatKcal}>
-                  {Math.round(yesterdayMealForType.total_calories)} kcal
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {habitualFavorite && (
-              <TouchableOpacity
-                style={styles.repeatChip}
-                accessibilityRole="button"
-                accessibilityLabel={`Registrar comida habitual ${habitualFavorite.title}`}
-                activeOpacity={0.85}
-                onPress={() => {
-                  beginMeal();
-                  useMealReviewStore
-                    .getState()
-                    .loadFavoriteCombo(habitualFavorite, selectedMealType);
-                  router.push("/meal/review");
-                }}
-              >
-                <View
-                  style={[
-                    styles.repeatIcon,
-                    { backgroundColor: colors.carbsLight },
-                  ]}
-                >
-                  <Star size={14} color={colors.carbs} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.repeatEyebrow}>HABITUAL</Text>
-                  <Text style={styles.repeatTitle} numberOfLines={1}>
-                    {habitualFavorite.title}
-                  </Text>
-                </View>
-                <Text style={styles.repeatKcal}>
-                  {Math.round(habitualFavorite.total_calories)} kcal
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+        {/* Repetir comida de ayer (1 toque sin llamadas a IA) */}
+        {yesterdayMealForType && (
+          <TouchableOpacity
+            style={styles.yesterdayBanner}
+            accessibilityRole="button"
+            accessibilityLabel={`Repetir comida de ayer: ${yesterdayMealForType.summaryLabel}`}
+            activeOpacity={0.85}
+            onPress={() => {
+              beginMeal();
+              useMealReviewStore.getState().loadFavoriteCombo(yesterdayMealForType, selectedMealType);
+              router.push("/meal/review");
+            }}
+          >
+            <View style={styles.yesterdayIconWrap}>
+              <RotateCcw size={18} color={colors.water} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.yesterdayOverline}>REPETIR DE AYER · 1 TOQUE</Text>
+              <Text style={styles.yesterdayTitle}>
+                {yesterdayMealForType.summaryLabel}
+              </Text>
+              <Text style={styles.yesterdayMeta}>
+                {Math.round(yesterdayMealForType.total_calories)} kcal · {Math.round(yesterdayMealForType.total_protein)}g Prot · Cargar en 1 toque
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.water} />
+          </TouchableOpacity>
         )}
 
-        {/* 2. Cuadrícula 2×2: Acciones principales sin scroll */}
-        <Text style={styles.sectionLabel}>Formas rápidas</Text>
-        <View style={styles.primaryGrid}>
-          {/* Foto IA */}
+        {/* Predicción de comida habitual por horario (1 toque sin llamadas a IA) */}
+        {habitualFavorite && (
           <TouchableOpacity
-            style={[styles.gridTile, styles.gridTileFeatured]}
+            style={styles.habitualBanner}
             accessibilityRole="button"
-            accessibilityLabel="Registrar con foto de comida"
+            accessibilityLabel={`Registrar comida habitual ${habitualFavorite.title}`}
             activeOpacity={0.85}
             onPress={() => {
               beginMeal();
-              if (!hasConsent) {
-                setPendingAiAction("camera");
-                return;
-              }
-              router.push({
-                pathname: "/meal/camera",
-                params: { suggestedMealType: selectedMealType },
-              });
+              useMealReviewStore.getState().loadFavoriteCombo(habitualFavorite, selectedMealType);
+              router.push("/meal/review");
             }}
           >
-            <View style={styles.gridTileTop}>
-              <View
-                style={[styles.gridIcon, { backgroundColor: colors.primary }]}
-              >
-                <Camera size={20} color="#FFFFFF" />
-              </View>
-              <View style={styles.miniBadge}>
-                <Sparkles size={10} color="#FFFFFF" />
-                <Text style={styles.miniBadgeText}>IA</Text>
-              </View>
-            </View>
-            <Text style={styles.gridTitle}>Foto de tu plato</Text>
-            <Text style={styles.gridDesc}>Estima porciones y macros</Text>
-          </TouchableOpacity>
-
-          {/* Escáner de Supermercado */}
-          <TouchableOpacity
-            style={styles.gridTile}
-            accessibilityRole="button"
-            accessibilityLabel="Registrar con código de barras"
-            activeOpacity={0.85}
-            onPress={() => {
-              beginMeal();
-              router.push({
-                pathname: "/meal/barcode",
-                params: { mealType: selectedMealType },
-              });
-            }}
-          >
-            <View style={styles.gridTileTop}>
-              <View
-                style={[styles.gridIcon, { backgroundColor: colors.fatLight }]}
-              >
-                <Barcode size={20} color={colors.fat} />
-              </View>
-              <View
-                style={[
-                  styles.miniBadge,
-                  { backgroundColor: colors.primaryLight },
-                ]}
-              >
-                <Text
-                  style={[styles.miniBadgeText, { color: colors.primaryDark }]}
-                >
-                  SÚPER
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.gridTitle}>Escáner Súper</Text>
-            <Text style={styles.gridDesc}>Veredicto, sellos y barras</Text>
-          </TouchableOpacity>
-
-          {/* Escribir o Dictar */}
-          <TouchableOpacity
-            style={styles.gridTile}
-            accessibilityRole="button"
-            accessibilityLabel="Registrar con texto o voz"
-            activeOpacity={0.85}
-            onPress={() => {
-              beginMeal();
-              if (!hasConsent) {
-                setPendingAiAction("voice");
-                return;
-              }
-              setShowTextVoiceModal(true);
-            }}
-          >
-            <View style={styles.gridTileTop}>
-              <View
-                style={[
-                  styles.gridIcon,
-                  { backgroundColor: colors.proteinLight },
-                ]}
-              >
-                <Mic size={20} color={colors.protein} />
-              </View>
-            </View>
-            <Text style={styles.gridTitle}>Dictar o escribir</Text>
-            <Text style={styles.gridDesc}>Describe tu comida rápido</Text>
-          </TouchableOpacity>
-
-          {/* Comidas Frecuentes */}
-          <TouchableOpacity
-            style={styles.gridTile}
-            accessibilityRole="button"
-            accessibilityLabel="Registrar comida frecuente"
-            activeOpacity={0.85}
-            onPress={() => {
-              beginMeal();
-              setShowFavoritesModal(true);
-            }}
-          >
-            <View style={styles.gridTileTop}>
-              <View
-                style={[
-                  styles.gridIcon,
-                  { backgroundColor: colors.carbsLight },
-                ]}
-              >
-                <Star size={20} color={colors.carbs} />
-              </View>
-            </View>
-            <Text style={styles.gridTitle}>Frecuentes</Text>
-            <Text style={styles.gridDesc}>Tus favoritos en 1 toque</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 3. Herramientas inteligentes (compacto 2×2) */}
-        <Text style={styles.sectionLabel}>Herramientas inteligentes</Text>
-        <View style={styles.toolsGrid}>
-          <TouchableOpacity
-            style={styles.toolTile}
-            accessibilityRole="button"
-            accessibilityLabel="Comparar dos productos de supermercado"
-            activeOpacity={0.85}
-            onPress={() => {
-              beginMeal();
-              router.push({
-                pathname: "/meal/barcode",
-                params: { mode: "compare", mealType: selectedMealType },
-              });
-            }}
-          >
-            <View
-              style={[
-                styles.toolIcon,
-                { backgroundColor: colors.primaryLight },
-              ]}
-            >
-              <Scale size={17} color={colors.primaryDark} />
+            <View style={styles.habitualIconWrap}>
+              <Star size={18} color={colors.carbs} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.toolTitle} numberOfLines={1}>
-                Comparar 2
+              <Text style={styles.habitualOverline}>SUGERENCIA HABITUAL · 1 TOQUE</Text>
+              <Text style={styles.habitualTitle}>
+                ¿Repetiste &ldquo;{habitualFavorite.title}&rdquo;?
               </Text>
-              <Text style={styles.toolDesc} numberOfLines={1}>
-                Sellos Ley 20.606
+              <Text style={styles.habitualMeta}>
+                {Math.round(habitualFavorite.total_calories)} kcal · {Math.round(habitualFavorite.total_protein)}g Prot · Toca para revisar y guardar
               </Text>
             </View>
+            <ChevronRight size={18} color={colors.carbs} />
           </TouchableOpacity>
+        )}
 
-          <TouchableOpacity
-            style={styles.toolTile}
-            accessibilityRole="button"
-            accessibilityLabel="Elegir qué pedir en restaurante o casino"
-            activeOpacity={0.85}
-            onPress={() => {
-              beginMeal();
-              router.push({
-                pathname: "/meal/menu-assistant" as any,
-                params: { suggestedMealType: selectedMealType },
-              });
-            }}
-          >
-            <View
-              style={[styles.toolIcon, { backgroundColor: colors.waterLight }]}
-            >
-              <UtensilsCrossed size={17} color={colors.water} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.toolTitle} numberOfLines={1}>
-                ¿Qué pido hoy?
-              </Text>
-              <Text style={styles.toolDesc} numberOfLines={1}>
-                Carta o casino IA
-              </Text>
-            </View>
-          </TouchableOpacity>
+        {/* Sección de Métodos de Registro */}
+        <Text style={styles.sectionTitle}>2. Añade lo que comiste</Text>
+        <TouchableOpacity style={styles.searchCard} accessibilityRole="button" accessibilityLabel="Buscar un alimento" activeOpacity={0.85}
+          onPress={() => { beginMeal(); setShowSearchModal(true); }}>
+          <View style={styles.searchTop}><View style={styles.searchIcon}><Search size={24} color={colors.mint} /></View><View style={styles.catalogBadge}><Text style={styles.catalogBadgeText}>{CHILEAN_CATALOG_METADATA.badgeLabel.toUpperCase()}</Text></View></View>
+          <Text style={styles.searchTitle}>Encuentra tu alimento</Text>
+          <Text style={styles.searchDescription}>Busca en español, elige cómo está preparado y ajusta tu porción.</Text>
+          <View style={styles.searchField}><Search size={17} color={colors.primary} /><Text style={styles.searchPlaceholder}>Arroz cocido, pollo, yogur…</Text><ChevronRight size={18} color={colors.primary} /></View>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.manualCard} accessibilityRole="button" accessibilityLabel="Ingresar alimento manualmente" activeOpacity={0.8}
+          onPress={() => { beginMeal(); router.push({ pathname: "/meal/review", params: { manual: "1" } }); }}>
+          <PencilLine size={20} color={colors.primary} /><View style={styles.methodInfo}><Text style={styles.methodTitle}>Tengo la etiqueta nutricional</Text><Text style={styles.methodDesc}>Ingresa la porción y sus nutrientes a mano.</Text></View><ChevronRight size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+        <Text style={styles.otherMethodsTitle}>O registra tu plato de otra forma</Text>
 
-          <TouchableOpacity
-            style={styles.toolTile}
-            accessibilityRole="button"
-            accessibilityLabel="Leer etiqueta nutricional con IA"
-            activeOpacity={0.85}
-            onPress={() => {
-              beginMeal();
-              if (!hasConsent) {
-                setPendingAiAction("nutrition_label");
-                return;
-              }
-              router.push({
-                pathname: "/meal/camera",
-                params: {
-                  suggestedMealType: selectedMealType,
-                  mode: "nutrition_label",
-                },
-              });
-            }}
-          >
-            <View
-              style={[styles.toolIcon, { backgroundColor: colors.dangerLight }]}
-            >
-              <FileText size={17} color={colors.danger} />
+        {/* 1. Foto con IA (Destacada) */}
+        <TouchableOpacity
+          style={[styles.methodCard, styles.methodCardFeatured]}
+          accessibilityRole="button"
+          accessibilityLabel="Registrar con foto de comida"
+          onPress={() => {
+            beginMeal();
+            if (!hasConsent) {
+              setPendingAiAction("camera");
+              return;
+            }
+            router.push({
+              pathname: "/meal/camera",
+              params: { suggestedMealType: selectedMealType },
+            });
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: colors.primary }]}>
+            <Camera size={24} color="#FFFFFF" />
+          </View>
+          <View style={styles.methodInfo}>
+            <View style={styles.titleRow}>
+              <Text style={styles.methodTitle}>Foto IA de tu plato</Text>
+              <View style={styles.featuredBadge}>
+                <Sparkles size={11} color="#FFFFFF" />
+                <Text style={styles.featuredBadgeText}>CON IA</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.toolTitle} numberOfLines={1}>
-                Leer etiqueta
-              </Text>
-              <Text style={styles.toolDesc} numberOfLines={1}>
-                Foto a la tabla
-              </Text>
-            </View>
-          </TouchableOpacity>
+            <Text style={styles.methodDesc}>
+              Fotografía tu plato y revisa los alimentos y las porciones que estima la IA.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.primary} />
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.toolTile}
-            accessibilityRole="button"
-            accessibilityLabel="Ingresar alimento manualmente"
-            activeOpacity={0.85}
-            onPress={() => {
-              beginMeal();
-              router.push({ pathname: "/meal/review", params: { manual: "1" } });
-            }}
-          >
-            <View
-              style={[
-                styles.toolIcon,
-                { backgroundColor: colors.surfaceMuted },
-              ]}
-            >
-              <PencilLine size={17} color={colors.primaryDark} />
+        {/* 2. Lector de Etiqueta Nutricional con IA */}
+        <TouchableOpacity
+          style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Leer etiqueta nutricional con IA"
+          onPress={() => {
+            beginMeal();
+            if (!hasConsent) {
+              setPendingAiAction("nutrition_label");
+              return;
+            }
+            router.push({
+              pathname: "/meal/camera",
+              params: { suggestedMealType: selectedMealType, mode: "nutrition_label" },
+            });
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: colors.dangerLight }]}>
+            <FileText size={22} color="#DB2777" />
+          </View>
+          <View style={styles.methodInfo}>
+            <View style={styles.titleRow}>
+              <Text style={styles.methodTitle}>Foto a Etiqueta Nutricional</Text>
+              <View style={[styles.featuredBadge, { backgroundColor: "#DB2777" }]}>
+                <Sparkles size={11} color="#FFFFFF" />
+                <Text style={styles.featuredBadgeText}>CON IA</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.toolTitle} numberOfLines={1}>
-                Manual
-              </Text>
-              <Text style={styles.toolDesc} numberOfLines={1}>
-                Escribir macros
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
+            <Text style={styles.methodDesc}>
+              Apunta a la tabla nutricional del envase para extraer calorías y macros exactos.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </TouchableOpacity>
 
+        {/* 2. Escribir o Dictar por Voz */}
+        <TouchableOpacity
+          style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Registrar con texto o voz"
+          onPress={() => {
+            beginMeal();
+            if (!hasConsent) {
+              setPendingAiAction("voice");
+              return;
+            }
+            setShowTextVoiceModal(true);
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: colors.proteinLight }]}>
+            <Mic size={24} color={colors.protein} />
+          </View>
+          <View style={styles.methodInfo}>
+            <Text style={styles.methodTitle}>Escribir o dictar</Text>
+            <Text style={styles.methodDesc}>
+              Describe tu comida con tus palabras, por escrito o con tu voz.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* 3. Escáner de Código de Barras */}
+        <TouchableOpacity
+          style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Registrar con código de barras"
+          onPress={() => {
+            beginMeal();
+            router.push({
+              pathname: "/meal/barcode",
+              params: { mealType: selectedMealType },
+            });
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: colors.fatLight }]}>
+            <Barcode size={24} color={colors.fat} />
+          </View>
+          <View style={styles.methodInfo}>
+            <Text style={styles.methodTitle}>Escáner de Supermercado / Barras</Text>
+            <Text style={styles.methodDesc}>
+              Evalúa si un producto sirve para tu dieta (azúcar, sellos Ley 20.606, semáforo) o regístralo en tu comida.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* 4. Comparador de 2 Productos */}
+        <TouchableOpacity
+          style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Comparar dos productos de supermercado"
+          onPress={() => {
+            beginMeal();
+            router.push({ pathname: "/meal/barcode", params: { mode: "compare" } });
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: colors.primaryLight }]}>
+            <Scale size={24} color={colors.primaryDark} />
+          </View>
+          <View style={styles.methodInfo}>
+            <View style={styles.titleRow}>
+              <Text style={styles.methodTitle}>Comparar 2 Productos</Text>
+              <View style={styles.featuredBadge}>
+                <Text style={styles.featuredBadgeText}>LEY 20.606</Text>
+              </View>
+            </View>
+            <Text style={styles.methodDesc}>
+              Pon lado a lado dos productos por sellos negros, proteína por caloría y elige el mejor.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* 5. ¿Qué pido hoy? (Carta / Casino) */}
+        <TouchableOpacity
+          style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Elegir qué pedir en restaurante o casino"
+          onPress={() => {
+            beginMeal();
+            router.push({
+              pathname: "/meal/menu-assistant" as any,
+              params: { suggestedMealType: selectedMealType },
+            });
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: colors.waterLight }]}>
+            <UtensilsCrossed size={24} color={colors.water} />
+          </View>
+          <View style={styles.methodInfo}>
+            <View style={styles.titleRow}>
+              <Text style={styles.methodTitle}>¿Qué pido hoy? (Carta / Casino)</Text>
+              <View style={[styles.featuredBadge, { backgroundColor: colors.water }]}>
+                <Sparkles size={11} color="#FFFFFF" />
+                <Text style={styles.featuredBadgeText}>CON IA</Text>
+              </View>
+            </View>
+            <Text style={styles.methodDesc}>
+              Escribe o dicta las opciones del menú y te recomendamos las 2 mejores según tus macros de hoy.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* 6. Comidas Frecuentes */}
+        <TouchableOpacity
+          style={styles.methodCard}
+          accessibilityRole="button"
+          accessibilityLabel="Registrar comida frecuente"
+          onPress={() => {
+            beginMeal();
+            setShowFavoritesModal(true);
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: colors.carbsLight }]}>
+            <Star size={24} color={colors.carbs} />
+          </View>
+          <View style={styles.methodInfo}>
+            <Text style={styles.methodTitle}>Comidas Frecuentes</Text>
+            <Text style={styles.methodDesc}>
+              Registra en 1 toque las combinaciones habituales que ya tienes guardadas en favoritos.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* Botón para volver al Inicio */}
         <TouchableOpacity
           style={styles.backHomeBtn}
           accessibilityRole="button"
-          onPress={() =>
-            router.replace({ pathname: "/(tabs)", params: { date: dateKey } })
-          }
+          onPress={() => router.replace({ pathname: "/(tabs)", params: { date: dateKey } })}
           activeOpacity={0.8}
         >
-          <ArrowLeft size={15} color={colors.textSecondary} />
+          <ArrowLeft size={16} color={colors.textSecondary} />
           <Text style={styles.backHomeText}>Volver a mi día</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -555,7 +442,9 @@ export default function RecordScreen() {
           const action = pendingAiAction;
           try {
             await setConsent(true);
-          } catch {}
+          } catch {
+            // Continuar de forma resiliente si la red demora
+          }
           setPendingAiAction(null);
           if (action === "camera") {
             router.push({
@@ -565,10 +454,7 @@ export default function RecordScreen() {
           } else if (action === "nutrition_label") {
             router.push({
               pathname: "/meal/camera",
-              params: {
-                suggestedMealType: selectedMealType,
-                mode: "nutrition_label",
-              },
+              params: { suggestedMealType: selectedMealType, mode: "nutrition_label" },
             });
           } else if (action === "voice") {
             setShowTextVoiceModal(true);
@@ -577,6 +463,7 @@ export default function RecordScreen() {
       />
 
       <Suspense fallback={null}>
+        {/* Modal de Texto / Voz */}
         {showTextVoiceModal && (
           <TextVoiceModal
             visible={showTextVoiceModal}
@@ -593,6 +480,8 @@ export default function RecordScreen() {
             }}
           />
         )}
+
+        {/* Modal de Comidas Frecuentes */}
         {showFavoritesModal && (
           <FavoritesModal
             visible={showFavoritesModal}
@@ -612,272 +501,203 @@ const styles = StyleSheet.create({
   },
   content: {
     ...layout.narrowPage,
-    paddingTop: 12,
-    paddingBottom: 28,
   },
-  topRow: {
+  section: {
+    marginBottom: 20,
+    marginTop: 4,
+  },
+  dateBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 14, backgroundColor: colors.primaryLight, marginBottom: 24 },
+  dateText: { flex: 1, color: colors.primaryDark, fontSize: 12, fontWeight: "600" },
+  todayButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: 6 },
+  todayText: { color: colors.primary, fontWeight: "700", fontSize: 12 },
+  habitualBanner: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    marginBottom: 14,
+    gap: 12,
+    backgroundColor: colors.carbsLight,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 18,
   },
-  screenTitle: {
-    fontSize: 22,
+  habitualIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.warningLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  habitualOverline: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    color: colors.carbs,
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  habitualTitle: {
+    fontSize: 14,
     fontWeight: "800",
     color: colors.text,
-    letterSpacing: -0.4,
   },
-  datePill: {
+  habitualMeta: {
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  yesterdayBanner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    backgroundColor: colors.primaryLight,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
+    gap: 12,
+    backgroundColor: colors.waterLight,
+    borderWidth: 1.5,
+    borderColor: colors.waterTrack,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 14,
   },
-  datePillText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: colors.primaryDark,
+  yesterdayIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.waterTrack,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  todayReset: {
-    fontSize: 11,
+  yesterdayOverline: {
+    fontSize: 9.5,
     fontWeight: "800",
-    color: colors.primary,
+    color: colors.water,
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  yesterdayTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  yesterdayMeta: {
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  mealCheck: { position: "absolute", top: 5, right: 5, backgroundColor: colors.primary, width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  searchCard: { backgroundColor: colors.forest, padding: 22, borderRadius: 24, marginBottom: 12 },
+  searchTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
+  searchIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#275747", alignItems: "center", justifyContent: "center" },
+  catalogBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: "#275747" },
+  catalogBadgeText: { color: colors.mint, fontSize: 9, fontWeight: "700", letterSpacing: 1 },
+  searchTitle: { fontSize: 23, fontWeight: "800", color: "white", letterSpacing: -0.5 },
+  searchDescription: { fontSize: 13, lineHeight: 20, color: "#CEE1D6", marginTop: 8, marginBottom: 18 },
+  searchField: { minHeight: 52, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 14, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  searchPlaceholder: { flex: 1, color: colors.textSecondary, fontSize: 13 },
+  manualCard: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: colors.cardBorder, backgroundColor: colors.card, padding: 16, borderRadius: 18, marginBottom: 24 },
+  otherMethodsTitle: { fontSize: 13, color: colors.textSecondary, fontWeight: "600", marginBottom: 12 },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: 12,
   },
   mealTypesRow: {
     flexDirection: "row",
-    gap: 7,
-    marginBottom: 12,
+    gap: 8,
   },
   mealTypeChip: {
     flex: 1,
     minWidth: 0,
+    minHeight: 64,
     backgroundColor: colors.card,
-    borderRadius: 15,
-    paddingVertical: 9,
-    paddingHorizontal: 4,
+    borderRadius: 14,
+    paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1.5,
     borderColor: colors.cardBorder,
-    position: "relative",
-    gap: 4,
   },
   mealTypeChipActive: {
     backgroundColor: colors.primaryLight,
     borderColor: colors.primary,
   },
-  momentIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
+  mealTypeEmoji: {
+    fontSize: 18,
+    marginBottom: 2,
   },
   mealTypeLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "700",
     color: colors.textSecondary,
   },
   mealTypeLabelActive: {
     color: colors.primaryDark,
-    fontWeight: "800",
   },
-  mealCheck: {
-    position: "absolute",
-    top: 5,
-    right: 5,
-    backgroundColor: colors.primary,
-    width: 15,
-    height: 15,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickSearchBar: {
+  methodCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 11,
     backgroundColor: colors.card,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderRadius: 17,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-    marginBottom: 12,
-    ...shadows.card,
-  },
-  quickSearchIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickSearchPlaceholder: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  quickSearchSub: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 1,
-  },
-  repeatStrip: {
-    gap: 8,
-    marginBottom: 14,
-  },
-  repeatChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: colors.card,
+    borderRadius: 18,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    borderRadius: 14,
-    paddingVertical: 9,
-    paddingHorizontal: 11,
+    marginBottom: 12,
   },
-  repeatIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+  methodCardFeatured: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryGhost,
+    borderWidth: 2,
+  },
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+    marginRight: 14,
   },
-  repeatEyebrow: {
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 0.7,
-    color: colors.textMuted,
+  methodInfo: {
+    flex: 1,
+    paddingRight: 6,
   },
-  repeatTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  repeatKcal: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: colors.primaryDark,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-    color: colors.textSecondary,
-    marginBottom: 9,
-  },
-  primaryGrid: {
+  titleRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 16,
-  },
-  gridTile: {
-    flexGrow: 1,
-    flexBasis: "47%",
-    backgroundColor: colors.card,
-    borderRadius: 19,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    ...shadows.card,
-  },
-  gridTileFeatured: {
-    borderColor: colors.primary,
-    borderWidth: 1.5,
-    backgroundColor: colors.primaryGhost,
-  },
-  gridTileTop: {
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
+    gap: 8,
+    marginBottom: 4,
   },
-  gridIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  miniBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  miniBadgeText: {
-    fontSize: 9,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: 0.5,
-  },
-  gridTitle: {
-    fontSize: 14,
-    fontWeight: "800",
+  methodTitle: {
+    fontSize: 15,
+    fontWeight: "700",
     color: colors.text,
     marginBottom: 2,
   },
-  gridDesc: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    lineHeight: 15,
-  },
-  toolsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 14,
-  },
-  toolTile: {
-    flexGrow: 1,
-    flexBasis: "47%",
+  featuredBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 15,
-    paddingVertical: 11,
-    paddingHorizontal: 11,
+    gap: 4,
+    backgroundColor: colors.primary,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 8,
   },
-  toolIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
+  featuredBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "800",
   },
-  toolTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  toolDesc: {
-    fontSize: 10,
+  methodDesc: {
+    fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 1,
+    lineHeight: 16,
   },
   backHomeBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
-    paddingVertical: 10,
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 12,
   },
   backHomeText: {
     fontSize: 13,
