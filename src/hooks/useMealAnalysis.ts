@@ -52,6 +52,7 @@ export function useMealAnalysis() {
       // 3. Llamar a Edge Function `analyze-meal`
       setStage("analyzing");
       const clientTimeIso = new Date().toISOString();
+      const sanitizedNote = userNote?.trim().slice(0, 200) || undefined;
 
       const { data, error: functionErr } = await supabase.functions.invoke<AnalyzeMealResponse>(
         "analyze-meal",
@@ -59,7 +60,7 @@ export function useMealAnalysis() {
           body: {
             image_path: imagePath,
             client_time_iso: clientTimeIso,
-            user_note: userNote,
+            user_note: sanitizedNote,
             provider: "gemini",
             mode: options.mode || "meal",
           },

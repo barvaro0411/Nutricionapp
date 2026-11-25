@@ -237,6 +237,7 @@ export default function CameraScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={note}
                     onChangeText={setNote}
+                    maxLength={200}
                     onSubmitEditing={() => triggerAnalysis(imageUri, note)}
                     returnKeyType="go"
                   />
@@ -312,6 +313,7 @@ export default function CameraScreen() {
               placeholderTextColor={colors.textMuted}
               value={note}
               onChangeText={setNote}
+              maxLength={200}
             />
           </View>
         </View>
